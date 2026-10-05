@@ -58,9 +58,10 @@ The original proof of concept (and a first demo attempt) reused the app name, se
 | P2 | Scaffold `apps/playground`: React 19 + workspace packages, `Bun.build` static output, served by the e2e server, base path `/` | delegated writer | [x] `22ca2a6` |
 | P3 | App shell: collapsible sidebar (`useLayout`), active nav indicator moving between items, top bar, view switching with `<Presence>` | delegated writer | [x] `cbc09e1` |
 | P4 | Overview: stat tiles with spring-animated numbers (`useSpringValue`), recent activity rows | delegated writer | [x] `15c63ad` |
-| P5 | Bills: grid of bill cards; card → dialog with `useMorph` (radius, content correction, blur crossfade); full keyboard support (focus trap, Esc, re-open while closing, focus return); "Pay" raises a toast | delegated writer | [ ] |
+| P5 | Bills: grid of bill cards; card → dialog with `useMorph` (radius, content correction, blur crossfade); full keyboard support (focus trap, Esc, re-open while closing, focus return); "Pay" raises a toast | delegated writer | [x] `ebb7bf9` |
 | P6 | Activity: transaction rows with filter chips and sort (`useLayout` FLIP), add and delete rows (`<Presence>`) | delegated writer | [ ] |
-| P7 | Toasts: stacked toasts with `<Presence>` enter/exit and layout shift of the stack | delegated writer | [ ] |
+| P7 | Toasts: stacked toasts with `<Presence>` enter/exit and layout shift of the stack | delegated writer | [x] `f1f2c2f` |
+| P7a | Library: `<Presence onExitComplete>` so the remaining children can reflow with `useLayout` when one leaves (found while building toasts); the toast stack then switches to it. Bills grid moves to a roving tabindex (a single tab stop, arrows move) | delegated writer | [ ] |
 | P8 | Spring lab panel: duration and bounce for the whole app, a compositor-driver showcase, and a reduced-motion simulation toggle | delegated writer | [ ] |
 | P9 | Playwright smoke tests: morph open/close/reverse, keyboard flow, toast, row add/delete, view switch | delegated writer | [ ] |
 | P10 | Deploy: GitHub Pages workflow (build → upload artifact → deploy), `CNAME` for `damped.dagadev.net`, documented DNS step | delegated writer | [ ] |
@@ -80,6 +81,8 @@ The original proof of concept (and a first demo attempt) reused the app name, se
 
 - P2–P4: e2e RED (404 / 5 of 6 / 6 of 12 failing) → GREEN; 18 helper unit tests; playground e2e 48/48 with `--repeat-each 4`. Full suite: 529 unit, 24 e2e. The playground JS is 68 KB gzip (React included). The parent checked the screenshots (expanded and collapsed sidebar): original content, no forbidden terms. Exiting views share one grid cell. Rows are staggered through a mount timeout chain, because the core has no per-child delay.
 
+- P5/P7: RED (missing helpers; 11/11 bills and 11/11 toast e2e failing) → GREEN; 550 unit, 138/138 e2e with `--repeat-each 3`; JS 72.9 KB gzip. One `useMorph` per card, dialogs portaled to `document.body`; focus moves to the card as soon as a close starts, so Enter can reverse it. The parent checked screenshots 4–7 (grid, mid-morph, open dialog, toasts). Finding: the toast removal reflow needed `snapshot()` in a cleanup, because `<Presence>` gives no signal when a child finishes exiting.
+
 ## Next step
 
-P5 bills (`useMorph`) + P7 toasts. Dialogs and toasts portal to `document.body`, because `.main` keeps an identity transform after settling.
+P7a, then P6 activity and P8 spring lab.

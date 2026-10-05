@@ -43,11 +43,11 @@ export interface LayoutSnapshot {
   animate(options?: LayoutOptions): AnimationControls;
 }
 
-type Axis = "x" | "y" | "scaleX" | "scaleY";
-type Deltas = Record<Axis, number>;
+export type Axis = "x" | "y" | "scaleX" | "scaleY";
+export type Deltas = Record<Axis, number>;
 
-const AXES: readonly Axis[] = ["x", "y", "scaleX", "scaleY"];
-const REST: Deltas = { x: 0, y: 0, scaleX: 1, scaleY: 1 };
+export const AXES: readonly Axis[] = ["x", "y", "scaleX", "scaleY"];
+export const REST: Deltas = { x: 0, y: 0, scaleX: 1, scaleY: 1 };
 // Boxes that differ by less than this are the same layout: below what a display can show, like the length rest delta.
 const PIXEL_EPSILON = 0.01;
 // Inverse scales and radii divide by the scale; this keeps a transient scale near 0 from producing Infinity.
@@ -90,7 +90,8 @@ function record(element: Element): Recorded {
   return { element, visual: boxOf(element), natural: measureLayout(element), velocity };
 }
 
-function deltas(previous: Box, next: Box): Deltas {
+/** Deltas that map the `next` box onto the `previous` one (so `previous` is where the element appears to be). */
+export function deltas(previous: Box, next: Box): Deltas {
   return {
     x: centerX(previous) - centerX(next),
     y: centerY(previous) - centerY(next),
@@ -114,7 +115,7 @@ function unchanged(previous: Box, next: Box): boolean {
   );
 }
 
-function resolveChildren(element: Element, correct: LayoutOptions["correct"]): HTMLElement[] {
+export function resolveChildren(element: Element, correct: LayoutOptions["correct"]): HTMLElement[] {
   if (correct === undefined) return [];
   if (correct !== "children") return [...correct];
   return Array.from(element.children).filter((child): child is HTMLElement => "style" in child);
@@ -148,7 +149,7 @@ function pinOrigin(run: Run, element: HTMLElement, origin: string): void {
 
 const safeScale = (scale: number): number => Math.max(Math.abs(scale), MIN_SCALE);
 
-function validate(options: LayoutOptions): void {
+export function validateLayoutOptions(options: LayoutOptions): void {
   const { radius } = options;
   if (radius !== undefined && !(Number.isFinite(radius) && radius >= 0)) {
     throw new RangeError(`radius must be a finite number greater than or equal to 0, received ${radius}`);
@@ -188,21 +189,35 @@ function animateRecorded(recorded: readonly Recorded[], options: LayoutOptions):
     const values = AXES.map((axis) => springValueFor(element, scheduler, axis));
     for (const [index, axis] of AXES.entries()) values[index]!.rebase(start[axis], carried[axis]);
 
-    const state = runFor(element);
-    for (const child of resolveChildren(element, correct)) state.children.add(child);
-    if (radius !== undefined) state.radius = radius;
-    setRenderHook(element, scheduler, (scaleX, scaleY) => {
-      // Finished means settled at the identity; a stop() freezes mid-flight and must keep its corrections.
-      if (values.every((value, index) => !value.animating && value.get() === REST[AXES[index]!])) {
-        finishRun(element, scheduler, state);
-        return;
-      }
-      applyCorrections(element as HTMLElement, state, scaleX, scaleY);
-    });
+    installCorrections(element, scheduler, correct, radius);
 
     controls.push(animate(element, REST, { ...animateOptions, scheduler }));
   }
   return combine(controls);
+}
+
+/**
+ * Makes the element's transform writes carry the corrections of its children and radius, and clean them up once its
+ * x, y, scaleX and scaleY have settled at the identity. An element that settles elsewhere (a morph origin) keeps them.
+ */
+export function installCorrections(
+  element: Element,
+  scheduler: Scheduler,
+  correct: LayoutOptions["correct"],
+  radius: number | undefined,
+): void {
+  const values = AXES.map((axis) => springValueFor(element, scheduler, axis));
+  const state = runFor(element);
+  for (const child of resolveChildren(element, correct)) state.children.add(child);
+  if (radius !== undefined) state.radius = radius;
+  setRenderHook(element, scheduler, (scaleX, scaleY) => {
+    // Finished means settled at the identity; a stop() freezes mid-flight and must keep its corrections.
+    if (values.every((value, index) => !value.animating && value.get() === REST[AXES[index]!])) {
+      finishRun(element, scheduler, state);
+      return;
+    }
+    applyCorrections(element as HTMLElement, state, scaleX, scaleY);
+  });
 }
 
 function applyCorrections(element: HTMLElement, state: Run, scaleX: number, scaleY: number): void {
@@ -229,7 +244,7 @@ export function snapshot(target: Element | readonly Element[]): LayoutSnapshot {
   const recorded = toList(target).map(record);
   return {
     animate(options = {}) {
-      validate(options);
+      validateLayoutOptions(options);
       return animateRecorded(recorded, options);
     },
   };
@@ -237,7 +252,7 @@ export function snapshot(target: Element | readonly Element[]): LayoutSnapshot {
 
 /** snapshot → mutate() → animate from the previous boxes to the new layout. */
 export function layout(target: Element | readonly Element[], mutate: () => void, options: LayoutOptions = {}): AnimationControls {
-  validate(options);
+  validateLayoutOptions(options);
   const taken = snapshot(target);
   mutate();
   return taken.animate(options);

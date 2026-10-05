@@ -1,0 +1,39 @@
+/*
+ * damped brand tokens. This file is the single source of the brand colours: the generator in scripts/brand-assets.ts
+ * reads the flat palette below, and the docs theme imports the themed aliases at the bottom.
+ * Contrast of every text pair is asserted in test/brand-tokens.test.ts.
+ */
+
+:root {
+  /* The signal: used only where something moves or comes to rest. */
+  --damped-accent: #ff5f1f;
+  /* Accent as text. Each is a step of the same hue that clears 4.5:1 on its own surface. */
+  --damped-accent-text-dark: #ff6a2e;
+  --damped-accent-text-light: #c73800;
+
+  --damped-dark-paper: #0a0a0b;
+  --damped-dark-ink: #ededed;
+  --damped-dark-ink-muted: #a1a1aa;
+  --damped-dark-hairline: #26262a;
+
+  --damped-light-paper: #fafaf9;
+  --damped-light-surface: #ffffff;
+  --damped-light-ink: #0a0a0b;
+  --damped-light-ink-muted: #52525b;
+  --damped-light-hairline: #e4e4e0;
+
+  /* Dark first: the site is dark unless the light theme is selected. */
+  --damped-paper: var(--damped-dark-paper);
+  --damped-ink: var(--damped-dark-ink);
+  --damped-ink-muted: var(--damped-dark-ink-muted);
+  --damped-hairline: var(--damped-dark-hairline);
+  --damped-accent-text: var(--damped-accent-text-dark);
+}
+
+:root[data-theme="light"] {
+  --damped-paper: var(--damped-light-paper);
+  --damped-ink: var(--damped-light-ink);
+  --damped-ink-muted: var(--damped-light-ink-muted);
+  --damped-hairline: var(--damped-light-hairline);
+  --damped-accent-text: var(--damped-accent-text-light);
+}

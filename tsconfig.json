@@ -20,6 +20,7 @@
     }
   },
   "include": [
+    "brand",
     "packages/*/src",
     "packages/*/test",
     "apps/*/src",

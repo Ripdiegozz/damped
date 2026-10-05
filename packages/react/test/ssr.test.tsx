@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { renderToString } from "react-dom/server";
-import { useLayout, useSpring, useSpringValue } from "../src";
+import { Presence, useLayout, useMorph, useSpring, useSpringValue } from "../src";
 import { cleanup } from "./harness";
 
 afterEach(cleanup);
@@ -60,6 +60,36 @@ describe("server rendering", () => {
     const { html, touched } = withoutDom(() => renderToString(<Probe />));
 
     expect(html).toBe("<div>layout</div>");
+    expect(touched).toEqual([]);
+  });
+
+  test("useMorph renders closed without touching the DOM", () => {
+    function Probe() {
+      const { source, target, isOpen } = useMorph();
+      return (
+        <div>
+          <span ref={source}>{String(isOpen)}</span>
+          <p ref={target}>target</p>
+        </div>
+      );
+    }
+    const { html, touched } = withoutDom(() => renderToString(<Probe />));
+
+    expect(html).toBe("<div><span>false</span><p>target</p></div>");
+    expect(touched).toEqual([]);
+  });
+
+  test("Presence renders its children without touching the DOM", () => {
+    const { html, touched } = withoutDom(() =>
+      renderToString(
+        <Presence enter={{ opacity: 0 }} exit={{ opacity: 0 }} initial>
+          <div key="a">a</div>
+          <div key="b">b</div>
+        </Presence>,
+      ),
+    );
+
+    expect(html).toBe("<div>a</div><div>b</div>");
     expect(touched).toEqual([]);
   });
 });

@@ -24,10 +24,11 @@ export interface PresenceProps {
   /** Also animate the children present on the first mount. Default false. */
   initial?: boolean;
   /**
-   * Called once with the key of each child whose exit settled, in the same batch as the render that removes it: the
-   * child is still in the DOM when this runs, so state set here re-renders together with the removal (a layout
-   * snapshot taken in that render still sees the old layout). It is not called when the exit was interrupted by the
-   * key coming back, when there is nothing to exit (no `exit` targets) or when Presence unmounted meanwhile.
+   * Called once with the key of every child that left. After an exit animation it runs in the same batch as the render
+   * that removes the child: the child is still in the DOM when this runs, so state set here re-renders together with
+   * the removal (a layout snapshot taken in that render still sees the old layout). A child that leaves without an
+   * animation (no `exit` targets, or nothing to animate) is reported right after the commit that removed it. It is not
+   * called when an exit was interrupted by the key coming back, or when Presence unmounted meanwhile.
    */
   onExitComplete?: (key: Key) => void;
   /** Keyed elements that are host elements or components that take `ref` as a prop. */
@@ -164,12 +165,16 @@ export function Presence({
     const firstCommit = !core.mounted;
     core.mounted = true;
     const live = new Set(items.map((item) => item.key));
+    // Children that were present and are gone without having exited: nothing animated, so they left with this commit.
+    const departed: string[] = [];
     for (const key of [...core.phases.keys(), ...core.retained.keys(), ...core.refs.keys()]) {
       if (live.has(key)) continue;
+      if (core.phases.get(key) === "present") departed.push(key);
       core.phases.delete(key);
       core.retained.delete(key);
       core.refs.delete(key);
     }
+    if (core.active) for (const key of departed) onExitComplete?.(readable(key));
 
     const drop = (key: string): void => {
       setSlots((current) => {

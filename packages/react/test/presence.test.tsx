@@ -340,16 +340,86 @@ describe("Presence onExitComplete", () => {
     expect(done).toEqual(["b"]);
   });
 
-  test("is not called without exit targets, where nothing exits", async () => {
+  test("is called for a child removed without exit targets, once, as soon as it is gone", async () => {
     const { fake, options } = setup();
     const done: string[] = [];
-    const props = { enter: ENTER, options, onExitComplete: (key: unknown) => done.push(String(key)) };
+    const rendered: string[][] = [];
+    const props = {
+      enter: ENTER,
+      options,
+      onExitComplete: (key: unknown) => {
+        done.push(String(key));
+        rendered.push(ids(view.container));
+      },
+    };
+    const view = mount(tree(["a", "b", "c"], props));
+
+    view.rerender(tree(["a"], props));
+    await drain(fake, 0);
+
+    expect(ids(view.container)).toEqual(["a"]);
+    expect([...done].sort()).toEqual(["b", "c"]);
+    // Nothing is animating, so there is no later moment to wait for: the children are already out of the DOM.
+    expect(rendered.every((snapshot) => snapshot.join() === "a")).toBe(true);
+  });
+
+  test("is called once for a child whose exit targets already equal its current values", async () => {
+    const { fake, options } = setup();
+    const done: string[] = [];
+    const props = { enter: ENTER, exit: { opacity: 1, y: 0 }, options, onExitComplete: (key: unknown) => done.push(String(key)) };
     const view = mount(tree(["a", "b"], props));
 
     view.rerender(tree(["a"], props));
     await drain(fake, 0);
 
     expect(ids(view.container)).toEqual(["a"]);
+    expect(done).toEqual(["b"]);
+  });
+
+  test("is called for a child that cannot take a ref and is dropped at once", async () => {
+    const { fake, options } = setup();
+    const done: string[] = [];
+    function Plain() {
+      return <div id="plain" />;
+    }
+    const render = (show: boolean) => (
+      <Presence exit={EXIT} options={options} onExitComplete={(key) => done.push(String(key))}>
+        {show ? <Plain key="plain" /> : null}
+      </Presence>
+    );
+    const view = mount(render(true));
+
+    view.rerender(render(false));
+    await drain(fake, 0);
+
+    expect(done).toEqual(["plain"]);
+  });
+
+  test("is called once per departure when a key leaves, returns and leaves again without exit targets", async () => {
+    const { fake, options } = setup();
+    const done: string[] = [];
+    const props = { options, onExitComplete: (key: unknown) => done.push(String(key)) };
+    const view = mount(tree(["a", "b"], props));
+
+    view.rerender(tree(["a"], props));
+    view.rerender(tree(["a", "b"], props));
+    expect(done).toEqual(["b"]);
+    view.rerender(tree(["a"], props));
+    await drain(fake, 0);
+
+    expect(done).toEqual(["b", "b"]);
+  });
+
+  test("is not called for children that stay, nor when Presence unmounts with children in it", async () => {
+    const { fake, options } = setup();
+    const done: string[] = [];
+    const props = { options, onExitComplete: (key: unknown) => done.push(String(key)) };
+    const view = mount(tree(["a", "b"], props));
+
+    view.rerender(tree(["a", "b", "c"], props));
+    view.unmount();
+    await drain(fake, 0);
+
     expect(done).toEqual([]);
   });
 

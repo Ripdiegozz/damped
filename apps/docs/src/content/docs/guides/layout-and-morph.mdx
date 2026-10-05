@@ -1,0 +1,308 @@
+---
+title: Layout and morph
+description: Animate layout changes with FLIP, then turn one element into another with a morph that corrects children, keeps the radius round and reverses with its velocity.
+sidebar:
+  order: 3
+---
+
+import { LinkCard, CardGrid, Steps } from "@astrojs/starlight/components";
+import { FlipReorder } from "../../../components/demos/FlipReorder";
+import { MorphCard } from "../../../components/demos/MorphCard";
+
+A browser cannot animate a layout change. When a list reorders or a panel grows, the elements are in their new place on the next paint. FLIP is the standard way around that: do the change, then animate each element from where it used to be to where it is now, using only `transform`. damped does the bookkeeping and drives the transform with the same springs as everything else, so a layout animation that is interrupted keeps its velocity.
+
+This guide covers `layout()`, `snapshot()` and `measureLayout()` first, then `morph()`, which builds a shared-element transition (a card that becomes a dialog) on the same machinery.
+
+## FLIP in three steps
+
+FLIP stands for First, Last, Invert, Play. damped splits it into three moves:
+
+<Steps>
+
+1. **Measure.** Record the box each element has now (its visual box, with any running transform) and the box it would have without a transform (its natural box).
+2. **Invert.** Let the DOM change, measure the new natural box, and write a transform that puts the element back on its old box. This happens before the browser paints, so the first frame still shows the old position.
+3. **Play.** Spring the transform back to the identity. The element glides from the old box to the new one.
+
+</Steps>
+
+The "invert" values are `x`, `y`, `scaleX` and `scaleY`, and they are ordinary `animate()` values. That is why interruption works: animating a layout again while it runs retargets those values and carries their velocity, like any other retarget. See [Interruption and reversal](/guides/interruption-and-reversal/).
+
+## layout()
+
+`layout(target, mutate, options?)` runs the three steps for you. Pass one element or an array, and a function that changes the DOM.
+
+```ts
+import { layout } from "@damped/core";
+
+const list = document.querySelector<HTMLElement>("ul");
+const last = list?.querySelector<HTMLElement>("li:last-child");
+
+if (list && last) {
+  // Measure, run the callback, then animate from the old box to the new one.
+  const controls = layout(last, () => list.prepend(last), { duration: 0.4, bounce: 0.1 });
+  await controls.finished;
+}
+```
+
+Things worth knowing:
+
+- Options are the spring options, plus `scheduler`, `reducedMotion`, `correct` and `radius`. `from` and `driver` do not apply to a layout.
+- Invalid options throw before `mutate` runs and before any element is touched.
+- If an element did not move or resize by more than 0.01 px, nothing is written and no frame is requested.
+- Layout animations always use the JS driver. A compositor animation that is running on the element is handed over to JS first, because the compositor's progress is invisible to measurements.
+
+### When the change happens somewhere else
+
+A framework often owns the DOM update, so you cannot wrap it in a callback. Take the snapshot yourself, let the framework commit, then animate:
+
+```ts
+import { snapshot } from "@damped/core";
+
+export function animateChange(items: readonly HTMLElement[], commit: () => void): Promise<void> {
+  const before = snapshot(items); // records the boxes now
+  commit(); // the framework updates the DOM synchronously
+  return before.animate({ duration: 0.4 }).finished;
+}
+```
+
+`snapshot()` accepts an element or an array and returns an object with a single method, `animate(options?)`. The options are validated before anything is measured or written.
+
+### measureLayout()
+
+`measureLayout(element)` returns `{ x, y, width, height }` in viewport coordinates: the box the element has **without** its inline transform. It clears the transform for the measurement and puts it back byte for byte, so it is safe to call while an animation runs. It forces a layout read, like any measurement.
+
+```ts
+import { measureLayout } from "@damped/core";
+
+const card = document.querySelector<HTMLElement>(".card");
+if (card) {
+  const box = measureLayout(card);
+  console.log(`${box.width} x ${box.height} at ${box.x}, ${box.y}`);
+}
+```
+
+## Try it
+
+Press the buttons while the rows are still moving. Each row retargets from where it is, with the velocity it has.
+
+<FlipReorder client:visible />
+
+The demo wraps the state update in `flushSync` so React commits inside the `layout()` callback. The [Demos page](/guides/demos/) shows the code. In your own React code, prefer `useLayout`, described [below](#in-react).
+
+## Children and border radius
+
+Scaling a box distorts what is inside it. A 200 px wide card that animates to 400 px wide with `scaleX: 2` would stretch its text and flatten its rounded corners. damped corrects both while the animation runs.
+
+| Option | What it does |
+| --- | --- |
+| `correct` | `"children"` or an array of elements. Each gets `scale(1 / scaleX, 1 / scaleY)` with `transform-origin: 0 0`, so it keeps its size while the parent scales. |
+| `radius` | A border radius in px that stays visually constant. It is written as `r / scaleX` px `/` `r / scaleY` px during the animation and as `r` px at rest. |
+
+```ts
+import { layout } from "@damped/core";
+
+const panel = document.querySelector<HTMLElement>(".panel");
+
+if (panel) {
+  layout(panel, () => panel.classList.toggle("expanded"), {
+    duration: 0.45,
+    correct: "children",
+    radius: 16,
+  });
+}
+```
+
+- `"children"` means the direct element children present when the animation starts. An explicit array corrects only those elements. Without `correct`, children are left alone.
+- Corrections are removed when the element settles at its natural box. If you call `stop()` they stay where the animation froze, so the frozen frame does not snap.
+- Corrected children measured in a real browser stay within 1.5e-5 px of their true size during the animation (Chromium, the repository's browser test).
+
+:::note[Assumptions]
+`layout` and `morph` assume the element is not rotated, its `scale` is `1` and its `transform-origin` is the center. While a layout runs it owns `x`, `y`, `scaleX` and `scaleY` of that element, so do not animate those yourself in the meantime. damped pins the origin to `50% 50%` for the run and restores your inline value at rest.
+:::
+
+## morph()
+
+`morph(from, to, options?)` turns one element into another. Both stay in the DOM: `to` starts on the box of `from` and settles at its own box, and `from` travels onto the box of `to`. At the same time the two fade across each other, so it reads as one element changing shape.
+
+What happens, frame by frame:
+
+| Part | Behavior |
+| --- | --- |
+| Geometry | A FLIP for both elements, with the same scale and radius correction as `layout`. `correct` defaults to `"children"` here. |
+| Crossfade | `to` fades in and `from` fades out. With the perceptual options the incoming fade runs twice as fast, so the combined opacity never dips in the middle (at least 0.85 asserted, 0.893 measured in Chromium). With physical options both fades use your spring, which may overshoot; the browser clamps opacity. Turn it off with `crossfade: false`. |
+| Blur | The content children blur while they swap: incoming from `blur` px to 0, outgoing from 0 to `blur` px. The default is `8`; `0` writes no filter at all. The two shells never get a filter, so their edges stay crisp. |
+| Radius | With `radius`, corrected on both elements and written at rest on the one that ends on the identity. |
+
+```ts
+import { morph } from "@damped/core";
+
+const options = { duration: 0.5, bounce: 0.1, radius: 16 } as const;
+
+export function openBill(card: HTMLElement, dialog: HTMLElement): void {
+  dialog.hidden = false; // visible and laid out at its final box before morph() measures it
+  void morph(card, dialog, options);
+  dialog.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
+}
+
+export async function closeBill(card: HTMLElement, dialog: HTMLElement): Promise<void> {
+  card.focus({ preventScroll: true });
+  // Reversal is the same call with the arguments swapped.
+  const settled = await morph(dialog, card, options).finished;
+  if (settled) dialog.hidden = true; // false means a newer morph took over: leave it visible
+}
+```
+
+### Preconditions
+
+- Both elements are visible and laid out at their final boxes when `morph` is called. A `hidden` or `display: none` element has no box, so show it first. A zero box does not throw, but the geometry will be wrong.
+- The two elements must be different: `morph(a, a)` throws a `TypeError`.
+- Invalid options or a non-finite measured box throw a `RangeError` before anything is written. A morph that throws does not cut the one that is running.
+- The card and the dialog should each hold their content in direct children. `morph` corrects and blurs the direct children of each element, so one wrapper child per element is the easiest shape.
+
+### Reversal keeps the velocity
+
+Call `morph(to, from)` while the first one runs and both elements retarget the same values, so position and velocity carry over. In the Chromium test, a reversal triggered while the dialog is still opening keeps moving the same way for a moment (+37.0 px, then +27.2 px) before it turns back. A reversal that restarted from rest would barely move on the first step.
+
+`finished` resolves `true` if this morph settled and `false` if a later morph or `stop()` on either element cut it short. It never rejects. `stop()` freezes both elements where they are and keeps the corrections applied.
+
+<MorphCard client:visible />
+
+Open the bill, then press Escape or Close while it is still opening. Focus goes into the dialog when the morph starts and back to the card as soon as a close starts, so Enter on the card reverses it.
+
+## Focus and accessibility
+
+damped moves pixels. It does not manage focus and it does not add roles. A card that becomes a dialog needs the usual dialog behavior, and that is your job:
+
+- **Name and role.** Give the dialog `role="dialog"`, `aria-modal="true"` and an accessible name (`aria-labelledby` or `aria-label`). Give the card `aria-haspopup="dialog"` and `aria-expanded`.
+- **Focus in.** Move focus into the dialog when the open starts, not when it settles; nobody should wait for a spring to reach the Close button.
+- **Focus trap and Escape.** Keep Tab inside the dialog while it is open, and close on Escape. The `MorphCard` demo above and the bills view of the Northbook playground (`apps/playground/src/BillCard.tsx`) show a full implementation, including a portal to `document.body`: a transformed ancestor becomes the containing block of a fixed dialog.
+- **Focus back.** Return focus to the card. Doing it when the close starts, not when it settles, lets Enter reverse the morph. The playground also marks the dialog `inert` while it closes.
+- **Closed means gone.** A closed dialog must not be focusable or announced. `useMorph` keeps the target `hidden` while closed. With the core `morph`, set `hidden` yourself once a close settles, as in the example above.
+- **Reduced motion.** Boxes and radius jump to their final values; the crossfade and the blur still animate, and `finished` still resolves `true`. See [Reduced motion](/guides/reduced-motion/).
+
+## In React
+
+`@damped/react` wraps both APIs so you do not touch the DOM. Neither re-renders per animation frame.
+
+### useLayout
+
+`useLayout(deps, options?)` returns a ref callback. When `deps` change (compared item by item with `Object.is`), the element animates from the box it had before the commit to its new box.
+
+```tsx
+import { useState } from "react";
+import { useLayout } from "@damped/react";
+
+function Row({ label, position }: { label: string; position: number }) {
+  // The deps list holds whatever makes this row move.
+  const ref = useLayout<HTMLLIElement>([position], { duration: 0.4, bounce: 0.1 });
+  return <li ref={ref}>{label}</li>;
+}
+
+export function Bills({ names }: { names: string[] }) {
+  const [reversed, setReversed] = useState(false);
+  const ordered = reversed ? [...names].reverse() : names;
+
+  return (
+    <>
+      <button type="button" onClick={() => setReversed((value) => !value)}>
+        Reverse
+      </button>
+      <ul>
+        {ordered.map((name, index) => (
+          <Row key={name} label={name} position={index} />
+        ))}
+      </ul>
+    </>
+  );
+}
+```
+
+- The first render never animates; there is no earlier box.
+- The previous box is read **during render**, the last moment the DOM still shows the old layout. React may discard a render, which is harmless: each render replaces the snapshot, and only the commit of the render that took it animates.
+- A deps change that does not move the element does not animate.
+- StrictMode's double render and effects produce a single, correct animation.
+
+### useMorph
+
+`useMorph(options?)` returns `{ source, target, open, close, isOpen }`. Attach `source` to the card and `target` to the dialog; both stay mounted.
+
+```tsx
+import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useMorph } from "@damped/react";
+
+export function Bill() {
+  const { source, target, open, close, isOpen } = useMorph({ duration: 0.5, bounce: 0.1, radius: 16 });
+  const card = useRef<HTMLButtonElement | null>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+
+  // Focus moves in as soon as the open starts. The target is already visible by now.
+  useEffect(() => {
+    if (isOpen) closeButton.current?.focus({ preventScroll: true });
+  }, [isOpen]);
+
+  const dismiss = () => {
+    card.current?.focus({ preventScroll: true });
+    void close();
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      dismiss();
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        ref={(node) => {
+          card.current = node;
+          source(node);
+        }}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        onClick={() => void open()}
+      >
+        <span>City Power: $84.20</span>
+      </button>
+
+      <div ref={target} role="dialog" aria-modal="true" aria-label="City Power bill" onKeyDown={onKeyDown}>
+        <div>
+          <p>Bill for John Doe</p>
+          <button type="button" ref={closeButton} onClick={dismiss}>
+            Close
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+```
+
+Rules for the hook:
+
+- **Do not render a `hidden` prop on the target.** The hook writes the `hidden` attribute during the commit while closed, so it never flashes, and `open()` removes it before measuring.
+- **The geometry `morph` measures must not depend on `isOpen`.** It is read inside `open()`, before React re-renders. Keep the dialog's size and position the same whether it is open or not.
+- Author CSS that sets `display` on the target overrides `hidden`. Add `[hidden] { display: none !important; }` if yours does.
+- `isOpen` becomes `true` when `open()` is called, not when the morph settles, and it is the only state. It never changes per frame.
+- `open()` and `close()` resolve `true` when the morph settled and `false` when a later call or an unmount cut it. If either ref is not attached they resolve `false` at once.
+- Changing `options` takes effect on the next `open()` or `close()`.
+
+## Edge cases
+
+- **Elements that leave the DOM.** Use `exit()` or `<Presence>` for an element that is being removed; they keep it in the DOM until its animation settles. Do not pass an element to `layout()` that your mutation removes: a detached element has no box to animate from or to. See [Presence](/guides/presence/).
+- **Scroll.** Boxes are in viewport coordinates, so the page must not scroll between the snapshot and the point where the animation starts. A scroll in that window is read as movement of the element. Scrolling while the animation runs is fine, because the transform is relative to the element.
+- **Nested transforms.** damped writes the deltas as local `translate` and `scale` values. An ancestor that is scaled or rotated makes viewport deltas and local values differ, and damped does not compensate for it. Keep animated layout elements out of transformed ancestors, or put the transform on a sibling wrapper.
+- **Your own transform.** An animated element's inline `transform` belongs to damped. `measureLayout` clears and restores it, but a static transform you set will be replaced by the first animation. Put static transforms on a wrapper element.
+- **Sub-pixel changes.** A box that changes by 0.01 px or less is treated as unchanged: no write, no frame, `finished` resolves at once.
+- **A zero-size axis.** If an element has no width or height in its new layout, that axis keeps scale `1` and the inverse scale stays finite.
+
+## Next
+
+<CardGrid>
+  <LinkCard title="Presence" description="Enter and exit, and how siblings glide into the space a leaving element frees." href="/guides/presence/" />
+  <LinkCard title="Interruption and reversal" description="Why a retarget keeps position and velocity, and what that looks like." href="/guides/interruption-and-reversal/" />
+  <LinkCard title="Reduced motion and accessibility" description="Exactly what jumps and what still fades, API by API." href="/guides/reduced-motion/" />
+  <LinkCard title="Core reference" description="Every option of layout, snapshot, measureLayout and morph." href="/reference/core/" />
+</CardGrid>

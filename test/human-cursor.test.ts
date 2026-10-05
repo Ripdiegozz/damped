@@ -86,3 +86,11 @@ describe("cursorPath", () => {
     expect(path.every((point) => point.x === from.x && point.y === from.y)).toBe(true);
   });
 });
+
+describe("cursorPath input validation", () => {
+  test("rejects a step count that is not a positive integer", () => {
+    for (const steps of [0, -3, 2.5, Number.NaN]) {
+      expect(() => cursorPath({ x: 0, y: 0 }, { x: 100, y: 40 }, mulberry32(1), steps)).toThrow(RangeError);
+    }
+  });
+});

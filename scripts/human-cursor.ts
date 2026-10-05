@@ -41,6 +41,7 @@ const cubic = (a: number, b: number, c: number, d: number, t: number): number =>
  * an ease-in-out speed. The last point is exactly `to`.
  */
 export function cursorPath(from: Point, to: Point, random: () => number, steps: number): Point[] {
+  if (!Number.isInteger(steps) || steps < 1) throw new RangeError(`steps must be a positive integer, received ${steps}`);
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const distance = Math.hypot(dx, dy);

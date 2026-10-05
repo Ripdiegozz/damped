@@ -1,4 +1,4 @@
-import { chromium, type Locator, type Page } from "@playwright/test";
+import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -119,7 +119,7 @@ async function scene(page: Page): Promise<void> {
   // 3. The reversal in slow motion: open, let it travel about 40%, turn it around, and watch it keep moving first.
   await toggleSlowMotion();
   await click(page, rent);
-  await page.waitForTimeout(520);
+  await page.waitForTimeout(REVERSAL_DELAY_MS);
   await page.keyboard.press("Escape");
   await pause(page, 2200, 2500);
   await toggleSlowMotion();
@@ -141,9 +141,13 @@ async function scene(page: Page): Promise<void> {
   await pause(page, 1300, 1600);
 }
 
+// With the default 0.5 s spring slowed ×4 by the Spring lab, this is about 40% of the way into the morph.
+const REVERSAL_DELAY_MS = 520;
+
 const work = mkdtempSync(join(tmpdir(), "northbook-record-"));
+let browser: Browser | undefined;
 try {
-  const browser = await chromium.launch();
+  browser = await chromium.launch();
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
   await context.addInitScript(CURSOR);
   const page = await context.newPage();
@@ -190,6 +194,8 @@ try {
   const bytes = Bun.file(output).size;
   console.log(`${output}: ${(bytes / 1024 / 1024).toFixed(2)} MB, ${GIF_FPS} fps, ${length.toFixed(1)} s, ${frames.length} captured frames`);
 } finally {
+  // Also closes the browser when the recording or ffmpeg fails partway; closing twice is harmless.
+  await browser?.close();
   await server.stop(true);
   rmSync(work, { recursive: true, force: true });
 }

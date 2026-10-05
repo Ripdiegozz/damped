@@ -93,7 +93,7 @@ describe("guides (layout, presence, reduced motion, react, native, faq)", () => 
   test("the FAQ quotes the committed bundle sizes and has the fair-comparison section", () => {
     const page = read("faq");
     expect(page).toContain("3.95 KB");
-    expect(page).toContain("6.97 KB");
+    expect(page).toContain("6.99 KB");
     expect(page).toMatch(/^## When to use Motion or Reanimated instead$/m);
     expect(page).toContain("https://motion.dev");
     expect(page).toContain("https://docs.swmansion.com/react-native-reanimated");

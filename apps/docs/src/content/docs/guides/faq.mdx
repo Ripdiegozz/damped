@@ -17,16 +17,16 @@ Small enough to pay only for what you import. The figures below come from `bun r
 | --- | ---: | ---: |
 | `animate` | 9,613 B | 4,044 B (3.95 KB) |
 | `animate` + `compositor` | 11,602 B | 4,784 B (4.67 KB) |
-| `layout` | 12,696 B | 5,168 B (5.05 KB) |
+| `layout` | 12,748 B | 5,186 B (5.06 KB) |
 | `morph` | 13,356 B | 5,428 B (5.30 KB) |
 | `enter` / `exit` | 11,374 B | 4,616 B (4.51 KB) |
-| full `@damped/core` | 18,146 B | 7,137 B (6.97 KB) |
+| full `@damped/core` | 18,198 B | 7,158 B (6.99 KB) |
 | `@damped/react` dist (`@damped/core` and `react` external) | 6,266 B | 2,534 B (2.47 KB) |
 | `useMorph` + `Presence` (`@damped/core` bundled, `react` external) | 19,288 B | 7,600 B (7.42 KB) |
 | `@damped/native` dist (not minified: the worklets plugin needs the directives) | 5,319 B | 1,609 B (1.57 KB) |
 
 - The packages are flagged `sideEffects: false`, so unused exports are dropped. `compositor` is a value you import, and an application that never passes it does not bundle it; it costs about 0.74 KB gzip when you do.
-- An application that only animates pays 3.95 KB. The whole core is 6.97 KB.
+- An application that only animates pays 3.95 KB. The whole core is 6.99 KB.
 - The Northbook playground, including React and React DOM, is 77,634 B of JavaScript gzip.
 
 ### Is it on npm?

@@ -55,8 +55,8 @@ Verified on 2026-10-05 against the npm registry and the Starlight docs (context7
 
 | ID | Task | Route | Status | Commit |
 |----|------|-------|--------|--------|
-| D1 | Scaffold `apps/docs` (Astro + Starlight + React), theme tokens, root scripts; the site builds | delegated (2+ non-trivial files) | done | this commit |
-| D2 | Example typecheck harness: extract code blocks from the content and typecheck them | delegated | todo | |
+| D1 | Scaffold `apps/docs` (Astro + Starlight + React), theme tokens, root scripts; the site builds | delegated (2+ non-trivial files) | done | `230d83a` |
+| D2 | Example typecheck harness: extract code blocks from the content and typecheck them | delegated | done | this commit |
 | D3 | Live demo islands (six demos) with reduced-motion support | delegated | todo | |
 | D4 | Custom landing page: hero with live morph, package cards, "why" | delegated | todo | |
 | D5 | API reference for `@damped/core`, `@damped/react`, `@damped/native` | delegated | todo | |
@@ -89,6 +89,11 @@ Verified on 2026-10-05 against the npm registry and the Starlight docs (context7
   - Known build noise, harmless: Rolldown `MODULE_LEVEL_DIRECTIVE` warnings for `use astro:head-inject` and Starlight's empty `i18n` collection / `404` entry warnings.
   - Theme: teal accent on cool neutrals in `src/styles/theme.css`; text pairs measured at 4.5:1 or better for body, muted and accent text in both themes.
 
+- 2026-10-05: D2 done, strict TDD. RED: `bun test apps/docs` failed with `Cannot find module '../scripts/examples'` / `'../scripts/typecheck-examples'`; GREEN: 18 pass. A deliberately wrong page (core, react and native blocks) failed the typecheck test with `file:line` messages and was removed; a permanent test feeds a wrong example straight to the harness.
+  - `apps/docs/scripts/examples.ts` is pure (block extraction with CommonMark-style fences, nested and indented fences, CRLF, `nocheck`, tsc output parsing, diagnostic mapping); `scripts/typecheck-examples.ts` writes each block as its own module in `apps/docs/node_modules/.cache/examples-*` and runs the repo's `tsc` once (about 0.1 s with TypeScript 7), extending the root `tsconfig.json` with `types: []` and `paths` for the three packages.
+  - Failure messages read `src/content/docs/<page>.mdx:<line>:<col> (code block at line <fence line>): TS<code> <message>`.
+  - Native examples typecheck: `react-native`, `react-native-reanimated` and `react-native-worklets` ship their own types and are installed for `packages/native`; the harness maps them from there, so docs examples may import them. Authoring conventions: complete examples, `nocheck` in the info string to skip a block, no `fragment` marker.
+
 ## Next step
 
-D2: example typecheck harness.
+D3: live demo islands (six demos) with reduced-motion support.

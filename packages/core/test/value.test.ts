@@ -458,3 +458,133 @@ describe("listeners", () => {
     expect(queued).toHaveLength(1);
   });
 });
+
+describe("rebase", () => {
+  function midFlight(springOptions: SpringOptions = SPRING) {
+    const context = setup();
+    const settled = context.value.set(100, springOptions);
+    let timestamp = 1000;
+    for (let i = 0; i < 6; i++) {
+      context.fake.flush(timestamp);
+      timestamp += 16;
+    }
+    return { ...context, settled, last: timestamp - 16 };
+  }
+
+  test("while animating, the new state is visible immediately and listeners are notified", () => {
+    const { value } = midFlight();
+    const velocity = value.getVelocity();
+    const seen: [number, number][] = [];
+    value.onChange((position, speed) => seen.push([position, speed]));
+    value.rebase(-30, velocity * 2);
+    expect(value.get()).toBe(-30);
+    expect(value.getVelocity()).toBe(velocity * 2);
+    expect(value.animating).toBe(true);
+    expect(seen).toEqual([[-30, velocity * 2]]);
+  });
+
+  test("the spring continues toward the same target from the rebased state, timed from the last frame", () => {
+    const { fake, value, last } = midFlight();
+    value.rebase(-30, 250);
+    fake.flush(last + 16);
+    const expected = createSpring(-30, 100, 250, SPRING).at(0.016);
+    expect(value.get()).toBe(expected.position);
+    expect(value.getVelocity()).toBe(expected.velocity);
+  });
+
+  test("the spring options of the running animation are kept", () => {
+    const options: SpringOptions = { stiffness: 300, damping: 20, restDelta: 0.5 };
+    const { fake, value, last } = midFlight(options);
+    value.rebase(20, 80);
+    fake.flush(last + 16);
+    const expected = createSpring(20, 100, 80, options).at(0.016);
+    expect(value.get()).toBe(expected.position);
+    expect(value.getVelocity()).toBe(expected.velocity);
+  });
+
+  test("velocity defaults to zero", () => {
+    const { value } = midFlight();
+    expect(value.getVelocity()).not.toBe(0);
+    value.rebase(10);
+    expect(value.get()).toBe(10);
+    expect(value.getVelocity()).toBe(0);
+  });
+
+  test("the pending set() promise is neither resolved nor superseded and resolves true on settle", async () => {
+    const { fake, value, settled, last } = midFlight();
+    let result: boolean | undefined;
+    void settled.then((outcome) => {
+      result = outcome;
+    });
+    value.rebase(-30, 250);
+    await Promise.resolve();
+    expect(result).toBeUndefined();
+    flushAll(fake, last + 16);
+    expect(await settled).toBe(true);
+    expect(value.get()).toBe(100);
+    expect(value.animating).toBe(false);
+  });
+
+  test("a rebase before the first frame still starts the spring at that first frame", () => {
+    const { fake, value } = setup();
+    void value.set(100, SPRING);
+    value.rebase(40, 10);
+    fake.flush(500);
+    expect(value.get()).toBe(40);
+    expect(value.getVelocity()).toBe(10);
+    fake.flush(516);
+    expect(value.get()).toBe(createSpring(40, 100, 10, SPRING).at(0.016).position);
+  });
+
+  test("rebasing exactly onto the target at rest speed settles on the next frame", async () => {
+    const { fake, scheduler, value, settled, last } = midFlight();
+    value.rebase(100, 0);
+    fake.flush(last + 16);
+    expect(await settled).toBe(true);
+    expect(value.get()).toBe(100);
+    expect(value.animating).toBe(false);
+    expect(scheduler.active).toBe(false);
+  });
+
+  test("the animation can be rebased repeatedly without registering extra loop jobs", () => {
+    const { fake, value, last } = midFlight();
+    value.rebase(10, 20);
+    value.rebase(15, 25);
+    expect(fake.pending).toBe(1);
+    fake.flush(last + 16);
+    expect(value.get()).toBe(createSpring(15, 100, 25, SPRING).at(0.016).position);
+  });
+
+  test("while idle it behaves like jump(): the position changes, velocity is ignored and no frame is requested", () => {
+    const { fake, scheduler, value } = setup({}, 3);
+    const seen: [number, number][] = [];
+    value.onChange((position, speed) => seen.push([position, speed]));
+    value.rebase(9, 500);
+    expect(value.get()).toBe(9);
+    expect(value.getVelocity()).toBe(0);
+    expect(value.animating).toBe(false);
+    expect(scheduler.active).toBe(false);
+    expect(fake.requests).toBe(0);
+    expect(seen).toEqual([[9, 0]]);
+  });
+
+  test("non-finite input throws RangeError and leaves the state untouched", () => {
+    const { value } = midFlight();
+    const position = value.get();
+    const velocity = value.getVelocity();
+    let notifications = 0;
+    value.onChange(() => notifications++);
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(() => value.rebase(bad, 1)).toThrow(RangeError);
+      expect(() => value.rebase(1, bad)).toThrow(RangeError);
+    }
+    expect(value.get()).toBe(position);
+    expect(value.getVelocity()).toBe(velocity);
+    expect(value.animating).toBe(true);
+    expect(notifications).toBe(0);
+
+    const idle = setup().value;
+    expect(() => idle.rebase(Number.NaN)).toThrow(RangeError);
+    expect(() => idle.rebase(1, Number.NaN)).toThrow(RangeError);
+  });
+});

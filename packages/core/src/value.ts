@@ -19,6 +19,12 @@ export interface SpringValue {
   set(target: number, options?: SpringOptions): Promise<boolean>;
   /** Set immediately with zero velocity, cancelling any animation. */
   jump(value: number): void;
+  /**
+   * Replace the current state. If animating, the spring continues toward its current target from (position, velocity),
+   * timed from the last frame; if idle, behaves like jump(position) and ignores velocity. Notifies listeners.
+   * Does not resolve or supersede the pending set() promise.
+   */
+  rebase(position: number, velocity?: number): void;
   /** Freeze at the current value with zero velocity. */
   stop(): void;
   onChange(listener: (value: number, velocity: number) => void): () => void;
@@ -38,6 +44,8 @@ export function createSpringValue(initial: number, options: SpringValueOptions =
   let position = initial;
   let velocity = 0;
   let spring: Spring | undefined;
+  // Options of the running spring, kept so rebase() can rebuild it from a new state.
+  let springConfig: SpringOptions | undefined;
   let resolve: ((settled: boolean) => void) | undefined;
   let cancelLoop: (() => void) | undefined;
   // Timestamp the current spring's t=0 maps to; undefined until the first frame that runs it.
@@ -104,7 +112,9 @@ export function createSpringValue(initial: number, options: SpringValueOptions =
     assertFinite("target", target);
     if (spring === undefined && position === target && velocity === 0) return Promise.resolve(true);
 
-    const next = createSpring(position, target, velocity, { ...thresholds, ...springOptions } as SpringOptions);
+    const config = { ...thresholds, ...springOptions } as SpringOptions;
+    const next = createSpring(position, target, velocity, config);
+    springConfig = config;
     const wasAnimating = spring !== undefined;
     const superseded = resolve;
     const promise = new Promise<boolean>((done) => {
@@ -136,6 +146,21 @@ export function createSpringValue(initial: number, options: SpringValueOptions =
       cancel();
       position = value;
       velocity = 0;
+      notify();
+    },
+    rebase(nextPosition, nextVelocity = 0) {
+      assertFinite("position", nextPosition);
+      assertFinite("velocity", nextVelocity);
+      if (spring === undefined) {
+        position = nextPosition;
+        velocity = 0;
+      } else {
+        // `startTime` stays put: the last frame is t=0 of the rebuilt spring, as in set().
+        spring = createSpring(nextPosition, spring.to, nextVelocity, springConfig);
+        position = nextPosition;
+        velocity = nextVelocity;
+        startTime = lastTimestamp;
+      }
       notify();
     },
     stop() {

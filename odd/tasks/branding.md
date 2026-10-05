@@ -99,6 +99,8 @@ Give damped its own identity: a mark built from the physics of the library, a re
   - Dependencies pinned exactly for reproducible rasters: `@resvg/resvg-js` 2.6.2, `geist` 1.7.2, `opentype.js` 2.0.0. The resvg binding resolves under the isolated linker. Risk: byte-exact PNG drift checks are proven on linux-x64 only (CI matches); fall back to pixel comparison if arm64 differs.
   - Renders for review in `/tmp/brand/b1/` (favicon sheet, lockups, og, icons).
 
+- 2026-10-05: Review assessment for `01d2b48..cc9ac75`: medium, `slice_budget_reached`, so the review was due. START asked for consent (44 files, 1316 lines). The user chose "Skip this time", and the exact decline invocation returned `declined` / `declined_this_candidate` for target `sha256:38f2593a…`. Verification for that range is therefore the writer's self-verification plus the parent spot check (medium tier, non-mini writer). B3 delegated to one writer.
+
 ## Next step
 
-B3: docs theme (writer).
+B3: docs theme (writer running).

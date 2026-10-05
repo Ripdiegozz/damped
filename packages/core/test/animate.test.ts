@@ -548,6 +548,25 @@ describe("validation", () => {
     expect(() => animate(element, { x: 1 }, options({ from: { skew: 1 } as never }))).toThrow(TypeError);
     expect(fake.requests).toBe(0);
   });
+
+  test("invalid spring options throw RangeError before any element is touched", () => {
+    const { fake, scheduler, options } = setup();
+    const first = createElement();
+    const second = createElement();
+    expect(() => animate([first, second], { x: 10 }, options({ from: { x: 5 }, duration: Number.NaN }))).toThrow(
+      RangeError,
+    );
+    expect(() =>
+      animate(first, { opacity: 0 }, { scheduler, stiffness: -1, damping: 10, from: { opacity: 0.5 } }),
+    ).toThrow(RangeError);
+    expect(fake.requests).toBe(0);
+
+    // No `from` jump leaked: a valid call still starts from the defaults.
+    animate([first, second], { x: 10 }, options());
+    fake.flush(0);
+    expect(translateX(first)).toBe(0);
+    expect(translateX(second)).toBe(0);
+  });
 });
 
 describe("idle", () => {

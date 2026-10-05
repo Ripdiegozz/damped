@@ -1,5 +1,5 @@
 import { frame, type Scheduler } from "./scheduler";
-import type { SpringOptions } from "./spring";
+import { springParams, type SpringOptions } from "./spring";
 import { createSpringValue, type SpringValue } from "./value";
 
 export type AnimatableProperty = "x" | "y" | "scale" | "scaleX" | "scaleY" | "rotate" | "opacity" | "blur";
@@ -29,13 +29,16 @@ interface PropertyConfig {
   restSpeed: number;
 }
 
+// Rest thresholds per unit: settling within 0.01 px (or degree) and 0.1 px/s is below what a display can show,
+// while unitless ratios (scale, opacity) need finer thresholds because their whole range is about 0..1.
 const LENGTH = { restDelta: 0.01, restSpeed: 0.1 };
+const ANGLE = { restDelta: 0.01, restSpeed: 0.1 };
 const RATIO = { restDelta: 0.0005, restSpeed: 0.005 };
 
 const CONFIG: Record<AnimatableProperty, PropertyConfig> = {
   x: { group: "transform", initial: 0, spatial: true, ...LENGTH },
   y: { group: "transform", initial: 0, spatial: true, ...LENGTH },
-  rotate: { group: "transform", initial: 0, spatial: true, ...LENGTH },
+  rotate: { group: "transform", initial: 0, spatial: true, ...ANGLE },
   scale: { group: "transform", initial: 1, spatial: true, ...RATIO },
   scaleX: { group: "transform", initial: 1, spatial: true, ...RATIO },
   scaleY: { group: "transform", initial: 1, spatial: true, ...RATIO },
@@ -157,9 +160,12 @@ export function animate(
   const springOptions = rest as SpringOptions;
   const targets = entries(values, "animate");
   const starts = entries(from, "animate from");
+  // Validate spring options before touching any element so a bad option never leaves a call half-applied.
+  springParams(springOptions);
   const reduced = targets.length > 0 && prefersReducedMotion(reducedMotion);
 
   const token = {};
+  // A property may appear twice (once from `from`, once from `values`); stopping it twice is harmless.
   const claims: { value: SpringValue; state: ElementState; property: AnimatableProperty }[] = [];
   const pending: Promise<boolean>[] = [];
 
@@ -187,6 +193,7 @@ export function animate(
   return {
     finished: Promise.all(pending).then(() => undefined),
     stop() {
+      // Properties taken over by a newer call keep animating; `finished` still resolves through their superseded set().
       for (const { value, state, property } of claims) {
         if (state.owners[property] === token) value.stop();
       }

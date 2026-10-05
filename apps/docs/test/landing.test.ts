@@ -114,11 +114,12 @@ describe("landing page source", () => {
     for (const slug of PLANNED_GUIDES) expect(page).toContain(`/guides/${slug}/`);
   });
 
-  test("sets a logo and a favicon, both self-hosted", () => {
-    expect(config).toContain('dark: "./src/assets/logo-dark.svg"');
-    expect(config).toContain('light: "./src/assets/logo-light.svg"');
-    expect(existsSync(join(docsRoot, "src/assets/logo-dark.svg"))).toBe(true);
-    expect(existsSync(join(docsRoot, "src/assets/logo-light.svg"))).toBe(true);
+  test("sets the lockup as the logo and a favicon, both self-hosted", () => {
+    expect(config).toContain('dark: "./src/assets/lockup-dark.svg"');
+    expect(config).toContain('light: "./src/assets/lockup-light.svg"');
+    expect(config).toMatch(/replacesTitle:\s*true/);
+    expect(existsSync(join(docsRoot, "src/assets/lockup-dark.svg"))).toBe(true);
+    expect(existsSync(join(docsRoot, "src/assets/lockup-light.svg"))).toBe(true);
     expect(config).toMatch(/favicon:\s*"\/favicon\.svg"/);
     expect(existsSync(join(docsRoot, "public/favicon.svg"))).toBe(true);
   });

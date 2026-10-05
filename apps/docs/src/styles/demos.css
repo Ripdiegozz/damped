@@ -1,33 +1,31 @@
 /* Live demo islands. Everything is built from the docs theme tokens (theme.css), so dark and light both work.
-   Demos opt out of Starlight's markdown styling with `not-content`. */
+   Demos opt out of Starlight's markdown styling with `not-content`.
+
+   Panels are hairline-ruled and flat, readouts are mono and buttons are neutral. The accent is reserved for what
+   moves or comes to rest: the markers, balls, traces and curves. `--demo-accent` fills those moving things and
+   `--demo-accent-line` strokes them (its light-theme step is dark enough to read on white). */
 
 .demo {
-  --demo-surface: var(--sl-color-gray-7);
-  --demo-raised: var(--sl-color-gray-6);
-  --demo-line: var(--sl-color-hairline-light);
+  --demo-surface: var(--damped-surface);
+  --demo-raised: var(--damped-raised);
+  --demo-line: var(--damped-hairline);
+  --demo-line-strong: var(--damped-hairline-strong);
   --demo-text: var(--sl-color-text);
-  --demo-muted: var(--sl-color-gray-3);
-  --demo-accent: var(--sl-color-accent);
-  --demo-accent-strong: var(--sl-color-accent-high);
-  --demo-accent-soft: var(--sl-color-accent-low);
-  --demo-danger: #e5484d;
-  --demo-danger-text: #ff9592;
+  --demo-muted: var(--damped-ink-muted);
+  --demo-ink: var(--damped-ink);
+  --demo-accent: var(--damped-accent);
+  --demo-accent-line: var(--damped-accent-text);
+  --demo-danger: var(--damped-danger);
 
   margin: 1.5rem 0;
   padding: 1.25rem;
   border: 1px solid var(--demo-line);
-  border-radius: calc(var(--damped-radius) + 0.125rem);
+  border-radius: var(--damped-radius);
   background: var(--demo-surface);
   color: var(--demo-text);
   font-family: var(--sl-font);
   font-size: 0.9375rem;
   line-height: 1.5;
-  box-shadow: 0 1px 0 var(--demo-line), 0 18px 40px -28px var(--damped-glow);
-}
-
-:root[data-theme="light"] .demo {
-  --demo-danger: #c62a2f;
-  --demo-danger-text: #a3171d;
 }
 
 .demo p,
@@ -40,11 +38,11 @@
 
 .demo .demo-title {
   margin-bottom: 0.9rem;
-  font-family: var(--damped-font-display);
-  font-size: 1.15rem;
+  font-family: var(--sl-font);
+  font-size: 0.9375rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--sl-color-white);
+  letter-spacing: -0.015em;
+  color: var(--demo-ink);
 }
 
 .demo .demo-hint,
@@ -66,28 +64,29 @@
   justify-content: space-between;
   margin-top: 0.9rem;
   padding: 0.6rem 0.8rem;
-  border: 1px solid var(--demo-accent);
-  border-radius: 0.6rem;
-  background: var(--demo-accent-soft);
-  color: var(--demo-accent-strong);
+  border: 1px solid var(--demo-line-strong);
+  border-radius: var(--damped-radius);
+  background: var(--demo-raised);
+  color: var(--demo-text);
   font-size: 0.875rem;
 }
 
 /* Buttons */
 .demo-button {
   appearance: none;
-  padding: 0.45rem 0.9rem;
-  border: 1px solid var(--demo-line);
-  border-radius: 0.55rem;
-  background: var(--demo-raised);
-  color: var(--demo-text);
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--demo-line-strong);
+  border-radius: var(--damped-radius);
+  background: transparent;
+  color: var(--demo-ink);
   font: inherit;
+  font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .demo-button:hover {
-  border-color: var(--demo-accent);
+  background: var(--demo-raised);
 }
 
 .demo-button:disabled {
@@ -95,16 +94,28 @@
   cursor: not-allowed;
 }
 
-.demo-button--primary,
+/* Solid ink on paper (or the inverse): the one emphasised button, neutral like every other call to action. */
+.demo-button--primary {
+  border-color: var(--demo-ink);
+  background: var(--demo-ink);
+  color: var(--damped-paper);
+}
+
+.demo-button--primary:hover {
+  background: color-mix(in srgb, var(--demo-ink) 86%, var(--damped-paper));
+}
+
 .demo-button[aria-pressed="true"] {
-  border-color: var(--demo-accent);
-  background: var(--demo-accent-soft);
-  color: var(--demo-accent-strong);
+  border-color: var(--demo-ink);
+  background: var(--demo-raised);
 }
 
 .demo-button--danger {
+  border-color: color-mix(in srgb, var(--demo-danger) 60%, transparent);
+}
+
+.demo-button--danger:hover {
   border-color: var(--demo-danger);
-  color: var(--demo-danger-text);
 }
 
 .demo-actions {
@@ -115,7 +126,7 @@
 }
 
 .demo :is(button, [role="slider"], input):focus-visible {
-  outline: 2px solid var(--demo-accent-strong);
+  outline: 1.5px solid var(--demo-accent-line);
   outline-offset: 2px;
 }
 
@@ -133,16 +144,17 @@
 
 .demo-readouts dt {
   color: var(--demo-muted);
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
+  font-family: var(--damped-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .demo-readouts dd {
-  font-family: var(--sl-font-mono);
-  font-size: 0.95rem;
+  font-family: var(--damped-font-mono);
+  font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
-  color: var(--sl-color-white);
+  color: var(--demo-ink);
 }
 
 .demo-readouts:not(.demo-readouts--wrap) dd {
@@ -154,7 +166,7 @@
   position: relative;
   height: 3.25rem;
   border: 1px solid var(--demo-line);
-  border-radius: 999px;
+  border-radius: var(--damped-radius);
   background: var(--demo-raised);
   cursor: pointer;
   touch-action: none;
@@ -182,11 +194,11 @@
 
 .retarget-marker {
   background: var(--demo-accent);
-  box-shadow: 0 0 0 4px var(--damped-glow), 0 4px 10px -2px rgb(0 0 0 / 0.35);
 }
 
+/* Where the marker will come to rest. */
 .retarget-target {
-  border: 2px dashed var(--demo-accent-strong);
+  border: 1.5px dashed var(--demo-accent-line);
 }
 
 .retarget-trace,
@@ -195,7 +207,7 @@
   width: 100%;
   margin-top: 0.9rem;
   border: 1px solid var(--demo-line);
-  border-radius: 0.6rem;
+  border-radius: var(--damped-radius);
   background: var(--demo-raised);
 }
 
@@ -221,7 +233,7 @@
 .trace-line,
 .plot-curve {
   fill: none;
-  stroke: var(--demo-accent-strong);
+  stroke: var(--demo-accent-line);
   stroke-width: 2;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
@@ -246,15 +258,19 @@
   font-weight: 500;
 }
 
+.demo-field label {
+  font-size: 0.8125rem;
+}
+
 .demo-field output {
-  font-family: var(--sl-font-mono);
+  font-family: var(--damped-font-mono);
   font-variant-numeric: tabular-nums;
-  color: var(--demo-accent-strong);
+  color: var(--demo-ink);
 }
 
 .demo-field input[type="range"] {
   width: 100%;
-  accent-color: var(--demo-accent);
+  accent-color: var(--demo-ink);
 }
 
 .tuner-plot .plot-target,
@@ -267,7 +283,7 @@
 
 .plot-label {
   fill: var(--demo-muted);
-  font-family: var(--sl-font-mono);
+  font-family: var(--damped-font-mono);
   font-size: 9px;
 }
 
@@ -284,7 +300,7 @@
   margin-top: 0.75rem;
   padding: 0 10px;
   border: 1px solid var(--demo-line);
-  border-radius: 999px;
+  border-radius: var(--damped-radius);
   background: var(--demo-raised);
 }
 
@@ -314,9 +330,9 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.65rem 0.9rem;
+  padding: 0.6rem 0.85rem;
   border: 1px solid var(--demo-line);
-  border-radius: 0.7rem;
+  border-radius: var(--damped-radius);
   background: var(--demo-raised);
 }
 
@@ -326,19 +342,22 @@
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
-  background: var(--demo-accent-soft);
-  color: var(--demo-accent-strong);
-  font-weight: 600;
+  border: 1px solid var(--demo-line-strong);
+  background: transparent;
+  color: var(--demo-ink);
+  font-family: var(--damped-font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
 }
 
 .flip-name {
   flex: 1;
   font-weight: 500;
-  color: var(--sl-color-white);
+  color: var(--demo-ink);
 }
 
 .flip-amount {
-  font-family: var(--sl-font-mono);
+  font-family: var(--damped-font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--demo-muted);
 }
@@ -360,10 +379,9 @@
   gap: 0.75rem;
   padding: 0.7rem 0.9rem;
   border: 1px solid var(--demo-line);
-  border-left: 3px solid var(--demo-accent);
-  border-radius: 0.6rem;
+  border-left: 2px solid var(--demo-accent-line);
+  border-radius: var(--damped-radius);
   background: var(--demo-raised);
-  box-shadow: 0 8px 18px -14px rgb(0 0 0 / 0.5);
 }
 
 /* damped marks a leaving toast inert: out of the flow, so the ones below glide up through layout(). */
@@ -374,7 +392,7 @@
 }
 
 .toast-text {
-  color: var(--sl-color-white);
+  color: var(--demo-ink);
 }
 
 .toast-dismiss {
@@ -394,7 +412,7 @@
 
 .toast-dismiss:hover {
   background: var(--demo-line);
-  color: var(--sl-color-white);
+  color: var(--demo-ink);
 }
 
 .toast-stage {
@@ -413,7 +431,6 @@
 /* Compositor comparison */
 .compare-lane {
   height: 4.1rem;
-  border-radius: 0.8rem;
 }
 
 .compare-label {
@@ -438,7 +455,6 @@
 
 .compare-ball--compositor {
   background: var(--demo-accent);
-  box-shadow: 0 0 0 4px var(--damped-glow);
 }
 
 /* Morph card */
@@ -448,8 +464,8 @@
   place-items: center;
   min-height: 25rem;
   overflow: hidden;
-  border-radius: calc(var(--damped-radius) - 0.125rem);
-  background: radial-gradient(40rem 14rem at 50% 0, var(--damped-glow), transparent 70%), var(--demo-raised);
+  border-radius: 4px;
+  background: var(--demo-raised);
 }
 
 .morph-card {
@@ -458,18 +474,17 @@
   z-index: 1;
   width: min(18rem, calc(100% - 2rem));
   padding: 0;
-  border: 1px solid var(--demo-line);
-  border-radius: 16px;
+  border: 1px solid var(--demo-line-strong);
+  border-radius: var(--damped-radius);
   background: var(--demo-surface);
   color: var(--demo-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 14px 30px -20px rgb(0 0 0 / 0.6);
 }
 
 .morph-card:hover {
-  border-color: var(--demo-accent);
+  border-color: var(--demo-muted);
 }
 
 .morph-card__body,
@@ -488,24 +503,26 @@
 
 .morph-card__name {
   font-weight: 600;
-  color: var(--sl-color-white);
+  color: var(--demo-ink);
 }
 
 .morph-card__badge {
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  background: var(--demo-accent-soft);
-  color: var(--demo-accent-strong);
-  font-size: 0.75rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--demo-line-strong);
+  border-radius: 4px;
+  color: var(--demo-muted);
+  font-family: var(--damped-font-mono);
+  font-size: 0.6875rem;
 }
 
 .morph-card__amount,
 .morph-dialog__amount {
-  font-family: var(--damped-font-display);
-  font-size: 2rem;
+  font-family: var(--sl-font);
+  font-size: 1.75rem;
   font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--sl-color-white);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--demo-ink);
 }
 
 .morph-card__meta,
@@ -516,16 +533,15 @@
 
 .morph-card__hint {
   margin-top: 0.25rem;
-  color: var(--demo-accent-strong);
+  color: var(--demo-muted);
   font-size: 0.8125rem;
-  font-weight: 500;
 }
 
 .morph-backdrop {
   position: absolute;
   inset: 0;
   z-index: 2;
-  background: rgb(8 12 16 / 0.55);
+  background: color-mix(in srgb, var(--damped-paper) 70%, transparent);
   opacity: 0;
   pointer-events: none;
 }
@@ -541,10 +557,9 @@
   width: min(24rem, calc(100% - 1.5rem));
   height: fit-content;
   margin: auto;
-  border: 1px solid var(--demo-line);
-  border-radius: 16px;
+  border: 1px solid var(--demo-line-strong);
+  border-radius: var(--damped-radius);
   background: var(--demo-surface);
-  box-shadow: 0 30px 60px -24px rgb(0 0 0 / 0.7);
 }
 
 .morph-dialog[hidden] {
@@ -552,7 +567,7 @@
 }
 
 .morph-dialog:focus-visible {
-  outline: 2px solid var(--demo-accent-strong);
+  outline: 2px solid var(--demo-accent-line);
 }
 
 .morph-dialog__body {
@@ -568,10 +583,11 @@
 }
 
 .morph-dialog__title {
-  font-family: var(--damped-font-display);
-  font-size: 1.25rem;
+  font-family: var(--sl-font);
+  font-size: 1.0625rem;
   font-weight: 600;
-  color: var(--sl-color-white);
+  letter-spacing: -0.02em;
+  color: var(--demo-ink);
 }
 
 .morph-dialog__close {
@@ -580,9 +596,9 @@
   place-items: center;
   width: 2rem;
   height: 2rem;
-  border: 1px solid var(--demo-line);
-  border-radius: 50%;
-  background: var(--demo-raised);
+  border: 1px solid var(--demo-line-strong);
+  border-radius: var(--damped-radius);
+  background: transparent;
   color: var(--demo-text);
   font-size: 1.2rem;
   line-height: 1;
@@ -590,7 +606,7 @@
 }
 
 .morph-dialog__close:hover {
-  border-color: var(--demo-accent);
+  background: var(--demo-raised);
 }
 
 .morph-dialog__rows {
@@ -610,8 +626,10 @@
 }
 
 .morph-dialog__rows dd {
+  font-family: var(--damped-font-mono);
+  font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
-  color: var(--sl-color-white);
+  color: var(--demo-ink);
 }
 
 .morph-dialog__note {

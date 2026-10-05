@@ -144,7 +144,6 @@ export function RetargetSpring() {
         onKeyDown={onKeyDown}
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
-          event.currentTarget.focus({ preventScroll: true });
           retarget(fromPointer(event), true);
         }}
         onPointerMove={(event) => {

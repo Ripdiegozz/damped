@@ -8,8 +8,9 @@ export const TOAST_EXIT: AnimationTargets = { opacity: 0, x: 24 };
 export const ROW_ENTER: AnimationTargets = { opacity: 0, y: 10 };
 export const ACTIVITY_ROW_ENTER: AnimationTargets = { opacity: 0, y: -12 };
 export const ACTIVITY_ROW_EXIT: AnimationTargets = { opacity: 0, x: 16 };
-export const LAB_ENTER: AnimationTargets = { opacity: 0, y: 16, scale: 0.97 };
-export const LAB_EXIT: AnimationTargets = { opacity: 0, y: 16 };
+// The lab hangs under its button, so it comes from the button side: a little up, and small.
+export const LAB_ENTER: AnimationTargets = { opacity: 0, y: -10, scale: 0.97 };
+export const LAB_EXIT: AnimationTargets = { opacity: 0, y: -10 };
 
 /** The corner radius of a bill card and of its dialog; morph() holds it constant while the box scales. */
 export const BILL_RADIUS_PX = 16;

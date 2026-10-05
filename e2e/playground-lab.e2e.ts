@@ -55,8 +55,14 @@ test("the Spring lab panel enters and leaves with Presence and shows the live va
   await expect(lab(page).locator("[data-lab-value=duration]")).toHaveText("0.50 s");
   await expect(lab(page).locator("[data-lab-value=bounce]")).toHaveText("0.10");
 
+  // Screen readers get units with the values.
+  await expect(durationSlider(page)).toHaveAttribute("aria-valuetext", "0.50 seconds");
+  await expect(bounceSlider(page)).toHaveAttribute("aria-valuetext", "bounce 0.10");
+
   await durationSlider(page).fill("1.25");
   await bounceSlider(page).fill("0.35");
+  await expect(durationSlider(page)).toHaveAttribute("aria-valuetext", "1.25 seconds");
+  await expect(bounceSlider(page)).toHaveAttribute("aria-valuetext", "bounce 0.35");
   await expect(lab(page).locator("[data-lab-value=duration]")).toHaveText("1.25 s");
   await expect(lab(page).locator("[data-lab-value=bounce]")).toHaveText("0.35");
 
@@ -248,4 +254,87 @@ test("the lab is reachable by keyboard", async ({ page }) => {
   await durationSlider(page).focus();
   await page.keyboard.press("ArrowRight");
   await expect(lab(page).locator("[data-lab-value=duration]")).not.toHaveText("0.50 s");
+});
+
+const ANCHOR_GAP_PX = 8;
+
+test("the lab opens as a popover under its button, right-aligned to it", async ({ page }) => {
+  await openPlayground(page);
+  await labButton(page).click();
+  const panel = await settledBox(lab(page));
+  const button = await settledBox(labButton(page));
+  expect(Math.abs(panel.x + panel.width - (button.x + button.width))).toBeLessThanOrEqual(2);
+  expect(Math.abs(panel.y - (button.y + button.height + ANCHOR_GAP_PX))).toBeLessThanOrEqual(2);
+  // It fits under the button: its bottom stays inside the window.
+  expect(panel.y + panel.height).toBeLessThanOrEqual(800);
+});
+
+test("on a narrow screen the popover stays inside the viewport, still under the button", async ({ page }) => {
+  await page.setViewportSize({ width: 420, height: 800 });
+  await openPlayground(page);
+  await labButton(page).click();
+  const panel = await settledBox(lab(page));
+  const button = await settledBox(labButton(page));
+  expect(panel.x).toBeGreaterThanOrEqual(6);
+  expect(panel.x + panel.width).toBeLessThanOrEqual(420 - 6);
+  expect(panel.y).toBeGreaterThanOrEqual(button.y + button.height);
+  expect(panel.y + panel.height).toBeLessThanOrEqual(800);
+});
+
+test("the popover enters from the button side", async ({ page }) => {
+  await openPlayground(page);
+  const tops = await page.evaluate(async () => {
+    document.querySelector<HTMLButtonElement>('button[aria-controls="spring-lab"]')!.click();
+    const samples: number[] = [];
+    await new Promise<void>((resolve) => {
+      let still = 0;
+      const tick = () => {
+        const panel = document.getElementById("spring-lab");
+        if (panel !== null) {
+          const top = panel.getBoundingClientRect().top;
+          still = samples.length > 0 && Math.abs(top - samples.at(-1)!) < 0.01 ? still + 1 : 0;
+          samples.push(top);
+        }
+        if (still >= 20) resolve();
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    return samples;
+  });
+  // It starts a few pixels toward the button (above its place) and settles down into it.
+  expect(tops[0]!).toBeLessThan(tops.at(-1)! - 3);
+});
+
+test("Escape closes the popover and returns focus to the button; so does a click outside", async ({ page }) => {
+  await openPlayground(page);
+  await labButton(page).click();
+  await expect(lab(page)).toBeVisible();
+  // Focus moves into the popover when it opens.
+  await expect(durationSlider(page)).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(lab(page)).toHaveCount(0);
+  await expect(labButton(page)).toBeFocused();
+  await expect(labButton(page)).toHaveAttribute("aria-expanded", "false");
+
+  await labButton(page).click();
+  await expect(lab(page)).toBeVisible();
+  await page.mouse.click(300, 600);
+  await expect(lab(page)).toHaveCount(0);
+
+  // Clicking the button itself while it is open closes it once, rather than closing and reopening it.
+  await labButton(page).click();
+  await expect(lab(page)).toBeVisible();
+  await labButton(page).click();
+  await expect(lab(page)).toHaveCount(0);
+});
+
+test("using the controls inside the popover does not close it", async ({ page }) => {
+  await openPlayground(page);
+  await labButton(page).click();
+  await durationSlider(page).fill("0.75");
+  await slowSwitch(page).check();
+  await lab(page).getByRole("button", { name: "Reset" }).click();
+  await expect(lab(page)).toBeVisible();
 });

@@ -1,5 +1,5 @@
 import { Presence, useLayout } from "@damped/react";
-import { useCallback, useReducer, useState, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useReducer, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { ActivityView } from "./ActivityView";
 import { BillsView } from "./BillsView";
 import { Overview } from "./Overview";
@@ -41,6 +41,7 @@ export function App() {
   const [view, setView] = useState<ViewId>("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
+  const labButton = useRef<HTMLButtonElement>(null);
   const [overview, setOverview] = useState(INITIAL_OVERVIEW);
   // Kept here, so a paid bill stays paid when the view is left and entered again.
   const [paid, setPaid] = useState<ReadonlySet<string>>(() => new Set());
@@ -87,6 +88,7 @@ export function App() {
           onToggleSidebar={() => setCollapsed((current) => !current)}
           labOpen={labOpen}
           onToggleLab={() => setLabOpen((current) => !current)}
+          labButton={labButton}
           onNew={() => (view === "activity" ? addTransaction() : toast.show("New transaction draft created"))}
           actions={
             view === "overview" ? (
@@ -126,9 +128,9 @@ export function App() {
           </Presence>
         </div>
       </main>
-      {/* The lab enters and leaves like everything else; its panel is portaled to <body>, away from the transformed <main>. */}
+      {/* The lab enters and leaves like everything else; its popover is portaled to <body>, away from the transformed <main>. */}
       <Presence enter={LAB_ENTER} exit={LAB_EXIT} options={spring("view")}>
-        {labOpen ? <SpringLab key="lab" /> : null}
+        {labOpen ? <SpringLab key="lab" anchor={labButton} onClose={() => setLabOpen(false)} /> : null}
       </Presence>
     </div>
   );

@@ -1,7 +1,7 @@
 import { Presence } from "@damped/react";
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ToastItem, type ToastData } from "./ToastItem";
+import { ToastItem, type ToastAction, type ToastData } from "./ToastItem";
 import { DEBUG } from "./debug";
 import { SPRINGS, TOAST_ENTER, TOAST_EXIT } from "./motion";
 
@@ -9,8 +9,13 @@ import { SPRINGS, TOAST_ENTER, TOAST_EXIT } from "./motion";
 export const MAX_TOASTS = 4;
 export const TOAST_DURATION_MS = 4000;
 
+export interface ToastOptions {
+  /** A button in the toast, such as "Undo". Using it dismisses the toast. */
+  action?: ToastAction;
+}
+
 interface ToastApi {
-  show(message: string): void;
+  show(message: string, options?: ToastOptions): void;
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -26,9 +31,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const nextId = useRef(1);
   const [gone, setGone] = useState(0);
 
-  const show = useCallback((message: string) => {
+  const show = useCallback((message: string, options: ToastOptions = {}) => {
     const id = nextId.current++;
-    setToasts((current) => [...current, { id, message }].slice(-MAX_TOASTS));
+    const toast: ToastData = options.action === undefined ? { id, message } : { id, message, action: options.action };
+    setToasts((current) => [...current, toast].slice(-MAX_TOASTS));
   }, []);
   const dismiss = useCallback((id: number) => setToasts((current) => current.filter((toast) => toast.id !== id)), []);
   const api = useMemo(() => ({ show }), [show]);

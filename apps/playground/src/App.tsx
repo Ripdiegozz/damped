@@ -1,10 +1,12 @@
 import { Presence, useLayout } from "@damped/react";
-import { useCallback, useState, type MouseEvent } from "react";
+import { useCallback, useReducer, useState, type MouseEvent, type ReactNode } from "react";
+import { ActivityView } from "./ActivityView";
 import { BillsView } from "./BillsView";
 import { Overview } from "./Overview";
 import { Placeholder, ViewPanel } from "./ViewPanel";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { activityReducer, draftTransaction, initialActivityState, visibleItems, type ActivityItem } from "./activity";
 import type { Bill } from "./bills";
 import { INITIAL_OVERVIEW, shuffleOverview, type OverviewData } from "./data";
 import { useToast } from "./ToastProvider";
@@ -17,16 +19,17 @@ interface ViewContentProps {
   overview: OverviewData;
   paid: ReadonlySet<string>;
   onPay(bill: Bill, amount: number): void;
+  activity: ReactNode;
 }
 
-function ViewContent({ view, overview, paid, onPay }: ViewContentProps) {
+function ViewContent({ view, overview, paid, onPay, activity }: ViewContentProps) {
   switch (view) {
     case "overview":
       return <Overview data={overview} />;
     case "bills":
       return <BillsView paid={paid} onPay={onPay} />;
     case "activity":
-      return <Placeholder title="Activity">Transactions will appear here.</Placeholder>;
+      return activity;
     case "settings":
       return <Placeholder title="Settings">Preferences for Northbook will appear here.</Placeholder>;
   }
@@ -39,6 +42,18 @@ export function App() {
   // Kept here, so a paid bill stays paid when the view is left and entered again.
   const [paid, setPaid] = useState<ReadonlySet<string>>(() => new Set());
   const toast = useToast();
+  // Kept here for the same reason as `paid`, and because the top bar's "+ New" adds a transaction while Activity is open.
+  const [activity, dispatch] = useReducer(activityReducer, undefined, initialActivityState);
+  const addTransaction = () => {
+    const item = draftTransaction(activity.added);
+    dispatch({ type: "add", item });
+    toast.show(`Added ${item.merchant}`);
+  };
+  const deleteTransaction = (item: ActivityItem) => {
+    const index = activity.items.findIndex((entry) => entry.id === item.id);
+    dispatch({ type: "remove", id: item.id });
+    toast.show(`Deleted ${item.merchant}`, { action: { label: "Undo", onAction: () => dispatch({ type: "restore", item, index }) } });
+  };
   const payBill = useCallback(
     (bill: Bill, amount: number) => {
       setPaid((current) => new Set(current).add(bill.id));
@@ -66,7 +81,7 @@ export function App() {
           title={viewLabel(view)}
           sidebarExpanded={!collapsed}
           onToggleSidebar={() => setCollapsed((current) => !current)}
-          onNew={() => toast.show("New transaction draft created")}
+          onNew={() => (view === "activity" ? addTransaction() : toast.show("New transaction draft created"))}
           actions={
             view === "overview" ? (
               // A dev control: retargets the figures, which is the quickest way to see a spring being interrupted.
@@ -84,7 +99,23 @@ export function App() {
         <div className="stage">
           <Presence enter={VIEW_ENTER} exit={VIEW_EXIT} options={SPRINGS.view}>
             <ViewPanel key={view} view={view}>
-              <ViewContent view={view} overview={overview} paid={paid} onPay={payBill} />
+              <ViewContent
+                view={view}
+                overview={overview}
+                paid={paid}
+                onPay={payBill}
+                activity={
+                  <ActivityView
+                    items={visibleItems(activity)}
+                    filter={activity.filter}
+                    sort={activity.sort}
+                    onFilter={(filter) => dispatch({ type: "filter", filter })}
+                    onSort={(sort) => dispatch({ type: "sort", sort })}
+                    onAdd={addTransaction}
+                    onDelete={deleteTransaction}
+                  />
+                }
+              />
             </ViewPanel>
           </Presence>
         </div>

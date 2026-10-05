@@ -42,3 +42,6 @@ export const BADGE_SPRING = { duration: 0.45, bounce: 0.45 } as const;
 /** For motion damped does not own (counting numbers, staggered mounts); damped itself follows the setting by default. */
 export const prefersReducedMotion = (): boolean =>
   typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+export const ACTIVITY_ROW_ENTER: AnimationTargets = { opacity: 0, y: -12 };
+export const ACTIVITY_ROW_EXIT: AnimationTargets = { opacity: 0, x: 16 };

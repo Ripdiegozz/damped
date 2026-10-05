@@ -756,3 +756,152 @@ p {
 .toast :focus-visible {
   outline-color: #fff;
 }
+
+/* Activity */
+
+.activity-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.net {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip-toggle {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.chip-toggle[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
+.sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.sort select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.tx-card {
+  padding-block: 8px;
+}
+
+.tx-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tx-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 48px 64px minmax(96px, auto) 36px;
+  align-items: center;
+  gap: 14px;
+  height: 64px;
+  border-top: 1px solid var(--line);
+}
+
+.tx-row:first-child {
+  border-top: 0;
+}
+
+.tx-who {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.tx-delete {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tx-delete:hover {
+  background: var(--bg);
+  color: var(--negative);
+}
+
+.tx-empty {
+  padding: 24px 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .tx-row {
+    grid-template-columns: 40px minmax(0, 1fr) 64px minmax(88px, auto) 36px;
+  }
+
+  .tx-who {
+    display: none;
+  }
+}
+
+.toast-action {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toast-action:hover {
+  background: rgb(255 255 255 / 12%);
+}

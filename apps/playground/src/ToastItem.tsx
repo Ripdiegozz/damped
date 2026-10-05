@@ -1,10 +1,18 @@
 import { useLayout } from "@damped/react";
 import { useCallback, useEffect, useRef, type FocusEvent, type Ref } from "react";
 import { SPRINGS } from "./motion";
+import { useMergedRef } from "./use-merged-ref";
+
+export interface ToastAction {
+  /** The visible text of the button, which is also its accessible name. */
+  label: string;
+  onAction(): void;
+}
 
 export interface ToastData {
   id: number;
   message: string;
+  action?: ToastAction;
 }
 
 /** After a pause ends, a toast stays at least this long (or its whole duration, if that is shorter). */
@@ -29,25 +37,7 @@ interface ToastItemProps {
 export function ToastItem({ toast, after, reflowKey, duration, onDismiss, ref }: ToastItemProps) {
   // Two things move a toast: one added below it pushes it up (`after`), and one that finished leaving frees space (`reflowKey`).
   const layoutRef = useLayout<HTMLDivElement>([after, reflowKey], SPRINGS.stack);
-  const node = useRef<HTMLDivElement | null>(null);
-
-  const setNode = useCallback(
-    (element: HTMLDivElement | null) => {
-      node.current = element;
-      layoutRef(element);
-      let cleanup: void | (() => void);
-      if (typeof ref === "function") cleanup = ref(element);
-      else if (ref) ref.current = element;
-      return () => {
-        node.current = null;
-        layoutRef(null);
-        if (typeof cleanup === "function") cleanup();
-        else if (typeof ref === "function") ref(null);
-        else if (ref) ref.current = null;
-      };
-    },
-    [layoutRef, ref],
-  );
+  const setNode = useMergedRef(layoutRef, ref);
 
   // The dismissal timer pauses while the pointer is over the toast or focus is inside it, and resumes with what was left.
   const timer = useRef({ id: undefined as number | undefined, remaining: duration, startedAt: 0, hovered: false, focused: false });
@@ -103,6 +93,18 @@ export function ToastItem({ toast, after, reflowKey, duration, onDismiss, ref }:
         </svg>
       </span>
       <p className="toast-message">{toast.message}</p>
+      {toast.action !== undefined && (
+        <button
+          type="button"
+          className="toast-action"
+          onClick={() => {
+            toast.action?.onAction();
+            onDismiss(toast.id);
+          }}
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button type="button" className="toast-close" aria-label="Dismiss notification" onClick={() => onDismiss(toast.id)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
           <path d="m6 6 12 12M18 6 6 18" />

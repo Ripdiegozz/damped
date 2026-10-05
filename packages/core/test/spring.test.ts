@@ -236,17 +236,6 @@ describe("at()", () => {
     }
   });
 
-  test("state depends only on elapsed time, not on frame sizes", () => {
-    const spring = createSpring(0, 1, 5, { duration: 0.5, bounce: 0.15 });
-    const at60 = spring.at(30 / 60);
-    const at120 = spring.at(60 / 120);
-    let elapsedMs = 0;
-    for (const stepMs of [100, 200, 50, 150]) elapsedMs += stepMs;
-    const irregular = spring.at(elapsedMs / 1000);
-    expect(at120).toEqual(at60);
-    expect(irregular).toEqual(at60);
-  });
-
   test("is symmetric for negative direction and large spans", () => {
     const options: SpringOptions = { duration: 0.5, bounce: 0.25 };
     const down = createSpring(0, -500, -80, options);

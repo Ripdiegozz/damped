@@ -1,0 +1,29 @@
+{
+  "name": "@damped/react",
+  "version": "0.0.0",
+  "description": "React hooks and components for damped spring animations, without per-frame re-renders.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "rm -rf dist && bun build.ts && tsc -p tsconfig.build.json"
+  },
+  "peerDependencies": {
+    "damped": ">=0.0.0",
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "damped": "workspace:*",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  }
+}

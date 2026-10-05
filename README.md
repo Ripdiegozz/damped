@@ -11,7 +11,7 @@ Spring animations for the web and for React Native that keep their velocity when
 
 Docs and the playground live at [damped.dagadev.net](https://damped.dagadev.net). Try it in [**Northbook**](https://damped.dagadev.net), a fictional personal-finance app built only on these packages. Open a bill, press Escape halfway and watch it turn around; change the duration and bounce of the whole app in the Spring lab.
 
-> damped is a work in progress and is not published to npm yet. The packages below are used from this repository's workspace.
+> damped `0.1.0` is published to npm as `@damped/core`, `@damped/react` and `@damped/native`.
 
 ## Packages
 
@@ -122,6 +122,12 @@ Bun 1.4.2 is the package manager and test runner, used for development only. Pub
 | `bun run demo:gif` | Records the scripted Northbook scene into `assets/northbook.gif` (needs `ffmpeg`). |
 
 The playground is deployed to https://damped.dagadev.net by a GitHub Actions workflow on every push to `main`.
+
+## Release
+
+1. Bump the three `version` fields in `packages/*/package.json` together.
+2. Push a `v*` tag (e.g. `v0.1.0`); `.github/workflows/release.yml` builds, tests and runs `npm publish --provenance --access public` in each package.
+3. It needs the `NPM_TOKEN` secret with publish rights on the `@damped` scope.
 
 ## License
 

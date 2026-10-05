@@ -1,6 +1,6 @@
 {
   "name": "@damped/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Interruptible, physically based spring animations for the web.",
   "keywords": ["spring", "animation", "physics", "interruptible", "velocity", "flip", "layout"],
@@ -16,6 +16,7 @@
     }
   },
   "files": ["dist"],
+  "publishConfig": { "access": "public" },
   "scripts": {
     "build": "rm -rf dist && bun build ./src/index.ts --outdir dist --format esm --target browser --minify && tsc -p tsconfig.build.json"
   }

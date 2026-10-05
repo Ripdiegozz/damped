@@ -1,6 +1,6 @@
 {
   "name": "@damped/native",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Velocity-preserving spring animations for Expo and React Native Reanimated.",
   "keywords": ["spring", "animation", "physics", "interruptible", "velocity", "react-native", "reanimated", "expo"],
@@ -16,6 +16,7 @@
     }
   },
   "files": ["dist"],
+  "publishConfig": { "access": "public" },
   "scripts": {
     "build": "rm -rf dist && bun build.ts && tsc -p tsconfig.build.json"
   },

@@ -118,7 +118,7 @@ damped does a few things and leaves the rest out on purpose. These are the cases
 - **Gestures and drag.** damped has none. If your interface is built around dragging, flicking and pressing, use a library that has them.
 - **Scroll-linked animation.** damped animates in time, not against scroll position.
 - **Shared elements across unmounts.** `useMorph` keeps both elements mounted. Motion's `layoutId` can animate between an element React has unmounted and one that mounts. A registry like that is not built in damped yet.
-- **A framework other than React,** or a library with a longer track record and a bigger ecosystem. damped is new and not published to npm yet.
+- **A framework other than React,** or a library with a longer track record and a bigger ecosystem. damped is new (`0.1.0` on npm).
 
 damped also has no SVG path morphing, keyframes, timelines or sequencing: it animates the eight properties listed above toward a target. Motion's documentation will tell you whether and how it covers each of those.
 

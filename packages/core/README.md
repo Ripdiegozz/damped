@@ -6,7 +6,7 @@ Spring animations for the DOM that keep their velocity when they are interrupted
 bun add @damped/core   # npm install / pnpm add work the same way
 ```
 
-> `@damped/core` is not published to npm yet. Until it is, use it from this repository's workspace.
+> Published to npm as `@damped/core` (`0.1.0`).
 
 ## Quick start
 

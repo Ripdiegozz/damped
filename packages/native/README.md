@@ -7,7 +7,7 @@ npx expo install react-native-reanimated   # the peer dependency
 npm install @damped/native                 # bun add / pnpm add work the same way
 ```
 
-> `@damped/native` is not published to npm yet. Until it is, use it from this repository's workspace.
+> Published to npm as `@damped/native` (`0.1.0`).
 
 ## Requirements
 

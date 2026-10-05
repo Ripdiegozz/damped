@@ -6,7 +6,7 @@ React hooks and a component for [`@damped/core`](../core) springs. Animated valu
 bun add @damped/react @damped/core react react-dom   # npm install / pnpm add work the same way
 ```
 
-> `@damped/react` is not published to npm yet. Until it is, use it from this repository's workspace.
+> Published to npm as `@damped/react` (`0.1.0`).
 
 Peer dependencies: React 19 (`react`, `react-dom`) and `@damped/core`.
 

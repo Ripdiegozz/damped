@@ -1,0 +1,40 @@
+name: Release
+
+# Publishes @damped/core, @damped/react and @damped/native to npm.
+# Requires the NPM_TOKEN secret (an npm access token with publish rights on the @damped scope).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are pinned to commit SHAs; the comment records the tag they resolve to.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun test
+      - name: Publish @damped/core
+        run: npm publish --provenance --access public
+        working-directory: packages/core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish @damped/react
+        run: npm publish --provenance --access public
+        working-directory: packages/react
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish @damped/native
+        run: npm publish --provenance --access public
+        working-directory: packages/native
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

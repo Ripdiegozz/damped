@@ -1,348 +1,32 @@
-/* Landing page (`/`): the hero override (components/landing/Hero.astro), the package cards and the "why" section.
-   Everything uses the theme tokens from theme.css, so dark and light stay in step. */
+/* Landing page (`/`): the hero override (components/landing/Hero.astro), the live spring instrument, and the package,
+   why, spec and guide sections. Quiet chrome, loud motion: ink and 1 px hairlines everywhere, and the signal colour only
+   on the things that move or come to rest (the mass, the rest dot, the phase head).
 
-/* The landing is wider than a documentation page; prose inside it is held to a readable measure below. */
+   Colours come from the Starlight tokens, which the docs theme maps onto the brand palette; the brand tokens are
+   referenced with fallbacks so the page reads correctly before and after that mapping. No glows, no card shadows, and
+   no box is rounded past 6 px (landing.test.ts holds the line). Sections opt out of Starlight's prose rules with
+   `not-content`, so nothing here fights a margin from the markdown theme. */
+
 :root[data-has-hero] {
+  /* Wider than a documentation page; prose inside it keeps its own measure. */
   --sl-content-width: 70rem;
+
+  --ld-ink: var(--sl-color-white, #ededed);
+  --ld-text: var(--sl-color-gray-2, #c4c4c8);
+  --ld-muted: var(--sl-color-gray-3, #a1a1aa);
+  --ld-line: var(--sl-color-hairline, #26262a);
+  --ld-line-strong: var(--sl-color-gray-4, #52525b);
+  --ld-paper: var(--sl-color-black, #0a0a0b);
+  --ld-accent: var(--damped-accent, #ff5f1f);
+  --ld-accent-text: var(--damped-accent-text, var(--sl-color-text-accent, #ff6a2e));
+  --ld-mono: var(--sl-font-mono, ui-monospace, monospace);
+  --ld-radius: 6px;
+  /* Width of the left column shared by the package rows, the reasons and the spec sheet. */
+  --ld-col: 17rem;
 }
 
-/* Hero ------------------------------------------------------------------------------------------------------ */
-.landing-hero {
-  background: none;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 2.5rem;
-  align-items: center;
-  padding-block: clamp(1.5rem, 1rem + 4vw, 5rem) 1rem;
-}
-
-.landing-hero__copy {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1.25rem;
-}
-
-.landing-hero h1 {
-  max-width: 13ch;
-  margin: 0;
-  font-size: clamp(2.6rem, 1.4rem + 5.4vw, 4.6rem);
-  line-height: 1.04;
-  letter-spacing: -0.025em;
-  color: var(--sl-color-white);
-  text-wrap: balance;
-}
-
-.landing-hero h1 em {
-  font-style: normal;
-  color: var(--sl-color-accent-high);
-}
-
-.landing-hero__tagline {
-  max-width: 34rem;
-  margin: 0;
-  font-size: clamp(1.05rem, 0.95rem + 0.5vw, 1.25rem);
-  line-height: 1.55;
-  color: var(--sl-color-gray-2);
-  text-wrap: pretty;
-}
-
-.landing-hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1rem;
-  margin-top: 0.5rem;
-}
-
-/* The island renders on the server with the same markup it hydrates, so the stage keeps its size. */
-.landing-hero__visual {
-  width: 100%;
-  max-width: 30rem;
-  justify-self: center;
-}
-
-.landing-hero__visual .demo {
-  margin: 0;
-}
-
-.landing-hero__hint {
-  margin: 0.9rem 0 0;
-  text-align: center;
-  font-size: 0.875rem;
-  color: var(--sl-color-gray-3);
-}
-
-.landing-hero kbd,
-.landing-hero__hint kbd {
-  padding: 0.1rem 0.4rem;
-  border: 1px solid var(--sl-color-hairline-light);
-  border-bottom-width: 2px;
-  border-radius: 0.35rem;
-  background: var(--sl-color-gray-6);
-  color: var(--sl-color-white);
-  font-family: var(--sl-font-mono);
-  font-size: 0.8125rem;
-}
-
-@media (min-width: 56rem) {
-  .landing-hero {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-    gap: clamp(2rem, 5vw, 5rem);
-    padding-block: clamp(2.5rem, 1rem + 6vw, 6rem) 2rem;
-  }
-
-  .landing-hero__visual {
-    justify-self: end;
-  }
-}
-
-/* Sections ------------------------------------------------------------------------------------------------ */
-.landing-section {
-  margin-top: clamp(3.5rem, 2rem + 6vw, 6.5rem);
-}
-
-.landing-section > h2 {
-  margin: 0 0 0.75rem;
-  font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.5rem);
-  line-height: 1.15;
-  color: var(--sl-color-white);
-}
-
-.landing-section > p {
-  max-width: 40rem;
-  color: var(--sl-color-gray-2);
-}
-
-/* Package cards ------------------------------------------------------------------------------------------- */
-.package-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1.25rem;
-  margin-top: 2rem;
-}
-
-/* One row per package: what it is on the left, the code to start with on the right. */
-.package-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1.5rem;
-  min-width: 0;
-  padding: clamp(1.25rem, 1rem + 1.2vw, 1.75rem);
-  border: 1px solid var(--sl-color-hairline-light);
-  border-radius: calc(var(--damped-radius) + 0.25rem);
-  background: var(--sl-color-gray-7);
-  box-shadow: 0 18px 40px -30px var(--damped-glow);
-}
-
-@media (min-width: 50rem) {
-  .package-card {
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    gap: 2.5rem;
-  }
-}
-
-.package-card__about {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  min-width: 0;
-}
-
-.package-card__head {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.package-card__head > * {
-  margin: 0;
-}
-
-.package-card__platform {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--sl-color-accent-high);
-}
-
-.sl-markdown-content .package-card__name {
-  margin: 0;
-  font-family: var(--sl-font-mono);
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--sl-color-white);
-}
-
-.package-card__name code {
-  padding: 0;
-  background: none;
-  border: 0;
-  font: inherit;
-  color: inherit;
-}
-
-.package-card__purpose {
-  font-size: 0.9375rem;
-  line-height: 1.55;
-  color: var(--sl-color-gray-2);
-}
-
-.package-card__code {
-  display: grid;
-  gap: 0.75rem;
-  min-width: 0;
-}
-
-.package-card__code > *,
-.package-card__code .expressive-code {
-  margin: 0;
-}
-
-.package-card__code .expressive-code {
-  min-width: 0;
-}
-
-.package-card__code pre {
-  font-size: 0.8125rem;
-}
-
-.package-card__link {
-  margin-top: auto;
-  align-self: flex-start;
-  font-weight: 600;
-  color: var(--sl-color-text-accent);
-  text-decoration: none;
-}
-
-.package-card__link:hover {
-  text-decoration: underline;
-  text-underline-offset: 0.25em;
-}
-
-/* Why ----------------------------------------------------------------------------------------------------- */
-.why-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 2rem 3rem;
-  margin-top: 2rem;
-}
-
-@media (min-width: 46rem) {
-  .why-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.why-point {
-  display: grid;
-  align-content: start;
-  gap: 0.6rem;
-  padding-top: 1.1rem;
-  border-top: 2px solid var(--sl-color-accent);
-}
-
-.why-point > * {
-  margin: 0;
-}
-
-.sl-markdown-content .why-point h3 {
-  margin: 0;
-  font-family: var(--damped-font-display);
-  font-size: 1.3rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--sl-color-white);
-}
-
-.why-point p {
-  color: var(--sl-color-gray-2);
-  line-height: 1.6;
-  text-wrap: pretty;
-}
-
-.why-point a {
-  justify-self: start;
-  font-weight: 600;
-  color: var(--sl-color-text-accent);
-  text-decoration: none;
-}
-
-.why-point a:hover {
-  text-decoration: underline;
-  text-underline-offset: 0.25em;
-}
-
-.size-strip {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1.5rem;
-  margin: 3rem 0 0;
-  padding: 1.75rem 1.5rem;
-  border: 1px solid var(--sl-color-hairline-light);
-  border-radius: calc(var(--damped-radius) + 0.25rem);
-  background: var(--sl-color-gray-7);
-}
-
-@media (min-width: 46rem) {
-  .size-strip {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2rem;
-    padding: 2rem;
-  }
-}
-
-.size-strip > div {
-  display: grid;
-  gap: 0.25rem;
-  margin: 0;
-}
-
-.size-strip dt {
-  font-family: var(--damped-font-display);
-  font-size: clamp(2.25rem, 1.8rem + 1.6vw, 3rem);
-  font-weight: 600;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  color: var(--sl-color-accent-high);
-}
-
-.size-strip dd {
-  margin: 0;
-  padding: 0;
-  font-size: 0.9375rem;
-  color: var(--sl-color-gray-2);
-}
-
-.sl-markdown-content .size-note {
-  max-width: 44rem;
-  margin-top: 1rem;
-  font-size: 0.8125rem;
-  color: var(--sl-color-gray-3);
-}
-
-/* Keep exploring ------------------------------------------------------------------------------------------- */
-.landing-section .sl-link-card {
-  border-radius: var(--damped-radius);
-}
-
-/* Starlight spaces consecutive siblings of markdown content; grid gaps do that here, so the margin must go. */
-.sl-markdown-content :is(.package-grid, .why-grid, .size-strip) > * {
-  margin: 0;
-}
-
-.sl-markdown-content .size-strip dd {
-  margin: 0;
-  padding: 0;
-}
-
-/* One soft glow behind the hero, full width, instead of a box the width of the content. */
-:root[data-has-hero] .main-pane {
-  background: radial-gradient(64rem 28rem at 72% -6rem, var(--damped-glow), transparent 70%);
-}
-
-.landing-section .visually-hidden {
+.landing-sr,
+.instrument__sr {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -351,4 +35,739 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* Hero ------------------------------------------------------------------------------------------------------ */
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(2rem, 1.2rem + 3vw, 3.5rem);
+  padding-block: clamp(1.5rem, 0.5rem + 4vw, 4.5rem) 0;
+  background: none;
+}
+
+.landing-hero__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.landing-hero h1 {
+  max-width: 14em;
+  margin: 0;
+  font-size: clamp(2.5rem, 1.5rem + 4.6vw, 4.5rem);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  color: var(--ld-ink);
+  text-wrap: balance;
+}
+
+.landing-hero__tagline {
+  max-width: 34rem;
+  margin: 0;
+  font-size: clamp(1rem, 0.94rem + 0.3vw, 1.1875rem);
+  line-height: 1.55;
+  color: var(--ld-text);
+  text-wrap: pretty;
+}
+
+.landing-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.landing-button {
+  display: inline-flex;
+  align-items: center;
+  height: 2.5rem;
+  padding-inline: 1rem;
+  border: 1px solid var(--ld-line-strong);
+  border-radius: var(--ld-radius);
+  color: var(--ld-ink);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.landing-button:hover {
+  border-color: var(--ld-ink);
+}
+
+/* Ink on paper, in both themes: neutral, never the signal colour. */
+.landing-button--solid {
+  border-color: var(--ld-ink);
+  background: var(--ld-ink);
+  color: var(--ld-paper);
+}
+
+.landing-button--solid:hover {
+  opacity: 0.88;
+}
+
+.landing-quiet {
+  padding-inline: 0.5rem;
+  color: var(--ld-muted);
+  font-size: 0.9375rem;
+  text-decoration: none;
+}
+
+.landing-quiet:hover {
+  color: var(--ld-ink);
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+
+.landing-hero :is(a, button):focus-visible,
+.landing-section a:focus-visible {
+  outline: 2px solid var(--ld-accent-text);
+  outline-offset: 2px;
+}
+
+/* The instrument ------------------------------------------------------------------------------------------- */
+.instrument {
+  --axis: 3rem;
+  margin: 0;
+  border: 1px solid var(--ld-line);
+  border-radius: var(--ld-radius);
+  color: var(--ld-text);
+  font-family: var(--sl-font, inherit);
+}
+
+:where(.instrument) :is(p, dl, dd, figure) {
+  margin: 0;
+  padding: 0;
+}
+
+.instrument__bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1.5rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--ld-line);
+  font-family: var(--ld-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ld-muted);
+}
+
+.instrument__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.instrument__track {
+  position: relative;
+  min-height: 14rem;
+  cursor: crosshair;
+  /* Only the track opts out of scrolling, so a swipe anywhere else on the page still scrolls it. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.instrument__track::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: var(--axis);
+  height: 1px;
+  background: var(--ld-line-strong);
+}
+
+.instrument__track:focus-visible {
+  outline: 2px solid var(--ld-accent-text);
+  outline-offset: -2px;
+}
+
+/* The rail is the coordinate frame: 0 % and 100 % of the track are its left and right edges. The side room is
+   what the mass may swing into past either end. */
+.instrument__rail {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: clamp(1.75rem, 7%, 4.5rem);
+}
+
+.instrument__tick {
+  position: absolute;
+  top: calc(var(--axis) - 3px);
+  width: 1px;
+  height: 7px;
+  background: var(--ld-line-strong);
+}
+
+.instrument__tick--major {
+  top: calc(var(--axis) - 6px);
+  height: 13px;
+}
+
+.instrument__tick {
+  font-style: normal;
+}
+
+.instrument__tick b {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+  transform: translateX(-50%);
+  font-family: var(--ld-mono);
+  font-size: 0.625rem;
+  font-weight: 400;
+  color: var(--ld-muted);
+}
+
+.instrument__trail {
+  position: absolute;
+  top: 4rem;
+  left: 0;
+  width: 100%;
+  height: 9.5rem;
+  overflow: visible;
+  color: var(--ld-muted);
+}
+
+.instrument__trail-path {
+  fill: none;
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+}
+
+/* Starts at the middle of the track; the script moves it with a transform, so the server-rendered page already
+   shows the mass where it rests. */
+.instrument__rest,
+.instrument__mass {
+  position: absolute;
+  top: var(--axis);
+  left: 50%;
+  will-change: transform;
+}
+
+.instrument__rest {
+  bottom: 0;
+  width: 0;
+  pointer-events: none;
+}
+
+.instrument__rest::before {
+  content: "";
+  position: absolute;
+  top: 1rem;
+  bottom: 0;
+  left: 0;
+  border-left: 1px dashed var(--ld-line-strong);
+}
+
+.instrument__rest::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ld-accent);
+}
+
+.instrument__mass {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: -0.625rem 0 0 -0.625rem;
+  border-radius: 50%;
+  background: var(--ld-accent);
+  cursor: grab;
+}
+
+.instrument__mass:active {
+  cursor: grabbing;
+}
+
+/* A fingertip is wider than the dot. */
+.instrument__mass::before {
+  content: "";
+  position: absolute;
+  inset: -0.75rem;
+  border-radius: 50%;
+}
+
+.instrument__phase {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-top: 1px solid var(--ld-line);
+}
+
+.instrument__phase svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+
+.instrument__axis {
+  stroke: var(--ld-line-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.instrument__phase-path {
+  fill: none;
+  stroke: var(--ld-ink);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.instrument__rest-dot,
+.instrument__phase-head {
+  fill: var(--ld-accent);
+}
+
+.instrument__phase figcaption {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--ld-muted);
+  text-wrap: pretty;
+}
+
+.instrument__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--ld-line);
+}
+
+.instrument__readouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  font-family: var(--ld-mono);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.instrument__readouts > div {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.instrument__readouts dt {
+  color: var(--ld-muted);
+}
+
+.instrument__readouts dd {
+  color: var(--ld-ink);
+}
+
+.instrument__readouts > div:nth-child(1) dd {
+  min-width: 9ch;
+}
+
+.instrument__readouts > div:nth-child(2) dd {
+  min-width: 10ch;
+}
+
+.instrument__hint {
+  max-width: 28rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--ld-muted);
+  text-wrap: pretty;
+}
+
+.instrument__note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.625rem 1rem;
+  border-top: 1px solid var(--ld-line);
+  font-size: 0.8125rem;
+  color: var(--ld-text);
+}
+
+.instrument__button {
+  appearance: none;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--ld-line-strong);
+  border-radius: var(--ld-radius);
+  background: none;
+  color: var(--ld-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.instrument__button:hover,
+.instrument__button[aria-pressed="true"] {
+  border-color: var(--ld-ink);
+}
+
+.instrument__button:focus-visible {
+  outline: 2px solid var(--ld-accent-text);
+  outline-offset: 2px;
+}
+
+@media (min-width: 46rem) {
+  .instrument__body {
+    grid-template-columns: minmax(0, 1fr) 13.5rem;
+  }
+
+  .instrument__phase {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    border-top: 0;
+    border-left: 1px solid var(--ld-line);
+  }
+
+  .instrument__phase svg {
+    max-width: 11rem;
+    margin-inline: auto;
+  }
+}
+
+/* Sections ------------------------------------------------------------------------------------------------- */
+.landing-section {
+  margin-top: clamp(4rem, 2.5rem + 6vw, 7rem);
+}
+
+.landing-section h2,
+.landing-section h3,
+.landing-section p,
+.landing-section ol,
+.landing-section ul {
+  margin: 0;
+}
+
+.landing-section__head {
+  display: grid;
+  gap: 0.5rem 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.landing-section__head h2 {
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--ld-ink);
+}
+
+.landing-section__head p {
+  max-width: 36rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--ld-muted);
+}
+
+@media (min-width: 50rem) {
+  .landing-section__head {
+    grid-template-columns: var(--ld-col) minmax(0, 1fr);
+    align-items: baseline;
+  }
+}
+
+.landing-section a {
+  color: var(--ld-ink);
+  text-decoration-color: var(--ld-line-strong);
+  text-underline-offset: 0.25em;
+}
+
+.landing-section a:hover {
+  color: var(--ld-accent-text);
+  text-decoration-color: currentColor;
+}
+
+/* Packages ------------------------------------------------------------------------------------------------- */
+.package-list {
+  border-bottom: 1px solid var(--ld-line);
+}
+
+.package-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem 2rem;
+  padding-block: 1.75rem;
+  border-top: 1px solid var(--ld-line);
+}
+
+@media (min-width: 50rem) {
+  .package-row {
+    grid-template-columns: var(--ld-col) minmax(0, 1fr);
+  }
+}
+
+.package-row__about {
+  min-width: 0;
+}
+
+.package-row__name {
+  font-family: var(--ld-mono);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ld-ink);
+}
+
+.package-row__name code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+
+.package-row__platform {
+  margin-top: 0.25rem;
+  font-family: var(--ld-mono);
+  font-size: 0.75rem;
+  color: var(--ld-muted);
+}
+
+.package-row__purpose {
+  margin-top: 0.9rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--ld-text);
+  text-wrap: pretty;
+}
+
+.package-row__link {
+  display: inline-block;
+  margin-top: 1rem;
+  font-family: var(--ld-mono);
+  font-size: 0.8125rem;
+}
+
+.package-row__code {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.package-row__code > *,
+.package-row__code .expressive-code {
+  margin: 0;
+  min-width: 0;
+}
+
+.package-row__code pre {
+  font-size: 0.8125rem;
+}
+
+/* Why ------------------------------------------------------------------------------------------------------ */
+.why-list {
+  list-style: none;
+  padding: 0;
+  border-bottom: 1px solid var(--ld-line);
+}
+
+.why-list > li {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  row-gap: 0.5rem;
+  padding-block: 1.5rem;
+  border-top: 1px solid var(--ld-line);
+}
+
+.why-list__n {
+  padding-top: 0.2rem;
+  font-family: var(--ld-mono);
+  font-size: 0.75rem;
+  color: var(--ld-muted);
+}
+
+.why-list h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--ld-ink);
+}
+
+.why-list__body {
+  grid-column: 2;
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+}
+
+.why-list__body p {
+  max-width: 38rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--ld-text);
+  text-wrap: pretty;
+}
+
+.why-list__body a {
+  font-family: var(--ld-mono);
+  font-size: 0.8125rem;
+}
+
+@media (min-width: 50rem) {
+  .why-list > li {
+    grid-template-columns: 2.5rem calc(var(--ld-col) - 0.5rem) minmax(0, 1fr);
+  }
+
+  .why-list h3 {
+    padding-right: 1.5rem;
+  }
+
+  .why-list__body {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
+/* Spec sheet ----------------------------------------------------------------------------------------------- */
+.spec-sheet {
+  width: 100%;
+  /* Fixed layout: the columns take the widths below instead of the length of their longest word. */
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.spec-sheet th,
+.spec-sheet td {
+  padding: 0.8rem 1rem 0.8rem 0;
+  border: 0;
+  border-top: 1px solid var(--ld-line);
+  background: none;
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.spec-sheet thead th {
+  padding-block: 0 0.5rem;
+  border-top: 0;
+  font-family: var(--ld-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ld-muted);
+}
+
+.spec-sheet thead th:nth-child(1) {
+  width: 7rem;
+}
+
+.spec-sheet thead th:nth-child(2) {
+  width: 5.5rem;
+}
+
+.spec-sheet tbody th {
+  font-family: var(--ld-mono);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--ld-text);
+  overflow-wrap: anywhere;
+}
+
+.spec-sheet td:nth-child(2) {
+  font-family: var(--ld-mono);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+  color: var(--ld-ink);
+}
+
+.spec-sheet td:last-child {
+  padding-right: 0;
+  font-size: 0.875rem;
+  color: var(--ld-text);
+}
+
+.spec-sheet tbody tr:last-child > * {
+  border-bottom: 1px solid var(--ld-line);
+}
+
+.spec-sheet code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--ld-mono);
+  font-size: 0.8125rem;
+  color: var(--ld-ink);
+}
+
+@media (min-width: 50rem) {
+  .spec-sheet thead th:nth-child(1) {
+    width: calc(var(--ld-col) + 2rem);
+  }
+
+  .spec-sheet thead th:nth-child(2) {
+    width: 9rem;
+  }
+}
+
+/* Guide index ---------------------------------------------------------------------------------------------- */
+.guide-index {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 3rem;
+  padding: 0;
+  list-style: none;
+}
+
+.guide-index > li {
+  border-top: 1px solid var(--ld-line);
+}
+
+.guide-index > li:last-child {
+  border-bottom: 1px solid var(--ld-line);
+}
+
+.guide-index a {
+  display: grid;
+  gap: 0.2rem;
+  padding-block: 0.9rem;
+  text-decoration: none;
+}
+
+.guide-index__title {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--ld-ink);
+}
+
+.guide-index__note {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--ld-muted);
+}
+
+.guide-index a:hover .guide-index__title {
+  color: var(--ld-accent-text);
+}
+
+.guide-index code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--ld-mono);
+  font-size: 0.8125rem;
+}
+
+@media (min-width: 46rem) {
+  .guide-index {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .guide-index > li:nth-last-child(2) {
+    border-bottom: 1px solid var(--ld-line);
+  }
 }

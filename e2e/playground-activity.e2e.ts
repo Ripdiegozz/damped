@@ -41,6 +41,75 @@ async function expectSettledStack(page: Page): Promise<void> {
     .toEqual({ uniform: true, identity: true, opaque: true });
 }
 
+const clickChip = (name: string) => `[...document.querySelectorAll(".chips button")].find((entry) => entry.textContent.trim() === ${JSON.stringify(name)}).click()`;
+
+// The element that paints the white card; the rows are not inside it, so its height must be animated on its own.
+const SURFACE = ".tx-surface";
+
+/** One painted frame: the rendered height of the surface, and the height the card's layout gives it. */
+interface Sample {
+  surface: number;
+  card: number;
+}
+
+/**
+ * Runs `act` (which must change the list in the page) and records, for every frame of the next 2.5 s, the rendered height of the
+ * element `surface` selects and the layout height of the card. The window covers the immediate change (rows added) and the one
+ * after the exits complete (rows dropped). Returns the heights before `act` and one sample per frame.
+ */
+async function recordSurface(page: Page, act: string, surface: string) {
+  return page.evaluate(
+    async ({ act: source, surface: selector }) => {
+      const element = document.querySelector(selector)!;
+      const card = document.querySelector(".tx-card")!;
+      const read = () => ({ surface: element.getBoundingClientRect().height, card: card.getBoundingClientRect().height });
+      const before = read();
+      // The trigger is plain DOM code, so it runs in the same task as the recording below.
+      new Function(source)();
+      // React commits in a microtask after the click; the animation's first write is queued in that commit.
+      await Promise.resolve();
+      await Promise.resolve();
+      // One sample per frame, read once every animation callback of that frame has run: that is what gets painted.
+      const painted = () =>
+        new Promise<{ surface: number; card: number }>((resolve) => {
+          requestAnimationFrame(() => {
+            const channel = new MessageChannel();
+            channel.port1.onmessage = () => resolve(read());
+            channel.port2.postMessage(null);
+          });
+        });
+      const frames: { surface: number; card: number }[] = [];
+      const startedAt = performance.now();
+      while (performance.now() - startedAt < 2500) frames.push(await painted());
+      return { before, frames };
+    },
+    { act, surface },
+  );
+}
+
+/**
+ * The surface glides: the frame in which the card's layout changes still shows the old height, no frame takes a big share of the
+ * change, and the surface ends at the card's natural height.
+ */
+function expectGlide({ before, frames }: { before: Sample; frames: Sample[] }, label: string) {
+  const all = [before, ...frames];
+  const natural = frames.at(-1)!.card;
+  const total = Math.abs(natural - before.card);
+  expect(total, `${label}: the card changes height`).toBeGreaterThan(100);
+  const steps = frames.map((frame, index) => frame.surface - all[index]!.surface);
+  const biggest = Math.max(...steps.map(Math.abs));
+  // The first frame in which the layout changes: whatever the surface does there must start from where it was.
+  const changed = frames.findIndex((frame, index) => Math.abs(frame.card - all[index]!.card) > 0.5);
+  expect(changed, `${label}: the layout changes`).toBeGreaterThanOrEqual(0);
+  const first = steps[changed]!;
+  console.log(
+    `${label}: total=${total.toFixed(1)} biggestStep=${biggest.toFixed(1)} (${((biggest / total) * 100).toFixed(0)}%) layoutFrame=${changed} stepOnLayoutFrame=${first.toFixed(2)} next=${steps.slice(changed + 1, changed + 4).map((step) => step.toFixed(1))} end=${frames.at(-1)!.surface.toFixed(1)} natural=${natural.toFixed(1)}`,
+  );
+  expect(biggest / total, `${label}: biggest frame-to-frame jump ${biggest.toFixed(1)}px of ${total.toFixed(1)}px`).toBeLessThanOrEqual(0.35);
+  expect(Math.abs(first), `${label}: surface on the frame the layout changes`).toBeLessThanOrEqual(TOLERANCE_PX);
+  expect(Math.abs(frames.at(-1)!.surface - natural), `${label}: final height`).toBeLessThanOrEqual(TOLERANCE_PX);
+}
+
 /**
  * Runs `act` (which must change the list in the page) and records every row's y for each frame until all of them have
  * been still for a while. Returns the y of each row before, on the first frame after, and at the end.
@@ -249,4 +318,31 @@ test("the restored row enters with a fade", async ({ page }) => {
   });
   expect(opacities[0]!).toBeLessThan(0.6);
   expect(opacities.at(-1)!).toBeGreaterThan(0.95);
+});
+
+test("the card background glides down to its new height when a filter removes rows", async ({ page }) => {
+  await openActivity(page);
+  expectGlide(await recordSurface(page, clickChip("Dining"), SURFACE), "All -> Dining");
+  await expect(rows(page)).toHaveCount(4);
+});
+
+test("the card background glides up to its new height when the filter is cleared", async ({ page }) => {
+  await openActivity(page);
+  await chip(page, "Dining").click();
+  await expect(rows(page)).toHaveCount(4);
+  await expect.poll(() => page.locator(".tx-card").evaluate((card) => card.getBoundingClientRect().height)).toBeLessThan(400);
+  await settledBox(page.locator(SURFACE));
+  expectGlide(await recordSurface(page, clickChip("All"), SURFACE), "Dining -> All");
+  await expect(rows(page)).toHaveCount(27);
+});
+
+test("with reduced motion the card background jumps and rests at its natural size", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openActivity(page);
+  const { frames } = await recordSurface(page, clickChip("Dining"), SURFACE);
+  await expect(rows(page)).toHaveCount(4);
+  expect(Math.abs(frames.at(-1)!.surface - frames.at(-1)!.card)).toBeLessThanOrEqual(TOLERANCE_PX);
+  const surface = await page.locator(SURFACE).evaluate((element) => ({ identity: new DOMMatrixReadOnly(getComputedStyle(element).transform).isIdentity, radius: getComputedStyle(element).borderRadius }));
+  expect(surface.identity).toBe(true);
+  expect(surface.radius).toBe("16px");
 });

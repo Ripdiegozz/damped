@@ -1,5 +1,6 @@
 import {
   animate,
+  flushTransform,
   IDENTITY_TRANSFORM,
   peekSpringValue,
   releaseToJs,
@@ -194,6 +195,8 @@ function animateRecorded(recorded: readonly Recorded[], options: LayoutOptions):
 
     // Layout corrections are written per frame from JS, so it always uses the JS driver.
     controls.push(animate(element, REST, { ...animateOptions, scheduler, driver: "js" }));
+    // The inverse transform is inline before this returns; waiting for the next frame is only safe when no paint can come first.
+    flushTransform(element, scheduler);
   }
   return combine(controls);
 }

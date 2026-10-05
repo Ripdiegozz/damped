@@ -54,6 +54,9 @@ function TransactionRow({ item, index, reflowKey, onDelete, ref }: RowProps) {
   );
 }
 
+/** The corner radius of the card surface in px: `--radius-md`, which `.tx-surface` uses. */
+const CARD_RADIUS = 16;
+
 interface ActivityViewProps {
   /** The transactions to show, already filtered and sorted. */
   items: readonly ActivityItem[];
@@ -70,6 +73,11 @@ export function ActivityView({ items, filter, sort, onFilter, onSort, onAdd, onD
   const [gone, setGone] = useState(0);
   const addButton = useRef<HTMLButtonElement>(null);
   const focusAfterDelete = useRef<string | null>(null);
+
+  // The card's height is plain layout, so the white surface behind the rows is its own layer that glides to the new height with the same
+  // spring as the rows. Rows come and go with `items.length` (which also brings the empty message in), and rows that finished leaving
+  // free their space when `gone` changes.
+  const surfaceRef = useLayout<HTMLDivElement>([items.length, gone], { ...spring("stack"), radius: CARD_RADIUS });
 
   // A deleted row takes focus with it; hand it to the row that is next to it, or to "Add transaction" when none is left.
   useEffect(() => {
@@ -118,6 +126,7 @@ export function ActivityView({ items, filter, sort, onFilter, onSort, onAdd, onD
       </div>
 
       <section className="card tx-card">
+        <div className="tx-surface" aria-hidden="true" ref={surfaceRef} />
         <ul className="tx-list" role="list" aria-label="Transactions">
           <Presence enter={ACTIVITY_ROW_ENTER} exit={ACTIVITY_ROW_EXIT} options={spring("row")} onExitComplete={() => setGone((count) => count + 1)}>
             {items.map((item, index) => (

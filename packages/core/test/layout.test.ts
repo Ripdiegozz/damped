@@ -92,6 +92,30 @@ describe("layout", () => {
     expect(visual.height).toBeCloseTo(A.height, 9);
   });
 
+  test("shows the previous box as soon as animate() returns, before any frame, so a commit between frames never paints the new layout", () => {
+    const world = createWorld();
+    const { fake, options } = setup();
+    const element = createElement();
+    world.place(element, { a: A, b: B });
+
+    layout(
+      element,
+      () => {
+        world.state = "b";
+      },
+      options(),
+    );
+    // No frame has run yet: the inverse transform is already inline.
+    expect(element.style.transform).toBe(transform(-300, -150, A.width / B.width, 0.5));
+    const visual = world.visual(element);
+    expect(visual.width).toBeCloseTo(A.width, 9);
+    expect(visual.height).toBeCloseTo(A.height, 9);
+
+    // The first frame keeps it there: no step on a frame of delta 0.
+    fake.flush(0);
+    expect(element.style.transform).toBe(transform(-300, -150, A.width / B.width, 0.5));
+  });
+
   test("settles to the identity transform and the scheduler goes idle", async () => {
     const world = createWorld();
     const { fake, scheduler, options } = setup();
@@ -648,8 +672,10 @@ describe("radius correction", () => {
       options({ radius: 8 }),
     );
     const scaleX = A.width / B.width;
-    fake.flush(0);
+    // The corrected radius goes inline together with the inverse transform, before any frame; the first frame repeats it.
     expect(writes.values("borderRadius")).toEqual([`${8 / scaleX}px / ${8 / 0.5}px`]);
+    fake.flush(0);
+    expect(writes.values("borderRadius").at(-1)).toBe(`${8 / scaleX}px / ${8 / 0.5}px`);
 
     fake.flush(80);
     const applied = parseTransform(element.style.transform);

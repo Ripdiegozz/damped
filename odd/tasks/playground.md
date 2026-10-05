@@ -42,6 +42,7 @@ The original proof of concept (and a first demo attempt) reused the app name, se
 
 ## Delivery
 
+- Merge gate (user, 2026-10-05): do not wait for CodeRabbit. `check` + `browser` (and GitGuardian when it reports) must be green.
 - Strategy: `auto-chain`, `stacked-to-main`. The user authorized automatic delivery on 2026-10-05.
 - Native review consent is treated as granted by the user's standing instruction, and every report discloses that.
 - Hosting decided on 2026-10-05: the user will make the repository public, so GitHub Pages (free plan) is deployed by GitHub Actions. The custom domain is `damped.dagadev.net`; the user wrote "damper", which was flagged.
@@ -66,6 +67,7 @@ The original proof of concept (and a first demo attempt) reused the app name, se
 | P9 | Playwright smoke tests: morph open/close/reverse, keyboard flow, toast, row add/delete, view switch | delegated writer | [x] covered by the per-feature e2e suites (71 tests) |
 | P10 | Deploy: GitHub Pages workflow (build → upload artifact → deploy), `CNAME` for `damped.dagadev.net`, documented DNS step | delegated writer | [ ] |
 | P11 | README with a GIF recorded from the playground, sizes script, links to the live playground | delegated writer | [ ] |
+| P12 | Full per-package documentation (requested on 2026-10-05: "document everything"). A new `packages/core/README.md`; complete `packages/react/README.md` and `packages/native/README.md`. Every public export documented with signature, options table, defaults, behavior, example and edge cases | delegated writer | [ ] |
 
 ## Acceptance criteria
 
@@ -87,4 +89,4 @@ The original proof of concept (and a first demo attempt) reused the app name, se
 
 ## Next step
 
-P10 deploy workflow and P11 README + GIF + sizes, then the playground PRs.
+P10 deploy workflow, P11 root README + GIF + sizes, P12 package READMEs; then the playground PRs.

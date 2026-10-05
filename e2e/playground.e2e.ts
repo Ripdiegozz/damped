@@ -159,3 +159,115 @@ test("keyboard users reach the nav buttons and see where focus is", async ({ pag
   expect(outline.outlineStyle).not.toBe("none");
   expect(outline.outlineWidth).toBeGreaterThanOrEqual(2);
 });
+
+// Overview. The figures are the app's initial data (apps/playground/src/data.ts).
+const INITIAL_STATS = {
+  balance: "$24,860.42",
+  income: "$5,830.00",
+  spent: "$2,364.18",
+  savings: "$6,400.00",
+} as const;
+const INITIAL_PROGRESS = 0.64;
+const PROGRESS_TOLERANCE = 0.005;
+
+const statValue = (page: Page, stat: keyof typeof INITIAL_STATS) => page.locator(`[data-stat="${stat}"] .stat-value`);
+const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+
+/** The horizontal scale of the progress fill, read from its computed transform. */
+const fillScale = (page: Page) =>
+  page.locator(".progress-fill").evaluate((element) => {
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+    return matrix.a;
+  });
+
+test("stat numbers end at their formatted target values", async ({ page }) => {
+  await openPlayground(page);
+  for (const [stat, text] of Object.entries(INITIAL_STATS)) {
+    await expect(statValue(page, stat as keyof typeof INITIAL_STATS)).toHaveText(text);
+  }
+});
+
+test("stat numbers count up from zero on the first view", async ({ page }) => {
+  await openPlayground(page);
+  await navItem(page, "Bills").click();
+  await expect(page.locator('[data-view="overview"]')).toHaveCount(0);
+
+  // Record every text the balance shows from the moment the Overview mounts.
+  await page.evaluate(() => {
+    const seen: string[] = [];
+    (window as unknown as { __seen: string[] }).__seen = seen;
+    const stage = document.querySelector(".stage")!;
+    new MutationObserver(() => {
+      const text = stage.querySelector('[data-stat="balance"] .stat-value')?.textContent;
+      if (text !== undefined && text !== null && seen.at(-1) !== text) seen.push(text);
+    }).observe(stage, { subtree: true, childList: true, characterData: true });
+  });
+  await navItem(page, "Overview").click();
+  await expect(statValue(page, "balance")).toHaveText(INITIAL_STATS.balance);
+
+  const seen = await page.evaluate(() => (window as unknown as { __seen: string[] }).__seen);
+  expect(seen[0]).toBe("$0.00");
+  expect(seen.length).toBeGreaterThan(5);
+  expect(seen.at(-1)).toBe(INITIAL_STATS.balance);
+});
+
+test("the savings progress bar ends at the right scale", async ({ page }) => {
+  await openPlayground(page);
+  await expect.poll(() => fillScale(page).then((scale) => Math.abs(scale - INITIAL_PROGRESS))).toBeLessThan(PROGRESS_TOLERANCE);
+  const origin = await page.locator(".progress-fill").evaluate((element) => getComputedStyle(element).transformOrigin);
+  expect(origin.startsWith("0px")).toBe(true);
+  await expect(page.getByRole("progressbar", { name: "Savings goal" })).toHaveAttribute("aria-valuenow", "64");
+});
+
+test("shuffling retargets the numbers and the bar, even when clicked repeatedly", async ({ page }) => {
+  await openPlayground(page);
+  await expect(statValue(page, "balance")).toHaveText(INITIAL_STATS.balance);
+
+  const shuffle = page.getByRole("button", { name: "Shuffle data" });
+  await shuffle.click();
+  await shuffle.click();
+  await shuffle.click();
+
+  // The last click wins: every tile settles on the target the app reports for it.
+  for (const stat of ["balance", "income", "spent", "savings"] as const) {
+    const value = statValue(page, stat);
+    const target = Number(await value.getAttribute("data-target"));
+    expect(Number.isFinite(target)).toBe(true);
+    await expect(value).toHaveText(currency.format(target));
+  }
+  await expect(statValue(page, "balance")).not.toHaveText(INITIAL_STATS.balance);
+
+  const progress = Number(await page.locator(".progress-fill").getAttribute("data-progress"));
+  await expect.poll(() => fillScale(page).then((scale) => Math.abs(scale - progress))).toBeLessThan(PROGRESS_TOLERANCE);
+});
+
+test("the shuffle button belongs to the Overview", async ({ page }) => {
+  await openPlayground(page);
+  await expect(page.getByRole("button", { name: "Shuffle data" })).toBeVisible();
+  await navItem(page, "Bills").click();
+  await expect(page.getByRole("button", { name: "Shuffle data" })).toHaveCount(0);
+});
+
+test("recent activity lists five rows with signed, colored amounts", async ({ page }) => {
+  await openPlayground(page);
+  const rows = page.getByRole("list", { name: "Recent activity" }).getByRole("listitem");
+  await expect(rows).toHaveCount(5);
+  await expect(rows.first()).toContainText("Corner Grocery");
+
+  const colors = await page.locator(".amount").evaluateAll((elements) =>
+    elements.map((element) => ({
+      positive: element.classList.contains("positive"),
+      color: getComputedStyle(element).color,
+      text: element.textContent ?? "",
+    })),
+  );
+  expect(colors).toHaveLength(5);
+  for (const { positive, color, text } of colors) {
+    expect(text.startsWith(positive ? "+" : "-"), text).toBe(true);
+    expect(color).toBe(positive ? "rgb(22, 138, 87)" : "rgb(196, 61, 61)");
+  }
+  // Every row ends fully opaque once its entrance settles.
+  await expect
+    .poll(() => rows.evaluateAll((items) => items.map((item) => Number(getComputedStyle(item).opacity))))
+    .toEqual([1, 1, 1, 1, 1]);
+});

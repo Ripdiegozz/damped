@@ -1,0 +1,24 @@
+:root {
+  color-scheme: light;
+  --bg: #f1f2f4;
+  --surface: #ffffff;
+  --ink: #16181d;
+  --muted: #6b7280;
+  --positive: #168a57;
+  --negative: #c43d3d;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.boot {
+  padding: 32px;
+}

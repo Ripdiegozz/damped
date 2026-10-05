@@ -1,0 +1,21 @@
+{
+  "name": "@damped/playground",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Northbook: a fictional personal-finance app that exercises damped in a realistic interface.",
+  "type": "module",
+  "scripts": {
+    "build": "bun build.ts",
+    "serve": "bun serve.ts"
+  },
+  "dependencies": {
+    "@damped/react": "workspace:*",
+    "damped": "workspace:*",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0"
+  }
+}

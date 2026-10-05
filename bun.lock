@@ -11,6 +11,20 @@
         "typescript": "^7.0.2",
       },
     },
+    "apps/playground": {
+      "name": "@damped/playground",
+      "version": "0.0.0",
+      "dependencies": {
+        "@damped/react": "workspace:*",
+        "damped": "workspace:*",
+        "react": "19.2.3",
+        "react-dom": "19.2.3",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.0",
+        "@types/react-dom": "^19.2.0",
+      },
+    },
     "packages/core": {
       "name": "damped",
       "version": "0.0.0",
@@ -176,6 +190,8 @@
     "@babel/types": ["@babel/types@7.29.8", "", { "dependencies": { "@babel/helper-string-parser": "^7.29.7", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg=="],
 
     "@damped/native": ["@damped/native@workspace:packages/native"],
+
+    "@damped/playground": ["@damped/playground@workspace:apps/playground"],
 
     "@damped/react": ["@damped/react@workspace:packages/react"],
 

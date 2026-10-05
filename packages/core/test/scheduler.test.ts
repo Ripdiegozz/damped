@@ -659,6 +659,8 @@ describe("default frame instance", () => {
   });
 
   test("falls back to a roughly 16 ms timer without animation frame support", async () => {
+    // Half of the 16 ms fallback delay: loose enough to absorb timer jitter, tight enough to prove a real delay.
+    const minimumDelay = 8;
     hideBrowserGlobals();
     const { frame } = await importFresh();
     const timestamps: number[] = [];
@@ -674,8 +676,8 @@ describe("default frame instance", () => {
       });
     });
     expect(deltas[0]).toBe(0);
-    for (const delta of deltas.slice(1)) expect(delta).toBeGreaterThan(8);
-    expect(timestamps[0]! - startedAt).toBeGreaterThan(8);
+    for (const delta of deltas.slice(1)) expect(delta).toBeGreaterThan(minimumDelay);
+    expect(timestamps[0]! - startedAt).toBeGreaterThan(minimumDelay);
     expect(frame.active).toBe(false);
   });
 

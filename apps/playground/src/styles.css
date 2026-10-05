@@ -829,11 +829,24 @@ p {
   font: inherit;
 }
 
+/* The card paints its background on .tx-surface so that layer can glide to a new height on its own; the content sits above it. */
 .tx-card {
+  position: relative;
   padding-block: 8px;
+  background: transparent;
+}
+
+.tx-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface);
 }
 
 .tx-list {
+  position: relative;
+  z-index: 1;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -875,6 +888,8 @@ p {
 }
 
 .tx-empty {
+  position: relative;
+  z-index: 1;
   padding: 24px 0;
   color: var(--muted);
   text-align: center;

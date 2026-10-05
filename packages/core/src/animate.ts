@@ -208,6 +208,15 @@ export function peekSpringValue(element: Element, property: AnimatableProperty):
   return existingState(element)?.values[property];
 }
 
+/**
+ * Writes the element's pending transform inline right now instead of in the next frame's write phase. A layout that starts
+ * from a commit landing between two frames (for example in a promise callback right after an exit animation finished) would
+ * otherwise let the browser paint the new layout once, without its inverse transform.
+ */
+export function flushTransform(element: Element, scheduler: Scheduler): void {
+  commit(element, stateFor(element, scheduler), ["transform"]);
+}
+
 /** Installs (or with `undefined` removes) the hook that runs inside every transform write of `element`. */
 export function setRenderHook(element: Element, scheduler: Scheduler, hook: RenderHook | undefined): void {
   stateFor(element, scheduler).renderHook = hook;

@@ -1,0 +1,109 @@
+---
+title: Compositor
+description: The opt-in compositor driver and the Driver type of @damped/core.
+---
+
+import { Badge } from "@astrojs/starlight/components";
+import { CompositorVsJs } from "../../../../components/demos/CompositorVsJs";
+
+By default `animate` writes styles from the frame loop, on the main thread. The compositor driver samples the same analytic spring into keyframes and hands them to the browser through the Web Animations API, so the animation keeps moving while the main thread is busy. It requests no animation frame at all while it plays.
+
+It is opt-in and only `animate()` accepts it. `layout`, `snapshot`, `morph`, `enter` and `exit` always use the JS driver, because they correct children and radii on every frame.
+
+## Values
+
+### `compositor`
+
+<Badge text="value" variant="default" size="small" />
+
+The driver that plays [`animate`](/reference/core/animate/#animate) animations on the browser's compositor.
+
+```ts nocheck
+export const compositor: Driver
+```
+
+Pass it as `driver` in the options of `animate`; the example below shows it.
+
+**Behavior**
+
+- **Sampling.** The spring is sampled every `1000 / 120` ms into keyframes that carry only the groups that animate, ending exactly on the targets. Animations longer than 3 s use 360 equal intervals instead, so a keyframe list never exceeds 361 entries. It then calls `element.animate(keyframes, { duration, easing: "linear", fill: "forwards" })`, with `duration` the longest `settleTime()` of the properties involved.
+- **Accuracy.** The browser draws straight lines between samples, so the drawn curve deviates from the analytic one by at most `acceleration * step² / 8`: about 0.4 px for a 300 px move over 0.5 s. In Chromium the measured worst offset stays within 0.5 px.
+- **Main thread blocked.** In Chromium, with a 250 ms busy loop the compositor box kept moving, while the identical JS-driven spring stood still.
+- **Completion.** When the animation finishes, damped writes the final values inline, syncs the spring values, resolves `finished` and cancels the Web Animation, which drops the forwards fill. The element ends with inline styles and nothing left running.
+- **Interruption.** A later `animate()` call computes the exact analytic state at the animation's current time, seeds the values with its position and velocity, commits the styles inline and cancels the animation. The new animation continues from it with the same velocity, whichever driver it uses, so a reversal does not jump. A property the new call does not touch keeps animating with its velocity. Within one style group (`transform`, `opacity`, `filter`) there is one driver at a time.
+- **Stop.** `stop()` freezes at the analytic state, commits inline, cancels the Web Animation and resolves `finished`. Only properties the call still owns are frozen; the rest keep animating.
+- **Cancelled from outside** (someone calls `cancel()` on the Web Animation): it freezes at the analytic state and resolves the jobs.
+- **Hand-over.** `layout`, `snapshot`, `morph`, `enter` and `exit` first take a compositor animation down at its exact state, then continue on the JS driver.
+
+**Edge cases**
+
+- **Fallback to JS.** `supports(element)` is `typeof element.animate === "function"`. Without it, or for a spring that never settles (`damping: 0`), `animate` falls back to the JS driver with an identical result.
+- A spring that is already at rest on its target starts no animation: the final styles are committed at once and the call resolves.
+- **Reduced motion.** Spatial properties jump (committed inline) before the driver is involved; `opacity` and `blur` can still run on the compositor.
+- **Validation.** Invalid input throws before anything is touched, including a running compositor animation.
+- **Tree-shaking.** `compositor` is a value you import. A bundle that never imports it does not carry it. It adds about 0.74 KB gzip when you use it.
+- **Server rendering.** Importing is safe. `performance.now()` is read when a compositor animation starts, which is only reached when `element.animate` exists.
+- JS and compositor animations for the same spring can end at slightly different times: the JS driver settles on the first frame that satisfies `isSettled`, the compositor uses `settleTime()` for its duration.
+
+The demo runs the same spring with both drivers. Start the balls, then press "Block main thread".
+
+<CompositorVsJs client:visible />
+
+**Example**
+
+```ts
+import { animate, compositor } from "@damped/core";
+
+const panel = document.querySelector<HTMLElement>(".panel");
+if (panel !== null) {
+  // Keeps moving while the main thread is busy; falls back to the JS driver without the Web Animations API.
+  animate(panel, { x: 300, opacity: 1 }, { duration: 1, bounce: 0.15, driver: compositor });
+}
+```
+
+**See also**: [`Driver`](#driver), [`animate`](/reference/core/animate/#animate), [`AnimateOptions`](/reference/core/animate/#animateoptions), [The compositor driver](/guides/compositor/), [Demos](/guides/demos/)
+
+## Types
+
+### `Driver`
+
+<Badge text="type" variant="default" size="small" />
+
+What plays animations other than through the frame loop. [`compositor`](#compositor) is the only implementation.
+
+```ts nocheck
+export interface Driver {
+  /** Whether the driver can animate this element at all (the platform may lack what it needs). */
+  supports(element: Element): boolean;
+  /** Plays the jobs from the current state of their values. Returns false, having done nothing, when it cannot. */
+  play(element: Element, state: ElementState, jobs: Job[]): boolean;
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `supports(element)` | `(element: Element) => boolean` | Whether the driver can animate this element at all. |
+| `play(element, state, jobs)` | `(element: Element, state: ElementState, jobs: Job[]) => boolean` | Plays the jobs. Returns `false`, having done nothing, when it cannot; `animate` then runs them on the JS driver. |
+
+**Behavior**
+
+- `ElementState` and `Job` are not exported, so you cannot write a custom driver against the public types. Treat `Driver` as an opaque type that [`compositor`](#compositor) implements.
+- Use `supports` to check support yourself before relying on the driver. `animate` already falls back when it is false.
+- `animate` validates a custom `driver` value: it must have function members `supports` and `play`, otherwise it throws a `TypeError`.
+
+**Example**
+
+```ts
+import { animate, compositor, type Driver } from "@damped/core";
+
+const driver: Driver = compositor;
+const box = document.querySelector<HTMLElement>(".box");
+
+if (box !== null) {
+  // Without the Web Animations API this would silently run on the JS driver; check if you need to know.
+  console.log("compositor supported:", driver.supports(box));
+  animate(box, { x: 200 }, { driver });
+}
+```
+
+**See also**: [`compositor`](#compositor), [`AnimateOptions`](/reference/core/animate/#animateoptions), [The compositor driver](/guides/compositor/)

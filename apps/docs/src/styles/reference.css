@@ -1,0 +1,19 @@
+/* API reference pages: kind badges and wide tables. */
+
+/* The kind badge sits under an export heading; give it room and keep it quiet. */
+.sl-markdown-content .sl-badge {
+  margin-block: 0.15rem 0.6rem;
+  letter-spacing: 0.02em;
+}
+
+/* Option tables are wide. They scroll inside their own box (Starlight already does that), so keep the last
+   column, which holds the prose, from collapsing into a tall one-word-per-line strip on a narrow screen. */
+.sl-markdown-content table td:last-child,
+.sl-markdown-content table th:last-child {
+  min-width: 14rem;
+}
+
+/* Names in the first column stay on one line, which keeps the rows scannable. */
+.sl-markdown-content table td:first-child code {
+  white-space: nowrap;
+}

@@ -1,0 +1,215 @@
+---
+title: Presence
+description: enter and exit, the element enter and exit animations of @damped/core, with EnterOptions and ExitOptions.
+---
+
+import { Badge } from "@astrojs/starlight/components";
+import { PresenceDemo } from "../../../../components/demos/PresenceDemo";
+
+`enter` and `exit` animate an element in and out of the document. `exit` keeps the element in the DOM until the animation settles, then removes it, and an `enter` that arrives while an element is leaving cancels the removal and carries on from where the element is, with its velocity.
+
+Both always use the JS driver. In React, [`<Presence>`](/reference/react/#presence) wraps them for you.
+
+## Functions
+
+### `enter`
+
+<Badge text="function" variant="default" size="small" />
+
+Jumps to the `from` values, then springs each of those properties to its identity value, or to the value in `to` when you give one.
+
+```ts nocheck
+export function enter(
+  target: Element | readonly Element[],
+  from: AnimationTargets,
+  to: AnimationTargets = {},
+  options: EnterOptions = {},
+): AnimationControls
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `target` | `Element \| readonly Element[]` | none | One element or an array. Each element of a list follows the rules on its own. |
+| `from` | [`AnimationTargets`](/reference/core/animate/#animationtargets) | none | Where the element starts. |
+| `to` | [`AnimationTargets`](/reference/core/animate/#animationtargets) | `{}` | Overrides the identity value of a property. A property only `to` mentions animates from its current value. |
+| `options` | [`EnterOptions`](#enteroptions) | `{}` | Spring, scheduler and reduced motion. |
+
+**Returns** [`AnimationControls`](/reference/core/animate/#animationcontrols).
+
+**Behavior**
+
+- Identity values are `0` for `x`, `y`, `rotate` and `blur`, and `1` for `scale`, `scaleX`, `scaleY` and `opacity`. Properties that are not mentioned are never written.
+- An element that is already animating one of the goal properties, for example one that is exiting, is only retargeted: no jump to `from`, position and velocity are kept. A single animating goal property is enough to retarget the whole element. The properties its exit animated also return to their identity unless `to` says otherwise. A compositor animation of the element counts as in flight.
+- It interrupts a running `exit()` on the element: its removal is cancelled, the `inert` and `aria-hidden` attributes it set are restored, and its `finished` resolves `false`.
+- Settled elements start from `from` again.
+- **Reduced motion.** Spatial entries jump, so the transform lands on the identity on the first frame, while `opacity` and `blur` still animate.
+- The scheduler idles once every enter and exit has settled.
+
+**Edge cases**
+
+- Throws a `TypeError` or `RangeError` for an unknown or non-finite property in `from` or `to` (labels `enter from` and `enter to`), and a `RangeError` for invalid spring options, before any element is touched.
+- A failed `enter` leaves a running exit alone.
+
+**Example**
+
+```ts
+import { enter } from "@damped/core";
+
+const toast = document.querySelector<HTMLElement>(".toast");
+
+if (toast !== null) {
+  // From invisible and 12 px low, to the identity values (opacity 1, y 0).
+  await enter(toast, { opacity: 0, y: 12 }, {}, { duration: 0.3, bounce: 0 }).finished;
+}
+```
+
+**See also**: [`exit`](#exit), [`EnterOptions`](#enteroptions), [`Presence`](/reference/react/#presence), [Presence](/guides/presence/), [Demos](/guides/demos/)
+
+### `exit`
+
+<Badge text="function" variant="default" size="small" />
+
+Animates the element to the `to` values and then removes it, or hands it to your callback, unless something interrupts it first.
+
+```ts nocheck
+export function exit(
+  target: Element | readonly Element[],
+  to: AnimationTargets,
+  options: ExitOptions = {},
+): { readonly finished: Promise<boolean>; stop(): void }
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `target` | `Element \| readonly Element[]` | none | One element or an array. Each element is removed when its own animation settles. |
+| `to` | [`AnimationTargets`](/reference/core/animate/#animationtargets) | none | Where the element animates to. |
+| `options` | [`ExitOptions`](#exitoptions) | `{}` | Spring, scheduler, reduced motion, `from` and `remove`. |
+
+**Returns** an object with `finished: Promise<boolean>` and `stop()`. `finished` resolves `true` after the removal or the callback, and `false` if the exit was interrupted. With several elements it is `true` only if every element completed.
+
+**Behavior**
+
+- **While exiting**, the element gets `inert` and `aria-hidden="true"`. The values it had are restored when the exit is interrupted, stopped, or finishes with `remove: false` or a function.
+- **When it settles without being interrupted**, `remove` decides: `true` (the default) calls `element.remove()`, `false` leaves the element in place, and a function is called with the element instead.
+- **Interruption.** `finished` resolves `false` when a later `enter()`, a later `exit()` on the element, `stop()` or a direct `animate()` that takes over one of its properties interrupts it. With a second `exit()` only the second removes the element, and the first exit's `stop()` no longer touches it.
+- **Reduced motion.** Spatial targets jump and `opacity` animates; the element is removed after the opacity settled. An exit with only spatial targets completes, and removes, at once.
+- `stop()` freezes the exit, resolves `finished` with `false`, keeps the element and restores the attributes. It does nothing after the exit completed, and it stops every element of a list.
+- `options` accepts `from` (a jump), `scheduler` and `reducedMotion`, not `driver`.
+
+**Edge cases**
+
+- A `remove` function that throws does not reject `finished`. The exit still counts as completed and the error is rethrown from a microtask.
+- An empty `to` removes the element on the next microtask, with `finished` already resolved.
+- Throws before touching any element for invalid `to` or spring options.
+- `remove` is not validated.
+
+The toast stack below enters and leaves with these functions (through `<Presence>`). Add and dismiss toasts quickly: a toast that comes back while it leaves reverses from where it is.
+
+<PresenceDemo client:visible />
+
+**Example**
+
+```ts
+import { exit } from "@damped/core";
+
+const toast = document.querySelector<HTMLElement>(".toast");
+
+if (toast !== null) {
+  // To invisible, then removed from the DOM. `completed` is false if an enter() or another exit() interrupted it.
+  const leaving = exit(toast, { opacity: 0, y: -12 }, { duration: 0.3, bounce: 0 });
+  const completed = await leaving.finished;
+
+  // Keep the element and handle it yourself.
+  const banner = document.querySelector<HTMLElement>(".banner");
+  if (banner !== null) {
+    void exit(banner, { opacity: 0 }, { remove: (element) => element.setAttribute("hidden", "") });
+  }
+  console.log(completed);
+}
+```
+
+**See also**: [`enter`](#enter), [`ExitOptions`](#exitoptions), [`Presence`](/reference/react/#presence), [Presence](/guides/presence/), [Reduced motion](/guides/reduced-motion/)
+
+## Types
+
+### `EnterOptions`
+
+<Badge text="type" variant="default" size="small" />
+
+The options of [`enter`](#enter): the spring, scheduler and reduced motion options of [`animate`](/reference/core/animate/#animateoptions), without `from` and `driver`.
+
+```ts nocheck
+export type EnterOptions = DistributiveOmit<AnimateOptions, "from" | "driver">;
+```
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| spring options | [`SpringOptions`](/reference/core/springs/#springoptions) | `duration: 0.5`, `bounce: 0.15` | Either form. |
+| `scheduler` | [`Scheduler`](/reference/core/scheduler/#scheduler) | the shared [`frame`](/reference/core/scheduler/#frame) | Fixed per element by the first call. |
+| `reducedMotion` | `"user" \| "always" \| "never"` | `"user"` | Spatial entries jump when it is on. |
+
+**Behavior**
+
+- `from` is removed because `enter` already takes it as a required argument. Both spring option forms stay available.
+- It is also the type of the `options` prop of [`<Presence>`](/reference/react/#presenceprops).
+
+**Example**
+
+```ts
+import { enter, type EnterOptions } from "@damped/core";
+
+const options: EnterOptions = { duration: 0.35, bounce: 0.1, reducedMotion: "user" };
+
+const row = document.querySelector<HTMLElement>(".row");
+if (row !== null) {
+  void enter(row, { opacity: 0, x: -16 }, {}, options);
+}
+```
+
+**See also**: [`enter`](#enter), [`ExitOptions`](#exitoptions), [`PresenceProps`](/reference/react/#presenceprops)
+
+### `ExitOptions`
+
+<Badge text="type" variant="default" size="small" />
+
+The options of [`exit`](#exit): the options of [`animate`](/reference/core/animate/#animateoptions) without `driver`, plus `remove`.
+
+```ts nocheck
+export type ExitOptions = DistributiveOmit<AnimateOptions, "driver"> & {
+  /** What to do once the exit settles without being interrupted: true (default) removes the element from the DOM; false leaves it; a function is called instead. */
+  remove?: boolean | ((element: Element) => void);
+};
+```
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| spring options | [`SpringOptions`](/reference/core/springs/#springoptions) | `duration: 0.5`, `bounce: 0.15` | Either form. |
+| `scheduler` | [`Scheduler`](/reference/core/scheduler/#scheduler) | the shared [`frame`](/reference/core/scheduler/#frame) | Fixed per element by the first call. |
+| `reducedMotion` | `"user" \| "always" \| "never"` | `"user"` | Spatial targets jump when it is on. |
+| `from` | [`AnimationTargets`](/reference/core/animate/#animationtargets) | none | A jump applied before animating. |
+| `remove` | `boolean \| ((element: Element) => void)` | `true` | `true` removes the element once the exit settles, `false` leaves it (attributes restored), a function is called with the element instead (attributes restored). Not called when the exit is interrupted. |
+
+**Behavior**
+
+- `remove` runs only when the exit settles without being interrupted.
+- With `remove: false` or a function, the element is left behind in the document with the `inert` and `aria-hidden` values it had before the exit.
+
+**Example**
+
+```ts
+import { exit, type ExitOptions } from "@damped/core";
+
+// Hide instead of removing, so the element can come back later.
+const options: ExitOptions = {
+  duration: 0.3,
+  bounce: 0,
+  remove: (element) => element.setAttribute("hidden", ""),
+};
+
+const panel = document.querySelector<HTMLElement>(".panel");
+if (panel !== null) {
+  void exit(panel, { opacity: 0, y: 8 }, options);
+}
+```
+
+**See also**: [`exit`](#exit), [`EnterOptions`](#enteroptions), [`PresenceProps`](/reference/react/#presenceprops)

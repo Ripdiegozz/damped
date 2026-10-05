@@ -20,7 +20,7 @@ export default defineConfig({
       },
       favicon: "/favicon.svg",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/Ripdiegozz/damped" }],
-      customCss: ["./src/styles/theme.css", "./src/styles/demos.css", "./src/styles/landing.css"],
+      customCss: ["./src/styles/theme.css", "./src/styles/demos.css", "./src/styles/landing.css", "./src/styles/reference.css"],
       components: {
         // The landing hero holds a live island, which the `hero` frontmatter cannot express.
         Hero: "./src/components/landing/Hero.astro",
@@ -30,7 +30,24 @@ export default defineConfig({
         { label: "Guides", items: [{ autogenerate: { directory: "guides" } }] },
         {
           label: "Reference",
-          items: [{ slug: "reference/core" }, { slug: "reference/react" }, { slug: "reference/native" }],
+          items: [
+            {
+              label: "@damped/core",
+              items: [
+                { slug: "reference/core", label: "Overview" },
+                { slug: "reference/core/springs" },
+                { slug: "reference/core/scheduler" },
+                { slug: "reference/core/spring-value" },
+                { slug: "reference/core/animate" },
+                { slug: "reference/core/compositor" },
+                { slug: "reference/core/layout" },
+                { slug: "reference/core/morph" },
+                { slug: "reference/core/presence" },
+              ],
+            },
+            { slug: "reference/react" },
+            { slug: "reference/native" },
+          ],
         },
         // Served by the Northbook playground once it is published next to the docs.
         { label: "Playground", link: "/playground/" },

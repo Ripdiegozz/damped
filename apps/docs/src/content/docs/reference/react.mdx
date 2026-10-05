@@ -1,6 +1,496 @@
 ---
 title: "@damped/react"
-description: API reference for @damped/react.
+description: API reference for @damped/react, the React adapter for @damped/core with four hooks and a Presence component.
 ---
 
-The reference is written in a later task.
+import { Tabs, TabItem, Badge } from "@astrojs/starlight/components";
+import { MorphCard } from "../../../components/demos/MorphCard";
+import { PresenceDemo } from "../../../components/demos/PresenceDemo";
+import { RetargetSpring } from "../../../components/demos/RetargetSpring";
+
+`@damped/react` is a thin adapter over [`@damped/core`](/reference/core/). It adds no state of its own to the animation: damped writes frames straight to the DOM through refs, so a component never re-renders per frame.
+
+<Tabs syncKey="package-manager">
+  <TabItem label="bun">
+
+```sh
+bun add @damped/core @damped/react
+```
+
+  </TabItem>
+  <TabItem label="npm">
+
+```sh
+npm install @damped/core @damped/react
+```
+
+  </TabItem>
+</Tabs>
+
+:::caution[Not published yet]
+The packages have not been published to npm at the time of writing. The commands above are what you will run once they are; until then, use the workspace packages from the repository.
+:::
+
+The peer dependencies are `@damped/core`, `react` and `react-dom` at version 19 or newer. `Presence` reads `element.props.ref`, so it needs React 19, where `ref` is an ordinary prop.
+
+Signature blocks are declarations excerpted from the source and are marked `nocheck` because they have no bodies. Every other `ts` and `tsx` block is a complete example that the docs test suite typechecks.
+
+## All exports
+
+| Export | Kind |
+| --- | --- |
+| [`useSpringValue`](#usespringvalue) | hook |
+| [`useSpring`](#usespring) | hook |
+| [`useLayout`](#uselayout) | hook |
+| [`useMorph`](#usemorph) | hook |
+| [`Presence`](#presence) | component |
+| [`MorphHandle`](#morphhandle), [`PresenceProps`](#presenceprops) | types |
+
+## The render guarantee
+
+Nothing in this package re-renders per animation frame. Tests count the renders across hundreds of animation frames.
+
+| API | Re-renders when |
+| --- | --- |
+| `useSpringValue` | never, by itself |
+| `useSpring` | never, by itself |
+| `useLayout` | never, by itself |
+| `useMorph` | once per `open()` or `close()` (`isOpen` changes) |
+| `Presence` | when the set of children changes, plus once when a leaving child is dropped |
+
+## Server rendering and StrictMode
+
+- Every hook and `Presence` render with `renderToString` without touching `window`, `document`, `requestAnimationFrame`, `matchMedia` or `getComputedStyle`. The effects that start animations are a no-op on the server, and React does not warn.
+- `useMorph` writes `hidden` on the client only, so server HTML shows the target.
+- All five exports are covered by StrictMode tests: the simulated unmount and remount neither double-starts an animation nor leaves a stale one running.
+- Reduced motion is applied through the `reducedMotion` option of the core APIs the hooks wrap. Spatial motion jumps, fades remain. See [Reduced motion](/guides/reduced-motion/).
+
+## Hooks
+
+### `useSpringValue`
+
+<Badge text="hook" variant="default" size="small" />
+
+A [`SpringValue`](/reference/core/spring-value/#springvalue) that lives as long as the component.
+
+```ts nocheck
+export function useSpringValue(initial: number, options?: SpringValueOptions): SpringValue
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `initial` | `number` | none | The starting position. Used once; the `initial` of later renders is ignored. Non-finite throws a `RangeError` during the first render. |
+| `options` | [`SpringValueOptions`](/reference/core/spring-value/#springvalueoptions) | `{}` | `scheduler`, `restDelta` and `restSpeed`. Used once; later renders' options are ignored. |
+
+**Returns** the same `SpringValue` object on every render. It has the members of the core value: `get`, `getVelocity`, `animating`, `set`, `jump`, `rebase`, `stop` and `onChange`.
+
+**Behavior**
+
+- It never renders by itself. Subscribe with `onChange`, or read it in an event handler.
+- Frames go through the `scheduler` option or the shared `frame`.
+- **Cleanup.** When the component unmounts the value is stopped: a pending `set` resolves `false`, the velocity is `0`, and every listener subscribed through the returned object is dropped. A listener subscribed after a StrictMode mount still fires, and the same value survives the simulated remount, so effects that subscribe re-run and re-subscribe.
+
+**Edge cases**
+
+- On the server it is created during render without touching the DOM or the scheduler, and `get()` returns `initial`.
+- Reduced motion is not applied, because the value is a number. Read `matchMedia("(prefers-reduced-motion: reduce)")` yourself and call `jump` when it matches.
+
+Press, drag or use the arrow keys on the track. The demo reads and writes one `useSpringValue` and draws its velocity.
+
+<RetargetSpring client:visible />
+
+**Example**
+
+```tsx
+import { useEffect, useRef } from "react";
+import { useSpringValue } from "@damped/react";
+
+export function Meter() {
+  const bar = useRef<HTMLDivElement>(null);
+  const level = useSpringValue(0);
+
+  // The frames are written to the DOM here, not through state.
+  useEffect(
+    () =>
+      level.onChange((value) => {
+        if (bar.current !== null) bar.current.style.width = `${value}%`;
+      }),
+    [level],
+  );
+
+  return (
+    <>
+      <div className="meter" ref={bar} />
+      <button onClick={() => void level.set(80, { duration: 0.4, bounce: 0.2 })}>Fill</button>
+    </>
+  );
+}
+```
+
+**See also**: [`createSpringValue`](/reference/core/spring-value/#createspringvalue), [`SpringValue`](/reference/core/spring-value/#springvalue), [`useSpring`](#usespring), [React guide](/guides/react/), [Interruption and reversal](/guides/interruption-and-reversal/)
+
+### `useSpring`
+
+<Badge text="hook" variant="default" size="small" />
+
+Springs the element that receives the returned ref toward target values with [`animate`](/reference/core/animate/#animate).
+
+```ts nocheck
+export function useSpring<T extends Element>(targets: AnimationTargets, options?: AnimateOptions): RefCallback<T>
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `targets` | [`AnimationTargets`](/reference/core/animate/#animationtargets) | none | The values to animate toward. Compared by value, entry by entry (`Object.is`, `undefined` entries ignored). |
+| `options` | [`AnimateOptions`](/reference/core/animate/#animateoptions) | `{}` | Spring, scheduler, reduced motion, `from` and `driver`. Read at the moment a retarget happens. |
+
+**Returns** a stable `RefCallback<T>`: the same function on every render. Attach it to one element.
+
+**Behavior**
+
+- It animates at ref attachment, which reaches an element that mounts after the hook's last commit, and in a layout effect after every render, so before passive effects.
+- It skips when the element is the one already animated and the targets are equal by value. A new object with equal values does nothing, also mid-flight.
+- A change of any value calls `animate(element, targets, options)` again. The running animation is retargeted and keeps its velocity.
+- Changing `options` alone does nothing. Pass `from` only for the first call: a later retarget with `from` would jump.
+- First mount: the element animates from its current style to the targets. A ref moved to another element animates that element. A ref wrapped in a callback that changes identity every render does not interrupt anything.
+- Properties removed from `targets` are not reset; only the properties in the new `targets` are retargeted.
+- **Cleanup.** On unmount (layout-effect cleanup) the animation is stopped and the bookkeeping cleared, so StrictMode's simulated remount starts over.
+- **Reduced motion** goes through `options.reducedMotion`, with the core rule: spatial properties jump, fades remain.
+
+**Edge cases**
+
+- On the server no effect or animation runs, and the ref attaches nothing.
+- It never re-renders by itself.
+
+**Example**
+
+```tsx
+import { useSpring } from "@damped/react";
+
+export function Card({ active }: { active: boolean }) {
+  const ref = useSpring<HTMLDivElement>({ scale: active ? 1.05 : 1, opacity: active ? 1 : 0.6 }, { duration: 0.4 });
+  return <div ref={ref}>Card</div>;
+}
+```
+
+**See also**: [`animate`](/reference/core/animate/#animate), [`AnimateOptions`](/reference/core/animate/#animateoptions), [`useLayout`](#uselayout), [React guide](/guides/react/), [Reduced motion](/guides/reduced-motion/)
+
+### `useLayout`
+
+<Badge text="hook" variant="default" size="small" />
+
+Animates an element from the box it had before a commit to its new layout, whenever `deps` change: FLIP on re-render.
+
+```ts nocheck
+export function useLayout<T extends Element>(deps: readonly unknown[], options?: LayoutOptions): RefCallback<T>
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `deps` | `readonly unknown[]` | none | Values that, when they change, mean the layout changed. Compared item by item with `Object.is`; the length must match. |
+| `options` | [`LayoutOptions`](/reference/core/layout/#layoutoptions) | `{}` | Spring, scheduler, reduced motion, `correct` and `radius`. The options of the committing render are used. |
+
+**Returns** a stable `RefCallback<T>`.
+
+**Behavior**
+
+- During render, if the previous commit's `deps` differ, the hook takes a [`snapshot`](/reference/core/layout/#snapshot). It reads layout during render on purpose: that is the last moment the DOM still shows the old box. It is the same trade-off other FLIP libraries make.
+- Each render replaces the snapshot, and a render with unchanged deps clears it, so a snapshot only animates the commit of the render that took it. A snapshot taken by a discarded render never animates a later commit.
+- In the layout effect after the commit, if the deps changed, the snapshot animates with the options of the committing render.
+- The first render never animates. A change of deps that does not move the element does not animate.
+- Interrupting keeps velocity: a second change in flight inherits the velocity of the first.
+- StrictMode's double render and effects produce a single, correct animation.
+- All layout assumptions apply: not rotated, `scale` of `1`, centered `transform-origin`.
+
+**Edge cases**
+
+- A change of deps is ignored when the ref is not attached at render time.
+- Reduced motion: the element jumps to its new box.
+- On the server nothing is read or animated. There is nothing to clean up; the pending snapshot is dropped by the next render.
+
+**Example**
+
+```tsx
+import { useLayout } from "@damped/react";
+
+export function Panel({ expanded }: { expanded: boolean }) {
+  const ref = useLayout<HTMLDivElement>([expanded], { duration: 0.4, correct: "children" });
+  return (
+    <div ref={ref} className={expanded ? "large" : "small"}>
+      <p>Content keeps its size while the panel scales.</p>
+    </div>
+  );
+}
+```
+
+**See also**: [`layout`](/reference/core/layout/#layout), [`snapshot`](/reference/core/layout/#snapshot), [`LayoutOptions`](/reference/core/layout/#layoutoptions), [`Presence`](#presence), [Layout and morph](/guides/layout-and-morph/)
+
+### `useMorph`
+
+<Badge text="hook" variant="default" size="small" />
+
+Owns a card-to-dialog [`morph`](/reference/core/morph/#morph): two elements that both stay mounted, and handles to open and close them.
+
+```ts nocheck
+export function useMorph(options?: MorphOptions): MorphHandle
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `options` | [`MorphOptions`](/reference/core/morph/#morphoptions) | `{}` | Spring, scheduler, reduced motion, `correct`, `radius`, `crossfade` and `blur`. Stored after every render, so a change applies to the next `open()` or `close()`. |
+
+**Returns** a [`MorphHandle`](#morphhandle), memoized on `isOpen`: `source`, `target`, `open` and `close` are stable.
+
+**Behavior**
+
+- While closed the hook keeps the target hidden through the DOM `hidden` attribute, set during the commit when the target attaches, so a closed target never paints. Re-attaching the same node (a ref callback that changes every render) never re-hides it or interrupts the morph.
+- `open()` unhides the target before the morph measures it. `close()` morphs back and hides the target again once that settles.
+- `isOpen` is the only React state. It changes when `open()` or `close()` is called, not when the morph settles, and never per frame.
+- **Cleanup.** Unmounting stops the running morph. It does not restore `hidden`.
+- **Reduced motion** goes through `options.reducedMotion`, with the core `morph` rule.
+
+**Rules**
+
+- Do not render a `hidden` prop on the target; the hook owns that attribute.
+- The geometry `morph` measures must not depend on `isOpen`. It is read synchronously inside `open()`, before React re-renders.
+- Author CSS that sets `display` on the target overrides `hidden`.
+- The hook animates motion only. Focus, `aria-modal`, Escape and the like are yours to manage.
+
+**Edge cases**
+
+- On the server `hidden` is not written, so the server HTML shows the target.
+- If `morph` throws (for example, invalid options), the target's previous `hidden` is restored and the promise returned by `open()` or `close()` rejects.
+
+The card below uses `useMorph`. Open it, then press Escape while it is still opening: the morph reverses from where it is, and focus returns to the card.
+
+<MorphCard client:visible />
+
+**Example**
+
+```tsx
+import { useRef } from "react";
+import { useMorph } from "@damped/react";
+
+export function Photo() {
+  const { source, target, open, close, isOpen } = useMorph({ duration: 0.5, bounce: 0.1, radius: 16 });
+  const card = useRef<HTMLButtonElement | null>(null);
+
+  return (
+    <>
+      <button
+        ref={(node) => {
+          card.current = node;
+          source(node);
+        }}
+        aria-expanded={isOpen}
+        onClick={() => void open()}
+      >
+        Photo
+      </button>
+
+      <div ref={target} role="dialog" aria-modal="true" aria-label="Photo">
+        <button onClick={() => void close().then((settled) => settled && card.current?.focus())}>Close</button>
+      </div>
+    </>
+  );
+}
+```
+
+**See also**: [`MorphHandle`](#morphhandle), [`morph`](/reference/core/morph/#morph), [`MorphOptions`](/reference/core/morph/#morphoptions), [Layout and morph](/guides/layout-and-morph/), [React guide](/guides/react/), [Demos](/guides/demos/)
+
+## Components
+
+### `Presence`
+
+<Badge text="component" variant="default" size="small" />
+
+Keeps a removed child mounted until its exit animation settles, and animates children in when they are added.
+
+```ts nocheck
+export function Presence({ enter, exit, options, initial = false, children }: PresenceProps): ReactElement
+```
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `enter` | [`AnimationTargets`](/reference/core/animate/#animationtargets) | none | Starting values of a child added after the first mount. It jumps there, then animates to its identity values. Without it, added children appear at once. |
+| `exit` | [`AnimationTargets`](/reference/core/animate/#animationtargets) | none | Where a removed child animates before it is dropped. Without it, removed children disappear at once. |
+| `options` | [`EnterOptions`](/reference/core/presence/#enteroptions) | core defaults | Spring, scheduler and reduced motion, for both directions. |
+| `initial` | `boolean` | `false` | Also animates the children present on the first mount. |
+| `children` | `ReactNode` | none | Keyed elements: host elements, or components that take `ref` as a prop. |
+
+**Returns** a `ReactElement` that renders its children, plus the ones still leaving.
+
+**Behavior**
+
+- **Enter.** A child added after the first commit calls [`enter`](/reference/core/presence/#enter) with the `enter` targets. Under StrictMode it enters once.
+- **Exit.** A removed child stays rendered and keeps its position among the remaining ones while [`exit`](/reference/core/presence/#exit) runs with `remove: false`. It is `inert` and `aria-hidden="true"` while it leaves. When the exit completes it is dropped with one re-render.
+- **Key returns during its exit.** The exit is interrupted and the element and its velocity are kept. A key can leave, return and leave again.
+- **Refs.** Each child is cloned with a ref that records its element and forwards to your own `ref`: an object, a callback, a callback that returns a cleanup function, or a component receiving `ref` as a prop. Swapping your ref moves the element to the new one. A child that stays is not re-attached on re-render.
+- **Reduced motion** goes through `options.reducedMotion`, with the core `enter` and `exit` rules.
+- On the server it renders its children as they are, `initial` or not, and no effect runs.
+
+**Rules and edge cases**
+
+- Every element child needs a unique `key`, in development and in production. A missing key throws a `TypeError`: ``<Presence> children need a unique `key`, so it can tell which one left.`` Two children with the same key throw the same message plus ``The key "x" is used twice.``
+- Text children throw a `TypeError`: they cannot be animated. `null`, `undefined` and booleans are ignored.
+- A child that cannot take a ref (a component that ignores `ref`) is dropped at once instead of hanging.
+- There is nothing to call on unmount; an exit in flight when `Presence` unmounts is left to the core.
+
+Add and dismiss toasts quickly. A toast that comes back while it leaves reverses from where it is, and the siblings glide into the freed space.
+
+<PresenceDemo client:visible />
+
+**Example**
+
+```tsx
+import type { Ref } from "react";
+import { Presence } from "@damped/react";
+
+interface ToastData {
+  id: string;
+  text: string;
+}
+
+// A component child must pass the `ref` prop on to an element (React 19 passes it as a prop).
+function Toast({ toast, ref }: { toast: ToastData; ref?: Ref<HTMLDivElement> }) {
+  return (
+    <div ref={ref} role="status">
+      {toast.text}
+    </div>
+  );
+}
+
+export function Toasts({ toasts }: { toasts: ToastData[] }) {
+  return (
+    <Presence enter={{ opacity: 0, y: 16 }} exit={{ opacity: 0, x: 24 }} options={{ duration: 0.3, bounce: 0 }}>
+      {toasts.map((toast) => (
+        <Toast key={toast.id} toast={toast} />
+      ))}
+    </Presence>
+  );
+}
+```
+
+**See also**: [`PresenceProps`](#presenceprops), [`enter`](/reference/core/presence/#enter), [`exit`](/reference/core/presence/#exit), [Presence guide](/guides/presence/), [Reduced motion](/guides/reduced-motion/)
+
+## Types
+
+### `MorphHandle`
+
+<Badge text="type" variant="default" size="small" />
+
+What [`useMorph`](#usemorph) returns: two refs, two functions and the open state.
+
+```ts nocheck
+export interface MorphHandle {
+  /** Ref for the element that is always visible (the card). */
+  source: RefCallback<HTMLElement>;
+  /** Ref for the element that opens (the dialog). Render it without a `hidden` prop: the hook owns that attribute. */
+  target: RefCallback<HTMLElement>;
+  /** Morphs source into target. Resolves true when it settled, false when a later open()/close() or an unmount cut it. */
+  open(): Promise<boolean>;
+  /** Morphs target back into source and re-hides the target once that settled. Same resolution as open(). */
+  close(): Promise<boolean>;
+  isOpen: boolean;
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `source` | `RefCallback<HTMLElement>` | Ref for the element that is always visible, the card. |
+| `target` | `RefCallback<HTMLElement>` | Ref for the element that opens, the dialog. |
+| `open()` | `() => Promise<boolean>` | Morphs the source into the target. Resolves `true` when it settled, `false` when a later `open()` or `close()` or an unmount cut it. |
+| `close()` | `() => Promise<boolean>` | Morphs the target back into the source and hides the target once that settled. Same resolution as `open()`. |
+| `isOpen` | `boolean` | `true` from the moment `open()` is called until `close()` is called. |
+
+**Behavior**
+
+- `open()` resolves `false` at once, staying closed, when either ref is not attached.
+- `open()` while opening returns the same promise. `close()` while closed resolves without a morph.
+- A cut `close()` (it resolves `false`) leaves the target as the newer morph needs it: `open()` in the middle of `close()` keeps the target visible.
+- `open` and `close` are stable across renders; the object changes when `isOpen` does.
+
+**Example**
+
+```tsx
+import { useMorph, type MorphHandle } from "@damped/react";
+
+function Controls({ handle }: { handle: MorphHandle }) {
+  return (
+    <button onClick={() => void (handle.isOpen ? handle.close() : handle.open())}>
+      {handle.isOpen ? "Close" : "Open"}
+    </button>
+  );
+}
+
+export function Bill() {
+  const handle = useMorph({ duration: 0.5 });
+  return (
+    <>
+      <div ref={handle.source}>City Power: $84.20</div>
+      <div ref={handle.target} role="dialog" aria-label="City Power bill">
+        <Controls handle={handle} />
+      </div>
+    </>
+  );
+}
+```
+
+**See also**: [`useMorph`](#usemorph), [`MorphControls`](/reference/core/morph/#morphcontrols), [`morph`](/reference/core/morph/#morph)
+
+### `PresenceProps`
+
+<Badge text="type" variant="default" size="small" />
+
+The props of [`Presence`](#presence).
+
+```ts nocheck
+export interface PresenceProps {
+  /** Where a child starts when it is added; it animates to its identity values. */
+  enter?: AnimationTargets;
+  /** Where a removed child animates to before it is dropped. Without it, removed children disappear at once. */
+  exit?: AnimationTargets;
+  options?: EnterOptions;
+  /** Also animate the children present on the first mount. Default false. */
+  initial?: boolean;
+  /** Keyed elements that are host elements or components that take `ref` as a prop. */
+  children?: ReactNode;
+}
+```
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `enter` | [`AnimationTargets`](/reference/core/animate/#animationtargets) | none | Start values of an added child. |
+| `exit` | [`AnimationTargets`](/reference/core/animate/#animationtargets) | none | End values of a removed child. |
+| `options` | [`EnterOptions`](/reference/core/presence/#enteroptions) | core defaults | Spring options for both directions. |
+| `initial` | `boolean` | `false` | Animate the children present on the first mount too. |
+| `children` | `ReactNode` | none | Keyed elements. |
+
+**Behavior**
+
+- `exit` is run with `{ ...options, remove: false }`, so Presence decides when the child is dropped.
+- With `initial` set, the children present on the first mount animate in too; by default they do not.
+
+**Example**
+
+```tsx
+import { Presence, type PresenceProps } from "@damped/react";
+
+const motion: Pick<PresenceProps, "enter" | "exit" | "options"> = {
+  enter: { opacity: 0, y: 8 },
+  exit: { opacity: 0, y: -8 },
+  options: { duration: 0.3, bounce: 0 },
+};
+
+export function Notices({ notices }: { notices: string[] }) {
+  return (
+    <Presence {...motion}>
+      {notices.map((notice) => (
+        <p key={notice}>{notice}</p>
+      ))}
+    </Presence>
+  );
+}
+```
+
+**See also**: [`Presence`](#presence), [`EnterOptions`](/reference/core/presence/#enteroptions), [`AnimationTargets`](/reference/core/animate/#animationtargets)

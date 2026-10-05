@@ -1,2 +1,7 @@
 [test]
 preload = ["./test/happydom.ts"]
+
+# Starlight's Tabs component loads the native binding of its markdown processor (satteri) from the bundled
+# prerender output, which the isolated linker cannot resolve unless the binding is hoisted to the root.
+[install]
+publicHoistPattern = ["@bruits/satteri-*"]

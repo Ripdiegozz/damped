@@ -1,0 +1,257 @@
+---
+title: animate
+description: animate, the element animation function of @damped/core, with its option, target, property and controls types.
+---
+
+import { Badge } from "@astrojs/starlight/components";
+
+`animate` springs the transform, opacity and blur of one or more elements toward target values. A second call on the same element does not restart anything: it retargets, and each property keeps the position and velocity it had.
+
+damped owns the inline `transform` of every element it animates and replaces any existing one, so put a static transform on a wrapper. `opacity` is written once opacity is animated, and `filter` once blur is animated.
+
+## Functions
+
+### `animate`
+
+<Badge text="function" variant="default" size="small" />
+
+Animates the properties in `values` on `target` with a spring, interrupting and continuing any animation already running there.
+
+```ts nocheck
+export function animate(
+  target: Element | readonly Element[],
+  values: AnimationTargets,
+  options: AnimateOptions = {},
+): AnimationControls
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `target` | `Element \| readonly Element[]` | none | One element or an array. A `NodeList` or `HTMLCollection` is not an array and would be treated as a single element; spread it first. |
+| `values` | [`AnimationTargets`](#animationtargets) | none | The target value of each property to animate. |
+| `options` | [`AnimateOptions`](#animateoptions) | `{}` | Spring, scheduler, reduced motion, start values and driver. |
+
+**Returns** [`AnimationControls`](#animationcontrols): a `finished` promise and a `stop()` function.
+
+**What it writes**
+
+| Group | Style | Format |
+| --- | --- | --- |
+| transform | `transform` | `translate3d(Xpx, Ypx, 0) rotate(Rdeg) scale(SX, SY)`, where `SX` is `scale * scaleX` and `SY` is `scale * scaleY`. At rest: `translate3d(0px, 0px, 0) rotate(0deg) scale(1, 1)`. |
+| opacity | `opacity` | the number as a string |
+| filter | `filter` | `blur(Npx)` while `blur > 0.01`, otherwise an empty string |
+
+A group is written whole: animating only `x` writes the complete `transform`. A group that is never animated is never written. Each group is written at most once per element per frame, in the `write` phase. Elements without a `style` are skipped silently.
+
+**Behavior**
+
+- **Ownership.** Each call gets a token, and the latest call that targets a property (through `values` or `from`) owns it. Retargeting reuses the same [`SpringValue`](/reference/core/spring-value/#springvalue), so position and velocity carry over. Different properties run side by side.
+- **Timing.** The first frame of an animation renders the start state (`t = 0`).
+- **Thresholds.** Per-property rest thresholds go in first and your own `restDelta` and `restSpeed` override them individually. A `100` px move with the default spring rests after about 0.94 s, where `createSpring` with the default thresholds needs 1.16 s.
+- **Validation first.** Spring options, unknown property names and non-finite values are all checked before any element is touched, so a bad call never leaves an element half-animated.
+- **Idle.** Once everything settles, the scheduler stops requesting frames. There is no cleanup to do and nothing to dispose; the element keeps its last inline styles.
+- **Scheduler.** The first call on an element fixes its scheduler for good. See the [overview](/reference/core/#elements-have-one-scheduler).
+- **Reduced motion.** Spatial properties jump to their target and `opacity` and `blur` still animate. A jump interrupts a running animation and resolves it. See [`AnimateOptions`](#animateoptions).
+- **Server rendering.** Importing is safe. `animate` needs an `Element`, so call it from an effect or an event handler.
+
+**Edge cases**
+
+- An unknown property name throws `TypeError('animate: unknown animatable property "foo"')`. This is checked before the `undefined` skip, so `{ foo: undefined }` throws too.
+- A non-number or non-finite value throws `RangeError('animate: "x" must be a finite number, received NaN')`. A known key with the value `undefined` is skipped.
+- `from` uses the same checks with the label `animate from`.
+- Invalid spring options throw a `RangeError` from the options validation.
+- With nothing to animate, `finished` resolves immediately.
+
+**Example**
+
+```ts
+import { animate } from "@damped/core";
+
+const card = document.querySelector<HTMLElement>(".card");
+if (card !== null) {
+  const controls = animate(card, { x: 200, opacity: 0.5 }, { duration: 0.5, bounce: 0.2, from: { x: -40 } });
+
+  // Later, while it moves: the new call starts from the current position and velocity.
+  animate(card, { x: 0, opacity: 1 });
+
+  await controls.finished; // resolves once superseded properties are accounted for
+  controls.stop(); // no-op: a newer call owns everything
+}
+```
+
+**See also**: [`AnimateOptions`](#animateoptions), [`AnimationTargets`](#animationtargets), [`AnimationControls`](#animationcontrols), [`compositor`](/reference/core/compositor/#compositor), [`useSpring`](/reference/react/#usespring), [Interruption and reversal](/guides/interruption-and-reversal/), [Reduced motion](/guides/reduced-motion/)
+
+## Types
+
+### `AnimatableProperty`
+
+<Badge text="type" variant="default" size="small" />
+
+The names of the properties `animate` can move.
+
+```ts nocheck
+export type AnimatableProperty = "x" | "y" | "scale" | "scaleX" | "scaleY" | "rotate" | "opacity" | "blur";
+```
+
+| Property | Group | Unit | Identity | `restDelta` / `restSpeed` | Reduced motion |
+| --- | --- | --- | --- | --- | --- |
+| `x`, `y` | transform | px | `0` | `0.01` / `0.1` | jumps |
+| `rotate` | transform | degrees | `0` | `0.01` / `0.1` | jumps |
+| `scale`, `scaleX`, `scaleY` | transform | ratio | `1` | `0.0005` / `0.005` | jumps |
+| `opacity` | opacity | 0 to 1 | `1` | `0.0005` / `0.005` | animates |
+| `blur` | filter | px | `0` | `0.01` / `0.1` | animates |
+
+**Behavior**
+
+- The identity is the value a property has when it is not animated, and what [`enter`](/reference/core/presence/#enter) animates to by default.
+- The first time a value is created for `opacity`, it starts from the element's computed opacity. It is `1` when `getComputedStyle` is missing or the result is not finite.
+- `scale` multiplies `scaleX` and `scaleY`.
+
+**Example**
+
+```ts
+import type { AnimatableProperty } from "@damped/core";
+
+const spatial: readonly AnimatableProperty[] = ["x", "y", "rotate", "scale", "scaleX", "scaleY"];
+
+/** The properties that jump, rather than animate, when the user prefers reduced motion. */
+export function jumpsUnderReducedMotion(property: AnimatableProperty): boolean {
+  return spatial.includes(property);
+}
+
+console.log(jumpsUnderReducedMotion("x"), jumpsUnderReducedMotion("opacity")); // true false
+```
+
+**See also**: [`AnimationTargets`](#animationtargets), [`animate`](#animate), [Reduced motion](/guides/reduced-motion/)
+
+### `AnimationTargets`
+
+<Badge text="type" variant="default" size="small" />
+
+A partial map from property name to target value: what you pass as `values` to [`animate`](#animate), and as the start and end values of [`enter`](/reference/core/presence/#enter) and [`exit`](/reference/core/presence/#exit).
+
+```ts nocheck
+export type AnimationTargets = Partial<Record<AnimatableProperty, number>>;
+```
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| any [`AnimatableProperty`](#animatableproperty) | `number` | omitted: the property is left alone | The value to animate that property to. |
+
+**Behavior**
+
+- Values must be finite numbers. `undefined` skips the key.
+- Properties that are not mentioned are never written.
+
+**Example**
+
+```ts
+import { animate, type AnimationTargets } from "@damped/core";
+
+const lifted: AnimationTargets = { y: -8, scale: 1.02, opacity: 1 };
+const resting: AnimationTargets = { y: 0, scale: 1, opacity: 0.9 };
+
+const tile = document.querySelector<HTMLElement>(".tile");
+if (tile !== null) {
+  tile.addEventListener("pointerenter", () => animate(tile, lifted));
+  tile.addEventListener("pointerleave", () => animate(tile, resting));
+}
+```
+
+**See also**: [`AnimatableProperty`](#animatableproperty), [`animate`](#animate), [`AnimateOptions`](#animateoptions)
+
+### `AnimateOptions`
+
+<Badge text="type" variant="default" size="small" />
+
+The options of [`animate`](#animate): either form of [`SpringOptions`](/reference/core/springs/#springoptions) plus a scheduler, a reduced motion mode, start values and a driver.
+
+```ts nocheck
+export type AnimateOptions = SpringOptions & {
+  scheduler?: Scheduler;
+  reducedMotion?: "user" | "always" | "never";
+  from?: AnimationTargets;
+  driver?: "js" | Driver;
+};
+```
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| spring options | [`SpringOptions`](/reference/core/springs/#springoptions) | `duration: 0.5`, `bounce: 0.15` | Validated before any element is touched. `restDelta` and `restSpeed` default per property. |
+| `scheduler` | [`Scheduler`](/reference/core/scheduler/#scheduler) | the shared [`frame`](/reference/core/scheduler/#frame) | Fixed per element by the first call. |
+| `reducedMotion` | `"user" \| "always" \| "never"` | `"user"` | `"user"` follows `prefers-reduced-motion`, evaluated at call time and only when there is something to animate. A missing `matchMedia` means no preference. `"always"` jumps spatial properties without consulting `matchMedia`; `"never"` animates everything. |
+| `from` | [`AnimationTargets`](#animationtargets) | none | Jumped to immediately before animating, also under reduced motion. |
+| `driver` | `"js"` or [`Driver`](/reference/core/compositor/#driver) | `"js"` | `"js"` writes styles from the frame loop. Pass [`compositor`](/reference/core/compositor/#compositor) to hand the sampled spring to the browser. |
+
+**Behavior**
+
+- `from` is applied as a jump. With the JS driver the inline style is written in the next frame's `write` phase, so a call with only `from` leaves `style.transform` empty until the first frame. With the compositor driver it is committed inline at once.
+- A `driver` other than `"js"` must have `supports` and `play` functions, otherwise `animate` throws `TypeError('animate: driver must be "js" or a driver such as the exported compositor')`.
+- Any `reducedMotion` string other than `"user"` and `"always"` behaves as `"never"`. The types forbid it.
+- `layout`, `morph`, `enter` and `exit` accept these options without `driver`. `layout`, `morph` and `enter` also drop `from`; `exit` keeps it.
+
+**Example**
+
+```ts
+import { animate, type AnimateOptions } from "@damped/core";
+
+const options: AnimateOptions = {
+  duration: 0.4,
+  bounce: 0.1,
+  reducedMotion: "user",
+  from: { opacity: 0, y: 12 },
+};
+
+const toast = document.querySelector<HTMLElement>(".toast");
+if (toast !== null) {
+  void animate(toast, { opacity: 1, y: 0 }, options);
+}
+```
+
+**See also**: [`animate`](#animate), [`SpringOptions`](/reference/core/springs/#springoptions), [`LayoutOptions`](/reference/core/layout/#layoutoptions), [`compositor`](/reference/core/compositor/#compositor), [Reduced motion](/guides/reduced-motion/)
+
+### `AnimationControls`
+
+<Badge text="type" variant="default" size="small" />
+
+What [`animate`](#animate) and [`layout`](/reference/core/layout/#layout) return: a promise for the end and a way to freeze the motion.
+
+```ts nocheck
+export interface AnimationControls {
+  readonly finished: Promise<void>;
+  stop(): void;
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `finished` | `Promise<void>` | Resolves when every property that this call animates has settled or been superseded. It never rejects. |
+| `stop()` | `() => void` | Freezes the properties this call still owns, with zero velocity. |
+
+**Behavior**
+
+- `finished` resolves, it does not reject, when the properties are superseded. It does not tell you which happened; use [`morph`](/reference/core/morph/#morph) or [`exit`](/reference/core/presence/#exit) when you need that.
+- Properties that jumped under reduced motion create no wait.
+- `stop()` leaves a property alone when a newer call has taken it over: that property keeps animating. `finished` still resolves.
+- `stop()` after everything settled changes nothing. It freezes every element in the call.
+- The element keeps its last inline styles after `stop()`.
+
+**Example**
+
+```ts
+import { animate, type AnimationControls } from "@damped/core";
+
+const panel = document.querySelector<HTMLElement>(".panel");
+if (panel !== null) {
+  const controls: AnimationControls = animate(panel, { x: 320 }, { duration: 0.8 });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") controls.stop(); // freeze where it is
+  });
+
+  await controls.finished;
+  console.log("done or interrupted");
+}
+```
+
+**See also**: [`animate`](#animate), [`LayoutSnapshot`](/reference/core/layout/#layoutsnapshot), [`MorphControls`](/reference/core/morph/#morphcontrols)

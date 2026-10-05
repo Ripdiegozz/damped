@@ -59,10 +59,10 @@ Give damped its own identity: a mark built from the physics of the library, a re
 | B1 | Brand system: `brand/` sources (mark, small mark, outlined wordmark, lockups, tokens) and the `bun run brand` generator with a drift test | delegated (writer: 2+ non-trivial files) | done | `332a80a` `f1096e3` |
 | B2 | Fix code frames and asides: Expressive Code `styleOverrides`, drop the radius rule, built-output test | inline (one mechanical, understood change) | done | `3d62d81` |
 | B3 | Docs theme: Geist/Geist Mono, dark-first tokens, accent rules, Starlight chrome, code, asides, tables; demos on the new tokens; logo and favicons wired | delegated (writer) | todo | |
-| B4 | Landing redesign: live spring instrument hero, new sections, updated landing tests | delegated (writer) | todo | |
-| B5 | Physics: interactive "Springs explained" (mass on a spring, damping ratio, phase portrait, interruption) with unit, SSR and e2e coverage | delegated (writer) | todo | |
-| B6 | Playground favicon and head metadata; build copies the assets; e2e asserts they load under `/playground/` | delegated (writer, with B7) | todo | |
-| B7 | README lockup, package manifest metadata, GitHub repository description, homepage and topics | delegated (writer, with B6) + inline `gh repo edit` | todo | |
+| B4 | Landing redesign: live spring instrument hero, new sections, updated landing tests | delegated (writer, worktree `feat/branding-landing`) | in progress | |
+| B5 | Physics: interactive "Springs explained" (mass on a spring, damping ratio, phase portrait, interruption) with unit, SSR and e2e coverage | delegated (writer, worktree `feat/branding-physics`) | in progress | |
+| B6 | Playground favicon and head metadata; build copies the assets; e2e asserts they load under `/playground/` | delegated (writer with B7, worktree `feat/branding-meta`) | in progress | |
+| B7 | README lockup, package manifest metadata, GitHub repository description, homepage and topics | delegated (writer with B6) + inline `gh repo edit` | in progress | |
 | B8 | Deliver: forbidden-strings grep, all gates, PRs, merge, verify the live site, screenshots | inline | todo | |
 
 ## Acceptance criteria
@@ -101,6 +101,11 @@ Give damped its own identity: a mark built from the physics of the library, a re
 
 - 2026-10-05: Review assessment for `01d2b48..cc9ac75`: medium, `slice_budget_reached`, so the review was due. START asked for consent (44 files, 1316 lines). The user chose "Skip this time", and the exact decline invocation returned `declined` / `declined_this_candidate` for target `sha256:38f2593a…`. Verification for that range is therefore the writer's self-verification plus the parent spot check (medium tier, non-mini writer). B3 delegated to one writer.
 
+- 2026-10-05: The user asked for maximum parallelism ("metele nitro, tirá paralelos"). Four writers now run at once. B3 is in the main checkout on `feat/branding`. B4, B5 and B6+B7 each have their own worktree under `../damped-worktrees/` on `feat/branding-landing`, `feat/branding-physics` and `feat/branding-meta`, all from `ecd4f04`, with `bun install --frozen-lockfile` done.
+  - File ownership: B3 owns the theme, chrome, code blocks, demos and head; it was told to stay out of the landing. B4 owns the landing files. B5 owns `springs-explained.mdx`, `components/physics/` and `styles/physics.css`, plus one `customCss` line. B6+B7 own the playground head and build, the README and the package manifests.
+  - Ports: `reuseExistingServer` is on locally, so each writer has its own `E2E_PORT` (B3 4173, B4 4174, B5 4175, B6+B7 4176) and its own static-server range.
+  - Integration: merge the three branches into `feat/branding` after B3, re-verify visually on the merged theme, and dedupe the overlap between the B4 hero instrument and the B5 phase-portrait figure.
+
 ## Next step
 
-B3: docs theme (writer running).
+Collect the B3-B7 reports; integrate; then B8.

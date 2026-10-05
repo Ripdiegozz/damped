@@ -5,11 +5,12 @@ interface TopBarProps {
   title: string;
   sidebarExpanded: boolean;
   onToggleSidebar(): void;
+  onNew(): void;
   /** View-specific controls, shown before the primary action. */
   actions?: ReactNode;
 }
 
-export function TopBar({ title, sidebarExpanded, onToggleSidebar, actions }: TopBarProps) {
+export function TopBar({ title, sidebarExpanded, onToggleSidebar, onNew, actions }: TopBarProps) {
   return (
     <header className="topbar">
       <button
@@ -25,8 +26,7 @@ export function TopBar({ title, sidebarExpanded, onToggleSidebar, actions }: Top
       <h1 className="topbar-title">{title}</h1>
       <div className="topbar-actions">
         {actions}
-        {/* A placeholder until toasts exist. */}
-        <button type="button" className="button primary">
+        <button type="button" className="button primary" onClick={onNew}>
           + New
         </button>
       </div>

@@ -7,6 +7,8 @@ import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import type { Bill } from "./bills";
 import { INITIAL_OVERVIEW, shuffleOverview, type OverviewData } from "./data";
+import { useToast } from "./ToastProvider";
+import { formatCurrency } from "./format";
 import { SPRINGS, VIEW_ENTER, VIEW_EXIT } from "./motion";
 import { viewLabel, type ViewId } from "./views";
 
@@ -36,7 +38,14 @@ export function App() {
   const [overview, setOverview] = useState(INITIAL_OVERVIEW);
   // Kept here, so a paid bill stays paid when the view is left and entered again.
   const [paid, setPaid] = useState<ReadonlySet<string>>(() => new Set());
-  const payBill = useCallback((bill: Bill) => setPaid((current) => new Set(current).add(bill.id)), []);
+  const toast = useToast();
+  const payBill = useCallback(
+    (bill: Bill, amount: number) => {
+      setPaid((current) => new Set(current).add(bill.id));
+      toast.show(`Paid ${formatCurrency(amount)} to ${bill.payee}`);
+    },
+    [toast],
+  );
   // The content area takes the space the sidebar gives up, so it animates its own box too.
   const main = useLayout<HTMLElement>([collapsed], { ...SPRINGS.panel, correct: "children" });
 
@@ -57,6 +66,7 @@ export function App() {
           title={viewLabel(view)}
           sidebarExpanded={!collapsed}
           onToggleSidebar={() => setCollapsed((current) => !current)}
+          onNew={() => toast.show("New transaction draft created")}
           actions={
             view === "overview" ? (
               // A dev control: retargets the figures, which is the quickest way to see a spring being interrupted.

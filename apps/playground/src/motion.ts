@@ -17,12 +17,18 @@ export const SPRINGS = {
   number: { duration: 0.8, bounce: 0, restDelta: 0.25, restSpeed: 2 },
   /** The savings bar. */
   progress: { duration: 0.7, bounce: 0.15 },
+  /** Toasts entering and leaving. */
+  toast: { duration: 0.35, bounce: 0 },
+  /** The rest of the stack moving into the space a toast gave up or took. */
+  stack: { duration: 0.4, bounce: 0.1 },
   /** A list row appearing. */
   row: { duration: 0.35, bounce: 0 },
 } as const;
 
 export const VIEW_ENTER: AnimationTargets = { opacity: 0, y: 12 };
 export const VIEW_EXIT: AnimationTargets = { opacity: 0, y: -8 };
+export const TOAST_ENTER: AnimationTargets = { y: 16, opacity: 0, scale: 0.96 };
+export const TOAST_EXIT: AnimationTargets = { opacity: 0, x: 24 };
 export const ROW_ENTER: AnimationTargets = { opacity: 0, y: 10 };
 
 /** The corner radius of a bill card and of its dialog; morph() holds it constant while the box scales. */

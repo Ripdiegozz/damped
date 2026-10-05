@@ -1,0 +1,178 @@
+---
+title: Interruption and reversal
+description: Retarget a moving element without a jump. How damped carries velocity across animations, and what cancellation means.
+sidebar:
+  order: 2
+---
+
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
+import { MorphCard } from "../../../components/demos/MorphCard";
+import { RetargetSpring } from "../../../components/demos/RetargetSpring";
+
+Interfaces get interrupted. A user opens a card and changes their mind halfway, a list reorders again while it is still sliding, a toast is dismissed as it arrives. A good animation system treats that as the normal case. damped's rule is simple: **the latest call wins, and it starts from the position and velocity the element has right now.**
+
+## Retargeting a moving element
+
+Call `animate` again on the same element. There is nothing to cancel first.
+
+```ts
+import { animate } from "@damped/core";
+
+const card = document.querySelector<HTMLElement>("#card");
+
+if (card) {
+  animate(card, { x: 240 }, { duration: 0.5, bounce: 0.15 });
+
+  // 200 ms later the user changes their mind.
+  setTimeout(() => {
+    animate(card, { x: 0 }, { duration: 0.5, bounce: 0.15 });
+  }, 200);
+}
+```
+
+At 200 ms the card is at about 78.6 px and still moving away from the origin at about 273 px/s. The second call starts a new spring from exactly that state. The same holds for `createSpringValue`, `layout`, `morph`, `enter` and `exit`, and for the React hooks built on them.
+
+<RetargetSpring client:visible />
+
+### What carrying velocity looks like
+
+Here is that interruption at 200 ms, with a spring that carries the velocity and with one that restarts from rest, the way a time-based easing would. Both are heading to 0 from 78.6.
+
+| After the retarget | Carried: position | Carried: velocity | Restarted: position | Restarted: velocity |
+| --- | --- | --- | --- | --- |
+| 0 ms | 78.6 | +273.2 | 78.6 | 0 |
+| 20 ms | 80.9 | -28.3 | 76.5 | -200.0 |
+| 40 ms | 78.2 | -223.5 | 71.2 | -320.2 |
+| 60 ms | 72.5 | -339.4 | 64.1 | -382.3 |
+| 100 ms | 56.8 | -415.3 | 48.1 | -396.2 |
+
+(`duration: 0.5`, `bounce: 0.15`, in pixels and pixels per second.) The carried spring keeps moving forward for a moment, up to about 81 px, before it turns around. A restart ignores the momentum and starts heading back at once, which reads as the element hitting a wall. The numbers come from the analytic spring, so you can reproduce them:
+
+```ts
+import { createSpring } from "@damped/core";
+
+const options = { duration: 0.5, bounce: 0.15 } as const;
+const { position, velocity } = createSpring(0, 100, 0, options).at(0.2);
+
+const carried = createSpring(position, 0, velocity, options);
+const restarted = createSpring(position, 0, 0, options);
+
+console.log(carried.at(0.02).position.toFixed(1)); // 80.9
+console.log(restarted.at(0.02).position.toFixed(1)); // 76.5
+```
+
+### Time-based easing has no velocity to carry
+
+A CSS transition or a `cubic-bezier` tween is a function from elapsed time to progress. It has a position at every moment but no memory of how fast it was going, so an interrupted one has to start its replacement from zero velocity. You see it as a stall followed by a new acceleration. A spring's state is `{ position, velocity }`, so there is something to hand over, and damped does so on every retarget.
+
+## Ownership: who controls a property
+
+- The latest call to target a property owns it. An older animation of that property stops writing and counts as taken over.
+- Calls that target different properties of one element run side by side, so `animate(el, { x: 100 })` does not disturb a running `opacity` animation.
+- Retargeting keeps the velocity whichever driver played the earlier animation, including the [compositor driver](/guides/compositor/).
+
+## Cancellation semantics
+
+Superseded and stopped animations never throw and never reject. They settle their promise, and the value tells you what happened.
+
+| You do | Promise of the animation that was running |
+| --- | --- |
+| Start a new `animate` on the same properties | `finished` resolves; the properties moved to the new owner. |
+| `controls.stop()` | `finished` resolves; the properties this call still owns freeze where they are. Properties a newer call took over are left alone. |
+| `value.set(next)` while a `set` runs | The earlier `set` resolves `false`; the new one resolves `true` when it settles. |
+| `value.jump(x)` or `value.stop()` | The pending `set` resolves `false`. `jump` sets the value now with zero velocity and notifies listeners; `stop` freezes without notifying them. |
+| `morph(...)` again, or `stop()` on either element | `finished` resolves `false` for the earlier morph. |
+| `enter(...)` while an `exit` runs | The exit's `finished` resolves `false` and the removal is cancelled. |
+
+A `SpringValue` makes the distinction easy to observe:
+
+```ts
+import { createSpringValue } from "@damped/core";
+
+const progress = createSpringValue(0);
+
+const first = progress.set(100);
+const second = progress.set(0); // retargets from wherever the value is, keeping its velocity
+
+// `true` means "settled at the target", `false` means "superseded".
+Promise.all([first, second]).then(([a, b]) => console.log(a, b)); // false true
+```
+
+## Reversing a morph
+
+`morph(from, to)` turns one element into another. To reverse it, call `morph` again with the arguments swapped. Both elements keep their velocity, so the reversal turns around from wherever they are.
+
+```ts
+import { morph } from "@damped/core";
+
+const card = document.querySelector<HTMLElement>(".card");
+const dialog = document.querySelector<HTMLElement>(".dialog");
+const options = { duration: 0.5, bounce: 0.1, radius: 16 } as const;
+
+if (card && dialog) {
+  const open = (): Promise<boolean> => {
+    dialog.hidden = false; // morph() measures the final box, so show the target first
+    return morph(card, dialog, options).finished;
+  };
+  const close = (): Promise<boolean> => morph(dialog, card, options).finished;
+
+  card.addEventListener("click", () => void open());
+  dialog.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") void close(); // works mid-flight, too
+  });
+}
+```
+
+In a Chromium test of a reversal in the middle of an opening morph, the element keeps moving the same way for a moment (+37.0 px, then +27.2 px) before it turns back. Open the card below, then press Escape or Close while it is still opening.
+
+<MorphCard client:visible />
+
+In React, `useMorph` does this for you: `open()` and `close()` can be called at any time. Each returns a promise that resolves `true` when its morph settled and `false` when a later `open()`, `close()` or an unmount cut it short.
+
+`layout` interruptions behave the same way. A layout animation is a set of `animate` values, so a second layout change while the first runs keeps the velocity, and a size change rescales it to the new size.
+
+## Reversing presence
+
+An element that is leaving can come back. `enter` on an element that is mid-exit cancels the removal and only retargets: the element keeps its position and velocity, and the properties its exit was animating return to their identity values.
+
+```ts
+import { enter, exit } from "@damped/core";
+
+const toast = document.querySelector<HTMLElement>(".toast");
+
+if (toast) {
+  const leaving = exit(toast, { opacity: 0, y: -12 }, { duration: 0.3, bounce: 0 });
+
+  // The user hovers the toast and it should stay after all.
+  void enter(toast, {}, {}, { duration: 0.3, bounce: 0 });
+
+  void leaving.finished.then((completed) => console.log(completed ? "removed" : "kept")); // kept
+}
+```
+
+With `<Presence>`, bringing a key back while it exits does the same, and the child keeps its velocity. See [Presence](/guides/presence/).
+
+## What happens on unmount
+
+Nothing keeps running after the owner is gone.
+
+| Owner | On unmount |
+| --- | --- |
+| `useSpring` | The animation stops. |
+| `useSpringValue` | The value stops and the listeners subscribed through it are dropped. |
+| `useMorph` | The running morph stops; a pending `open()` or `close()` resolves `false`. |
+| `<Presence>` | The children leave with the tree. An exit that settles afterwards reports nowhere, and `onExitComplete` is not called. |
+| Core calls in your own code | They run until they settle. Call `controls.stop()` in your cleanup if the element may go away. |
+
+<Aside type="note">
+  `stop()` freezes an element where it is; it does not return it to where it started. If you want it to go somewhere, start a new animation.
+</Aside>
+
+## Next
+
+<CardGrid>
+  <LinkCard title="Layout and morph" description="FLIP, scale correction and shared-element morphs." href="/guides/layout-and-morph/" />
+  <LinkCard title="Presence" description="Enter and exit, including leaving elements that come back." href="/guides/presence/" />
+  <LinkCard title="React" description="Hooks that retarget without re-rendering." href="/guides/react/" />
+  <LinkCard title="@damped/core reference" description="animate, createSpringValue, morph, enter and exit." href="/reference/core/" />
+</CardGrid>

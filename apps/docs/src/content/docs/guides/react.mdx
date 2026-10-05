@@ -1,0 +1,254 @@
+---
+title: React
+description: The @damped/react hooks, the model that keeps animation frames out of React renders, StrictMode and server rendering behavior, and patterns for controlled dialogs and lists.
+sidebar:
+  order: 7
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+
+`@damped/react` is a thin layer over `@damped/core`. It does not add a second animation engine: every hook starts, retargets and cleans up core animations for you, and then gets out of the way.
+
+```sh frame="none"
+bun add @damped/react @damped/core react react-dom
+```
+
+It needs **React 19** (`react` and `react-dom` 19 or newer) and `@damped/core` as peer dependencies. React 19 matters in one place: `<Presence>` reads the `ref` prop of its children, and React 19 passes `ref` to function components as an ordinary prop, with no `forwardRef`.
+
+## The hooks at a glance
+
+| Export | Use it to |
+| --- | --- |
+| `useSpringValue` | Hold a spring-driven number for the life of a component. |
+| `useSpring` | Spring an element toward target styles when props or state change. |
+| `useLayout` | Animate an element from its old box to its new one when something changed (FLIP). |
+| `useMorph` | Turn a card into a dialog, and back. |
+| `<Presence>` | Animate children in when they are added and out before they are removed. |
+
+All options are the [`@damped/core` options](/reference/core/); the hooks add no options of their own. `<Presence>` has its own props, described in [Presence](/guides/presence/#presence-in-react).
+
+## Nothing re-renders per frame
+
+The most important thing to know about the package is what React is **not** doing. A spring produces a new value 60 or more times a second. If each value went through `setState`, the component would render 60 times a second and animation would compete with everything else React is doing. damped never does that.
+
+Here is how a value reaches the screen:
+
+1. React renders your component. The hook hands you a ref callback.
+2. React attaches the ref, and in a layout effect the hook calls the core `animate()` for that element.
+3. From then on a single `requestAnimationFrame` loop owned by `@damped/core` computes each spring and writes `transform`, `opacity` or `filter` straight to the element's inline style.
+4. React hears nothing until the animation is over, and often not even then.
+
+That is why the hooks return refs, not values. The render counts are part of the package's contract and are covered by tests that count renders across hundreds of animation frames:
+
+| Hook or component | Renders |
+| --- | --- |
+| `useSpringValue` | Never, by itself. Subscribe with `onChange` or read it in an event handler. |
+| `useSpring` | Never, by itself. |
+| `useLayout` | Never, by itself. It reads the DOM during your render and animates after the commit. |
+| `useMorph` | Once when `open()` is called (`isOpen` becomes `true`) and once when `close()` is called. Never per frame. |
+| `<Presence>` | When the set of children changes, plus one more render when a leaving child is dropped after its exit. Never per frame. |
+
+### Reading a value without a render
+
+`useSpringValue` gives you a number that lives as long as the component. To show it on screen, subscribe with `onChange` and write to the DOM yourself:
+
+```tsx
+import { useEffect, useRef } from "react";
+import { useSpringValue } from "@damped/react";
+
+const format = (value: number): string => Math.round(value).toLocaleString("en-US");
+
+export function AnimatedNumber({ value }: { value: number }) {
+  const text = useRef<HTMLSpanElement>(null);
+  const spring = useSpringValue(value);
+  // The first value is rendered once. React never rewrites the text, so the frames below are not overwritten.
+  const first = useRef(value);
+
+  useEffect(
+    () =>
+      spring.onChange((current) => {
+        if (text.current !== null) text.current.textContent = format(current);
+      }),
+    [spring],
+  );
+
+  useEffect(() => {
+    void spring.set(value, { duration: 0.6, bounce: 0 });
+  }, [spring, value]);
+
+  return <span ref={text}>{format(first.current)}</span>;
+}
+```
+
+The pattern is general: render the starting state, then let `onChange` own the DOM. `useSpringValue` creates the value once (`initial` and `options` of later renders are ignored), stops it on unmount and drops the listeners that were subscribed through it. It does not follow `prefers-reduced-motion` because it is a number; see [Reduced motion](/guides/reduced-motion/).
+
+## useSpring: styles that follow state
+
+`useSpring(targets, options?)` springs the element that receives its ref toward `targets`. The properties are `x`, `y`, `scale`, `scaleX`, `scaleY`, `rotate`, `opacity` and `blur`.
+
+```tsx
+import { useSpring } from "@damped/react";
+
+export function Card({ active }: { active: boolean }) {
+  const ref = useSpring<HTMLDivElement>({ scale: active ? 1.05 : 1, opacity: active ? 1 : 0.6 }, { duration: 0.4 });
+  return <div ref={ref}>Card</div>;
+}
+```
+
+| Behavior | Detail |
+| --- | --- |
+| Retargeting | A change of any target value, compared by value and not by object identity, retargets the running animation and keeps its velocity. A new object with the same values does nothing, even mid-flight. |
+| Options | Read at the moment a retarget happens. Changing `options` alone does not restart anything. |
+| First mount | The element animates from its current style to `targets`; it does not start at them. |
+| Late elements | An element that receives the ref after the component's last commit is animated as well. |
+| Unmount | The animation stops. |
+
+To start from a given style on the first mount, pass `from`. Because options are read on every retarget, apply it only the first time:
+
+```tsx
+import { useEffect, useRef } from "react";
+import { useSpring } from "@damped/react";
+
+export function Progress({ ratio }: { ratio: number }) {
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
+
+  const fill = useSpring<HTMLDivElement>(
+    { scaleX: ratio },
+    { duration: 0.6, ...(mounted.current ? {} : { from: { scaleX: 0 } }) },
+  );
+
+  return (
+    <div className="track">
+      <div className="fill" ref={fill} style={{ transformOrigin: "left" }} />
+    </div>
+  );
+}
+```
+
+:::caution[One owner per property]
+damped owns the inline `transform` of an animated element and replaces any transform you set. Put static transforms on a wrapper. A layout animation (`useLayout`, `useMorph`) owns `x`, `y`, `scaleX` and `scaleY` of its element, so do not also animate those with `useSpring` on the same element. Animating `opacity` next to a layout is fine.
+:::
+
+## useLayout and useMorph
+
+`useLayout(deps, options?)` runs FLIP on re-render and `useMorph(options?)` is a card-to-dialog morph where both elements stay mounted. They are explained, with full examples, in [Layout and morph](/guides/layout-and-morph/#in-react). Two facts to carry over:
+
+- `useLayout` reads the DOM during render, the last moment it still shows the old layout. Renders React discards are harmless, because each render replaces the snapshot and only the commit of the render that took it animates.
+- `useMorph` stores your options after every render, so a change applies to the next `open()` or `close()`. Its geometry must not depend on `isOpen`, and you must not render a `hidden` prop on the target.
+
+`<Presence>` is covered in [Presence](/guides/presence/).
+
+## StrictMode
+
+StrictMode renders twice, and in development mounts, unmounts and remounts every component. The hooks are written for that and each one is covered by a test that wraps it in `<StrictMode>`:
+
+| Hook or component | What the test shows |
+| --- | --- |
+| `useSpringValue` | The same value survives the simulated remount, and listeners subscribed after a StrictMode mount still fire. |
+| `useSpring` | The animation survives the simulated remount and still reaches its targets. |
+| `useLayout` | The double render and the double effects produce a single, correct animation. |
+| `useMorph` | It still opens and closes. |
+| `<Presence>` | A child added later enters once. |
+
+The practical rule is the usual one for effects: whatever you subscribe in an effect, return its cleanup. `spring.onChange(...)` returns the unsubscribe function, which is why the `AnimatedNumber` example returns it straight from `useEffect`.
+
+## Server rendering and hydration
+
+Every hook and `<Presence>` render on the server without touching `window`, `document`, `requestAnimationFrame`, `matchMedia` or `getComputedStyle`. This is checked by rendering with those globals replaced by traps, and in a process that has no DOM at all.
+
+- The effects that start animations never run on the server: the layout effect is a no-op there, so React does not warn about it.
+- Nothing the hooks render differs between server and client. Animation writes inline styles after hydration, so there is no mismatch to reconcile.
+- `useMorph` writes `hidden` on the client only, so server-rendered HTML shows the target until hydration. Hide it in CSS if that matters.
+- `<Presence>` renders its children as they are, whether or not `initial` is set. Nothing animates until the client takes over.
+
+## Patterns
+
+### A controlled dialog
+
+`useMorph` owns `isOpen`: it becomes `true` when `open()` is called and `false` when `close()` is called. When the open state lives somewhere else, for example in the URL or in a parent, mirror it with an effect:
+
+```tsx
+import { useEffect } from "react";
+import { useMorph } from "@damped/react";
+
+interface BillDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function BillDialog({ open: wanted, onOpenChange }: BillDialogProps) {
+  const { source, target, open, close, isOpen } = useMorph({ duration: 0.5, bounce: 0.1, radius: 16 });
+
+  // The parent decides; the hook follows. Reversing mid-flight is just the opposite call.
+  useEffect(() => {
+    if (wanted && !isOpen) void open();
+    if (!wanted && isOpen) void close();
+  }, [wanted, isOpen, open, close]);
+
+  return (
+    <>
+      <button type="button" ref={source} aria-expanded={wanted} onClick={() => onOpenChange(true)}>
+        City Power: $84.20
+      </button>
+      <div ref={target} role="dialog" aria-modal="true" aria-label="City Power bill">
+        <p>Bill for John Doe</p>
+        <button type="button" onClick={() => onOpenChange(false)}>
+          Close
+        </button>
+      </div>
+    </>
+  );
+}
+```
+
+The effect cannot loop: it only acts when the hook disagrees with the parent, and once `open()` or `close()` has been called, `isOpen` follows on the next render. Focus handling is still yours; see [Layout and morph](/guides/layout-and-morph/#focus-and-accessibility).
+
+### Lists with layout
+
+A hook cannot be called in a loop, so give each item its own component and call `useLayout` there. Pass in `deps` whatever makes the item move, usually its position:
+
+```tsx
+import { useState } from "react";
+import { useLayout } from "@damped/react";
+
+function Row({ label, position }: { label: string; position: number }) {
+  const ref = useLayout<HTMLLIElement>([position], { duration: 0.4, bounce: 0.1 });
+  return <li ref={ref}>{label}</li>;
+}
+
+export function Activity({ rows }: { rows: string[] }) {
+  const [newestFirst, setNewestFirst] = useState(true);
+  const ordered = newestFirst ? rows : [...rows].reverse();
+
+  return (
+    <>
+      <button type="button" onClick={() => setNewestFirst((value) => !value)}>
+        {newestFirst ? "Oldest first" : "Newest first"}
+      </button>
+      <ul>
+        {ordered.map((label, index) => (
+          <Row key={label} label={label} position={index} />
+        ))}
+      </ul>
+    </>
+  );
+}
+```
+
+Add `<Presence>` around the rows for items that are inserted and removed. The two combine; see [Siblings that glide](/guides/presence/#siblings-that-glide).
+
+### Tests and options
+
+Every hook that takes options accepts a `scheduler`. Pass one backed by a manual frame source and a test runs animations without waiting for time. See [Testing](/guides/testing/).
+
+## Next
+
+<CardGrid>
+  <LinkCard title="Layout and morph" description="useLayout and useMorph with full examples and the dialog accessibility checklist." href="/guides/layout-and-morph/" />
+  <LinkCard title="Presence" description="Enter and exit, interruption by re-adding, and sibling reflow." href="/guides/presence/" />
+  <LinkCard title="Testing" description="Run React animations deterministically with a fake frame source." href="/guides/testing/" />
+  <LinkCard title="React reference" description="Every hook and prop with signatures and edge cases." href="/reference/react/" />
+</CardGrid>

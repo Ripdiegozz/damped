@@ -1,0 +1,165 @@
+---
+title: Reduced motion and accessibility
+description: How every damped API follows prefers-reduced-motion, the reducedMotion option, and what to do about focus, inert elements and keyboard use.
+sidebar:
+  order: 6
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+
+Some people get dizzy or sick from large movement on screen, and they can ask their system to reduce it. Browsers expose that request as the [`prefers-reduced-motion`](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion) media query. damped follows it from the first API.
+
+The rule is one sentence: **spatial motion jumps, fades remain.** Position, rotation and scale go straight to their final value. Opacity and blur still animate, because a fade does not move anything across the screen. The element still arrives, appears or leaves with some feedback, just without the travel.
+
+## What each API does
+
+| API | Reduced-motion behavior |
+| --- | --- |
+| `animate` | `x`, `y`, `rotate`, `scale`, `scaleX` and `scaleY` jump to their target. `opacity` and `blur` animate. A jump interrupts a running animation of that property and resolves it. `from` values are still applied. |
+| `animate` with `compositor` | The same rule, applied before the driver is involved. Spatial properties jump and are committed inline; `opacity` and `blur` can still run on the compositor. |
+| `layout`, `snapshot` | The element jumps to its new box on the first frame. Child and radius corrections are cleaned up at once, and `finished` resolves. |
+| `morph` | The boxes, radius and corrections jump. The crossfade and the blur still animate, and `finished` resolves `true`. |
+| `enter` | Spatial entries jump, so the transform lands on the identity on the first frame. `opacity` and `blur` still animate. |
+| `exit` | Spatial targets jump and opacity animates, and the element is removed after the opacity has settled. An exit with only spatial targets completes, and removes the element, at once. |
+| `createSpring`, `createSpringValue` | Not affected. They are numbers, not elements. Decide in your own code, for example by calling `jump()`. |
+| `useSpring`, `useLayout`, `useMorph`, `<Presence>` | Through the `reducedMotion` option of the core API they call. The core rule applies. |
+| `useSpringValue` | Not affected, like `createSpringValue`. |
+| `withDamped` (React Native) | Follows Reanimated's `ReduceMotion`: the shared value jumps to `toValue` and the animation ends. `System` is the default. |
+| `toReanimated` | Returns only the physics config. `reduceMotion` is an option of `withSpring` that you set yourself. |
+
+The rows for the core element APIs are covered by unit tests, and `animate` is also checked in a real browser: under reduced motion it jumps spatial properties on the first frame and still animates opacity.
+
+## The reducedMotion option
+
+All the element APIs take a `reducedMotion` option, and so do the React hooks and `<Presence options>`.
+
+| Value | Meaning |
+| --- | --- |
+| `"user"` (default) | Follow `matchMedia("(prefers-reduced-motion: reduce)")`, read when the call starts. Without `matchMedia` it is off. |
+| `"always"` | Always reduce. Useful for an in-app setting or for a test. |
+| `"never"` | Never reduce. |
+
+`"never"` is the override. Use it sparingly, only when the motion is the content: the compositor demo on the [Demos page](/guides/demos/) offers a "Play anyway" button that switches to `"never"`, because without the motion there would be nothing to compare.
+
+```tsx
+import { useSpring } from "@damped/react";
+
+// `reduce` comes from your own settings screen. "user" keeps following the system.
+export function Card({ active, reduce }: { active: boolean; reduce: boolean }) {
+  const ref = useSpring<HTMLDivElement>(
+    { scale: active ? 1.05 : 1, opacity: active ? 1 : 0.6 },
+    { duration: 0.4, reducedMotion: reduce ? "always" : "user" },
+  );
+  return <div ref={ref}>Card</div>;
+}
+```
+
+Two details to keep in mind:
+
+- The preference is read **when a call starts**. An animation that is already running is not changed if the setting flips mid-flight; the next call sees the new value.
+- Springs that animate plain numbers never look at the setting. If you drive something from `createSpringValue` or `useSpringValue`, check it yourself:
+
+```ts
+import { createSpringValue } from "@damped/core";
+
+const progress = createSpringValue(0);
+const reduce = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// A number has no "spatial" or "fade": your code decides which one this is.
+if (reduce) progress.jump(80);
+else void progress.set(80, { duration: 0.5, bounce: 0.15 });
+```
+
+## Dialogs and focus
+
+damped animates; it does not manage focus. A card that morphs into a dialog needs the behavior of a dialog:
+
+- Move focus into the dialog when the open **starts**, not when it settles.
+- Keep Tab inside it while it is open, and close on Escape.
+- Return focus to the card when the close **starts**. Then Enter on the card reverses the morph, with its velocity.
+- Give the dialog a role, `aria-modal` and an accessible name, and keep a closed dialog out of the focus order and the accessibility tree. `useMorph` keeps its target `hidden` while closed.
+
+The [Layout and morph](/guides/layout-and-morph/) guide has the code, and the bills view of the Northbook playground (`apps/playground/src/BillCard.tsx`) is a complete implementation. With reduced motion on, the same dialog opens without travelling: the box jumps and the crossfade stays.
+
+## Elements that are leaving
+
+An element that is exiting is still in the DOM until its animation settles. damped sets `inert` and `aria-hidden="true"` on it for that time, so it cannot take focus, receive a click or be announced by a screen reader. If the exit is interrupted, stopped, or finishes with `remove: false` or a function, the values the element had before are restored. See [Presence](/guides/presence/#why-a-leaving-element-is-inert).
+
+If you use `remove: false` or a function, the element is back to normal after the exit. Decide yourself whether it should now be hidden, for example with the `hidden` attribute.
+
+## Keyboard and interruption
+
+Interruption is an accessibility feature. People using a keyboard, a switch or a screen reader should never have to wait for a spring to finish before the next action works, and with damped they do not: every animation can be redirected at any moment, and the retarget keeps its velocity.
+
+- Make handlers work mid-flight. Do not ignore a click or a key press because something is still moving; call `open()`, `close()` or `animate()` again and let the spring retarget.
+- Keep the real element focusable and in the tab order during an animation. damped writes transforms, opacity and filters; it does not change `tabindex`, `disabled` or `hidden` except for the `inert` of a leaving element.
+- A transform moves the pixels, not the layout box. Browsers hit-test against the transformed position, so a card that is mid-flight is clickable where it appears.
+
+## Testing reduced motion
+
+Check the behavior in three layers.
+
+**In a unit test**, force the rule without touching the media query. Pass `reducedMotion: "always"` and a manual frame source. The first frame is `t = 0`: the transform is already at its final value while the opacity has not started yet.
+
+```ts
+import { animate, createScheduler, type FrameSource } from "@damped/core";
+
+const queue = new Map<number, (timestamp: number) => void>();
+let next = 1;
+const source: FrameSource = {
+  request(callback) {
+    queue.set(next, callback);
+    return next++;
+  },
+  cancel: (handle) => void queue.delete(handle),
+};
+const flush = (timestamp: number): void => {
+  const callbacks = [...queue.values()];
+  queue.clear();
+  for (const callback of callbacks) callback(timestamp);
+};
+
+const box = document.createElement("div");
+animate(box, { x: 120, opacity: 0.4 }, { scheduler: createScheduler(source), reducedMotion: "always" });
+
+flush(0);
+console.log(box.style.transform); // translate3d(120px, 0px, 0) rotate(0deg) scale(1, 1): already there
+console.log(box.style.opacity); // 1: the fade has only just started
+```
+
+**In a real browser**, emulate the media feature. In Playwright, `emulateMedia` flips `prefers-reduced-motion` for the whole page, so the default `"user"` setting takes the reduced path:
+
+```ts
+import { expect, test, type Page } from "@playwright/test";
+
+const twoFrames = (page: Page): Promise<void> =>
+  page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+
+test("the dialog is on its final box right after it opens", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.getByRole("button", { name: "City Power" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await twoFrames(page);
+  const early = await dialog.boundingBox();
+  await page.waitForTimeout(800);
+
+  // A spring would still be travelling at the first sample. A jump has already arrived.
+  expect(early).not.toBeNull();
+  expect(early).toEqual(await dialog.boundingBox());
+});
+```
+
+**By hand**, turn on the system setting (Reduce motion on macOS and iOS, Animation effects off on Windows, Remove animations on Android), or use the "Emulate CSS media feature prefers-reduced-motion" option in the Chromium DevTools Rendering panel. Then walk through every animated interaction with the keyboard.
+
+For the manual frame source in more depth, see [Testing](/guides/testing/).
+
+## Next
+
+<CardGrid>
+  <LinkCard title="Testing" description="Drive animations by hand with a fake frame source." href="/guides/testing/" />
+  <LinkCard title="Layout and morph" description="The dialog pattern with focus management, in core and in React." href="/guides/layout-and-morph/" />
+  <LinkCard title="Presence" description="Why leaving elements are inert, and how they interact with focus." href="/guides/presence/" />
+  <LinkCard title="Core reference" description="The reducedMotion option on every API that takes it." href="/reference/core/" />
+</CardGrid>

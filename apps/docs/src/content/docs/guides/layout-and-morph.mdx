@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+import { LinkCard, CardGrid, Steps } from "@astrojs/starlight/components";
 import { FlipReorder } from "../../../components/demos/FlipReorder";
 import { MorphCard } from "../../../components/demos/MorphCard";
 
@@ -17,9 +17,13 @@ This guide covers `layout()`, `snapshot()` and `measureLayout()` first, then `mo
 
 FLIP stands for First, Last, Invert, Play. damped splits it into three moves:
 
+<Steps>
+
 1. **Measure.** Record the box each element has now (its visual box, with any running transform) and the box it would have without a transform (its natural box).
 2. **Invert.** Let the DOM change, measure the new natural box, and write a transform that puts the element back on its old box. This happens before the browser paints, so the first frame still shows the old position.
 3. **Play.** Spring the transform back to the identity. The element glides from the old box to the new one.
+
+</Steps>
 
 The "invert" values are `x`, `y`, `scaleX` and `scaleY`, and they are ordinary `animate()` values. That is why interruption works: animating a layout again while it runs retargets those values and carries their velocity, like any other retarget. See [Interruption and reversal](/guides/interruption-and-reversal/).
 

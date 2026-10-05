@@ -2,25 +2,13 @@
    why, spec and guide sections. Quiet chrome, loud motion: ink and 1 px hairlines everywhere, and the signal colour only
    on the things that move or come to rest (the mass, the rest dot, the phase head).
 
-   Colours come from the Starlight tokens, which the docs theme maps onto the brand palette; the brand tokens are
-   referenced with fallbacks so the page reads correctly before and after that mapping. No glows, no card shadows, and
+   Colours, radius and type are the shared properties documented at the top of theme.css. No glows, no card shadows, and
    no box is rounded past 6 px (landing.test.ts holds the line). Sections opt out of Starlight's prose rules with
    `not-content`, so nothing here fights a margin from the markdown theme. */
 
 :root[data-has-hero] {
   /* Wider than a documentation page; prose inside it keeps its own measure. */
   --sl-content-width: 70rem;
-
-  --ld-ink: var(--sl-color-white, #ededed);
-  --ld-text: var(--sl-color-gray-2, #c4c4c8);
-  --ld-muted: var(--sl-color-gray-3, #a1a1aa);
-  --ld-line: var(--sl-color-hairline, #26262a);
-  --ld-line-strong: var(--sl-color-gray-4, #52525b);
-  --ld-paper: var(--sl-color-black, #0a0a0b);
-  --ld-accent: var(--damped-accent, #ff5f1f);
-  --ld-accent-text: var(--damped-accent-text, var(--sl-color-text-accent, #ff6a2e));
-  --ld-mono: var(--sl-font-mono, ui-monospace, monospace);
-  --ld-radius: 6px;
   /* Width of the left column shared by the package rows, the reasons and the spec sheet. */
   --ld-col: 17rem;
 }
@@ -61,7 +49,7 @@
   font-weight: 600;
   line-height: 1.02;
   letter-spacing: -0.04em;
-  color: var(--ld-ink);
+  color: var(--damped-ink);
   text-wrap: balance;
 }
 
@@ -70,7 +58,7 @@
   margin: 0;
   font-size: clamp(1rem, 0.94rem + 0.3vw, 1.1875rem);
   line-height: 1.55;
-  color: var(--ld-text);
+  color: var(--sl-color-gray-2);
   text-wrap: pretty;
 }
 
@@ -87,9 +75,9 @@
   align-items: center;
   height: 2.5rem;
   padding-inline: 1rem;
-  border: 1px solid var(--ld-line-strong);
-  border-radius: var(--ld-radius);
-  color: var(--ld-ink);
+  border: 1px solid var(--damped-hairline-strong);
+  border-radius: var(--damped-radius);
+  color: var(--damped-ink);
   font-size: 0.9375rem;
   font-weight: 500;
   line-height: 1;
@@ -97,14 +85,14 @@
 }
 
 .landing-button:hover {
-  border-color: var(--ld-ink);
+  border-color: var(--damped-ink);
 }
 
 /* Ink on paper, in both themes: neutral, never the signal colour. */
 .landing-button--solid {
-  border-color: var(--ld-ink);
-  background: var(--ld-ink);
-  color: var(--ld-paper);
+  border-color: var(--damped-ink);
+  background: var(--damped-ink);
+  color: var(--damped-paper);
 }
 
 .landing-button--solid:hover {
@@ -113,20 +101,20 @@
 
 .landing-quiet {
   padding-inline: 0.5rem;
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
   font-size: 0.9375rem;
   text-decoration: none;
 }
 
 .landing-quiet:hover {
-  color: var(--ld-ink);
+  color: var(--damped-ink);
   text-decoration: underline;
   text-underline-offset: 0.3em;
 }
 
 .landing-hero :is(a, button):focus-visible,
 .landing-section a:focus-visible {
-  outline: 2px solid var(--ld-accent-text);
+  outline: 1.5px solid var(--damped-accent-text);
   outline-offset: 2px;
 }
 
@@ -134,9 +122,9 @@
 .instrument {
   --axis: 3rem;
   margin: 0;
-  border: 1px solid var(--ld-line);
-  border-radius: var(--ld-radius);
-  color: var(--ld-text);
+  border: 1px solid var(--damped-hairline);
+  border-radius: var(--damped-radius);
+  color: var(--sl-color-gray-2);
   font-family: var(--sl-font, inherit);
 }
 
@@ -151,12 +139,12 @@
   justify-content: space-between;
   gap: 0.25rem 1.5rem;
   padding: 0.625rem 1rem;
-  border-bottom: 1px solid var(--ld-line);
-  font-family: var(--ld-mono);
+  border-bottom: 1px solid var(--damped-hairline);
+  font-family: var(--damped-font-mono);
   font-size: 0.6875rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
 }
 
 .instrument__body {
@@ -180,12 +168,12 @@
   inset-inline: 0;
   top: var(--axis);
   height: 1px;
-  background: var(--ld-line-strong);
+  background: var(--damped-hairline-strong);
 }
 
 .instrument__track:focus-visible {
-  outline: 2px solid var(--ld-accent-text);
-  outline-offset: -2px;
+  outline: 1.5px solid var(--damped-accent-text);
+  outline-offset: 2px;
 }
 
 /* The rail is the coordinate frame: 0 % and 100 % of the track are its left and right edges. The side room is
@@ -201,7 +189,7 @@
   top: calc(var(--axis) - 3px);
   width: 1px;
   height: 7px;
-  background: var(--ld-line-strong);
+  background: var(--damped-hairline-strong);
 }
 
 .instrument__tick--major {
@@ -218,10 +206,10 @@
   bottom: calc(100% + 0.5rem);
   left: 0;
   transform: translateX(-50%);
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.625rem;
   font-weight: 400;
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
 }
 
 .instrument__trail {
@@ -231,7 +219,7 @@
   width: 100%;
   height: 9.5rem;
   overflow: visible;
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
 }
 
 .instrument__trail-path {
@@ -243,7 +231,7 @@
 /* Starts at the middle of the track; the script moves it with a transform, so the server-rendered page already
    shows the mass where it rests. */
 .instrument__rest,
-.instrument__mass {
+.instrument__mass-dot {
   position: absolute;
   top: var(--axis);
   left: 50%;
@@ -262,7 +250,7 @@
   top: 1rem;
   bottom: 0;
   left: 0;
-  border-left: 1px dashed var(--ld-line-strong);
+  border-left: 1px dashed var(--damped-hairline-strong);
 }
 
 .instrument__rest::after {
@@ -273,24 +261,24 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--ld-accent);
+  background: var(--damped-accent);
 }
 
-.instrument__mass {
+.instrument__mass-dot {
   width: 1.25rem;
   height: 1.25rem;
   margin: -0.625rem 0 0 -0.625rem;
   border-radius: 50%;
-  background: var(--ld-accent);
+  background: var(--damped-accent);
   cursor: grab;
 }
 
-.instrument__mass:active {
+.instrument__mass-dot:active {
   cursor: grabbing;
 }
 
 /* A fingertip is wider than the dot. */
-.instrument__mass::before {
+.instrument__mass-dot::before {
   content: "";
   position: absolute;
   inset: -0.75rem;
@@ -303,7 +291,7 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  border-top: 1px solid var(--ld-line);
+  border-top: 1px solid var(--damped-hairline);
 }
 
 .instrument__phase svg {
@@ -314,14 +302,14 @@
 }
 
 .instrument__axis {
-  stroke: var(--ld-line-strong);
+  stroke: var(--damped-hairline-strong);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .instrument__phase-path {
   fill: none;
-  stroke: var(--ld-ink);
+  stroke: var(--damped-ink);
   stroke-width: 1.25;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -329,13 +317,13 @@
 
 .instrument__rest-dot,
 .instrument__phase-head {
-  fill: var(--ld-accent);
+  fill: var(--damped-accent);
 }
 
 .instrument__phase figcaption {
   font-size: 0.75rem;
   line-height: 1.5;
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
   text-wrap: pretty;
 }
 
@@ -346,14 +334,14 @@
   justify-content: space-between;
   gap: 0.75rem 2rem;
   padding: 0.75rem 1rem;
-  border-top: 1px solid var(--ld-line);
+  border-top: 1px solid var(--damped-hairline);
 }
 
 .instrument__readouts {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 1.5rem;
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
 }
@@ -364,11 +352,11 @@
 }
 
 .instrument__readouts dt {
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
 }
 
 .instrument__readouts dd {
-  color: var(--ld-ink);
+  color: var(--damped-ink);
 }
 
 .instrument__readouts > div:nth-child(1) dd {
@@ -383,7 +371,7 @@
   max-width: 28rem;
   font-size: 0.8125rem;
   line-height: 1.5;
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
   text-wrap: pretty;
 }
 
@@ -394,29 +382,29 @@
   justify-content: space-between;
   gap: 0.5rem 1rem;
   padding: 0.625rem 1rem;
-  border-top: 1px solid var(--ld-line);
+  border-top: 1px solid var(--damped-hairline);
   font-size: 0.8125rem;
-  color: var(--ld-text);
+  color: var(--sl-color-gray-2);
 }
 
 .instrument__button {
   appearance: none;
   padding: 0.35rem 0.75rem;
-  border: 1px solid var(--ld-line-strong);
-  border-radius: var(--ld-radius);
+  border: 1px solid var(--damped-hairline-strong);
+  border-radius: var(--damped-radius);
   background: none;
-  color: var(--ld-ink);
+  color: var(--damped-ink);
   font: inherit;
   cursor: pointer;
 }
 
 .instrument__button:hover,
 .instrument__button[aria-pressed="true"] {
-  border-color: var(--ld-ink);
+  border-color: var(--damped-ink);
 }
 
 .instrument__button:focus-visible {
-  outline: 2px solid var(--ld-accent-text);
+  outline: 1.5px solid var(--damped-accent-text);
   outline-offset: 2px;
 }
 
@@ -429,7 +417,7 @@
     grid-template-columns: minmax(0, 1fr);
     align-content: center;
     border-top: 0;
-    border-left: 1px solid var(--ld-line);
+    border-left: 1px solid var(--damped-hairline);
   }
 
   .instrument__phase svg {
@@ -462,14 +450,14 @@
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: -0.02em;
-  color: var(--ld-ink);
+  color: var(--damped-ink);
 }
 
 .landing-section__head p {
   max-width: 36rem;
   font-size: 0.9375rem;
   line-height: 1.55;
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
 }
 
 @media (min-width: 50rem) {
@@ -480,19 +468,19 @@
 }
 
 .landing-section a {
-  color: var(--ld-ink);
-  text-decoration-color: var(--ld-line-strong);
+  color: var(--damped-ink);
+  text-decoration-color: var(--damped-hairline-strong);
   text-underline-offset: 0.25em;
 }
 
 .landing-section a:hover {
-  color: var(--ld-accent-text);
+  color: var(--damped-accent-text);
   text-decoration-color: currentColor;
 }
 
 /* Packages ------------------------------------------------------------------------------------------------- */
 .package-list {
-  border-bottom: 1px solid var(--ld-line);
+  border-bottom: 1px solid var(--damped-hairline);
 }
 
 .package-row {
@@ -500,7 +488,7 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem 2rem;
   padding-block: 1.75rem;
-  border-top: 1px solid var(--ld-line);
+  border-top: 1px solid var(--damped-hairline);
 }
 
 @media (min-width: 50rem) {
@@ -514,10 +502,10 @@
 }
 
 .package-row__name {
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 1rem;
   font-weight: 600;
-  color: var(--ld-ink);
+  color: var(--damped-ink);
 }
 
 .package-row__name code {
@@ -530,23 +518,23 @@
 
 .package-row__platform {
   margin-top: 0.25rem;
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.75rem;
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
 }
 
 .package-row__purpose {
   margin-top: 0.9rem;
   font-size: 0.9375rem;
   line-height: 1.55;
-  color: var(--ld-text);
+  color: var(--sl-color-gray-2);
   text-wrap: pretty;
 }
 
 .package-row__link {
   display: inline-block;
   margin-top: 1rem;
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.8125rem;
 }
 
@@ -571,7 +559,7 @@
 .why-list {
   list-style: none;
   padding: 0;
-  border-bottom: 1px solid var(--ld-line);
+  border-bottom: 1px solid var(--damped-hairline);
 }
 
 .why-list > li {
@@ -579,14 +567,14 @@
   grid-template-columns: 2.5rem minmax(0, 1fr);
   row-gap: 0.5rem;
   padding-block: 1.5rem;
-  border-top: 1px solid var(--ld-line);
+  border-top: 1px solid var(--damped-hairline);
 }
 
 .why-list__n {
   padding-top: 0.2rem;
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.75rem;
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
 }
 
 .why-list h3 {
@@ -594,7 +582,7 @@
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: -0.01em;
-  color: var(--ld-ink);
+  color: var(--damped-ink);
 }
 
 .why-list__body {
@@ -608,12 +596,12 @@
   max-width: 38rem;
   font-size: 0.9375rem;
   line-height: 1.6;
-  color: var(--ld-text);
+  color: var(--sl-color-gray-2);
   text-wrap: pretty;
 }
 
 .why-list__body a {
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.8125rem;
 }
 
@@ -645,7 +633,7 @@
 .spec-sheet td {
   padding: 0.8rem 1rem 0.8rem 0;
   border: 0;
-  border-top: 1px solid var(--ld-line);
+  border-top: 1px solid var(--damped-hairline);
   background: none;
   text-align: left;
   vertical-align: baseline;
@@ -654,12 +642,12 @@
 .spec-sheet thead th {
   padding-block: 0 0.5rem;
   border-top: 0;
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.6875rem;
   font-weight: 400;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
 }
 
 .spec-sheet thead th:nth-child(1) {
@@ -671,37 +659,37 @@
 }
 
 .spec-sheet tbody th {
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.8125rem;
   font-weight: 400;
-  color: var(--ld-text);
+  color: var(--sl-color-gray-2);
   overflow-wrap: anywhere;
 }
 
 .spec-sheet td:nth-child(2) {
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.9375rem;
   white-space: nowrap;
-  color: var(--ld-ink);
+  color: var(--damped-ink);
 }
 
 .spec-sheet td:last-child {
   padding-right: 0;
   font-size: 0.875rem;
-  color: var(--ld-text);
+  color: var(--sl-color-gray-2);
 }
 
 .spec-sheet tbody tr:last-child > * {
-  border-bottom: 1px solid var(--ld-line);
+  border-bottom: 1px solid var(--damped-hairline);
 }
 
 .spec-sheet code {
   padding: 0;
   border: 0;
   background: none;
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.8125rem;
-  color: var(--ld-ink);
+  color: var(--damped-ink);
 }
 
 @media (min-width: 50rem) {
@@ -724,11 +712,11 @@
 }
 
 .guide-index > li {
-  border-top: 1px solid var(--ld-line);
+  border-top: 1px solid var(--damped-hairline);
 }
 
 .guide-index > li:last-child {
-  border-bottom: 1px solid var(--ld-line);
+  border-bottom: 1px solid var(--damped-hairline);
 }
 
 .guide-index a {
@@ -741,24 +729,24 @@
 .guide-index__title {
   font-size: 0.9375rem;
   font-weight: 500;
-  color: var(--ld-ink);
+  color: var(--damped-ink);
 }
 
 .guide-index__note {
   font-size: 0.875rem;
   line-height: 1.5;
-  color: var(--ld-muted);
+  color: var(--damped-ink-muted);
 }
 
 .guide-index a:hover .guide-index__title {
-  color: var(--ld-accent-text);
+  color: var(--damped-accent-text);
 }
 
 .guide-index code {
   padding: 0;
   border: 0;
   background: none;
-  font-family: var(--ld-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.8125rem;
 }
 
@@ -768,6 +756,6 @@
   }
 
   .guide-index > li:nth-last-child(2) {
-    border-bottom: 1px solid var(--ld-line);
+    border-bottom: 1px solid var(--damped-hairline);
   }
 }

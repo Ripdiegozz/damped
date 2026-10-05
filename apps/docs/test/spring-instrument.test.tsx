@@ -62,7 +62,7 @@ const until = (condition: () => boolean, timeoutMs = 6000) =>
 
 const root = (container: HTMLElement) => container.querySelector<HTMLElement>("[data-demo]")!;
 const slider = (container: HTMLElement) => container.querySelector<HTMLElement>('[role="slider"]')!;
-const mass = (container: HTMLElement) => container.querySelector<HTMLElement>(".instrument__mass")!;
+const mass = (container: HTMLElement) => container.querySelector<HTMLElement>(".instrument__mass-dot")!;
 const readout = (container: HTMLElement, name: string) => container.querySelector<HTMLElement>(`[data-readout="${name}"]`)!;
 const key = (container: HTMLElement, name: string) => act(() => void slider(container).dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true })));
 const button = (container: HTMLElement, name: string) => [...container.querySelectorAll("button")].find((candidate) => candidate.textContent?.trim() === name)!;

@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>animate</title>
+<style>
+  body { margin: 0; }
+  #box { position: absolute; left: 20px; top: 20px; width: 100px; height: 100px; background: #36c; }
+</style>
+<div id="box"></div>
+<script src="/support.js"></script>
+<script type="module">
+  import * as damped from "/dist/index.js";
+  window.damped = damped;
+</script>

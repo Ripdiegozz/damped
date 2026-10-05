@@ -1,0 +1,35 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>layout</title>
+<style>
+  body { margin: 0; }
+  #row { display: flex; align-items: flex-start; gap: 10px; padding: 20px; }
+  .item { flex: none; background: #36c; }
+  #a { width: 80px; height: 60px; }
+  #b { width: 140px; height: 90px; background: #c63; }
+  #c { width: 100px; height: 120px; background: #3a6; }
+
+  /* Left stage: a box whose class toggle changes both size and position. */
+  #stage { position: relative; height: 320px; }
+  #box { position: absolute; left: 40px; top: 20px; width: 80px; height: 60px; background: #36c; }
+  #box.moved { left: 300px; top: 140px; width: 200px; height: 140px; }
+
+  /* Scale correction: the parent grows 2x, the child keeps a fixed pixel size. */
+  #parent { position: absolute; left: 600px; top: 20px; width: 100px; height: 100px; background: #c63; }
+  #parent.big { width: 200px; height: 200px; }
+  #child { width: 60px; height: 40px; background: #fff; }
+</style>
+<div id="row">
+  <div class="item" id="a"></div>
+  <div class="item" id="b"></div>
+  <div class="item" id="c"></div>
+</div>
+<div id="stage">
+  <div id="box"></div>
+  <div id="parent"><div id="child"></div></div>
+</div>
+<script src="/support.js"></script>
+<script type="module">
+  import * as damped from "/dist/index.js";
+  window.damped = damped;
+</script>

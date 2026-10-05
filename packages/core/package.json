@@ -1,0 +1,17 @@
+{
+  "name": "damped",
+  "version": "0.0.0",
+  "description": "Interruptible, physically based spring animations for the web.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "rm -rf dist && bun build ./src/index.ts --outdir dist --format esm --target browser --minify && tsc -p tsconfig.build.json"
+  }
+}

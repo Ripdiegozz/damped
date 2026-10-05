@@ -272,6 +272,35 @@ test("Pay now closes the dialog and marks the card paid with a badge that pops i
   await expect(modal.getByRole("button", { name: "Paid" })).toBeDisabled();
 });
 
+test("reopening an already paid bill puts focus on Cancel, its only enabled control", async ({ page }) => {
+  await openBills(page);
+  const city = card(page, "city-power");
+  const modal = dialog(page, "city-power");
+  await city.focus();
+  await page.keyboard.press("Enter");
+  await modal.getByRole("button", { name: "Pay now" }).click();
+  await expect(modal).toBeHidden();
+  await expect(city).toHaveAttribute("data-paid", "true");
+
+  await city.focus();
+  await page.keyboard.press("Enter");
+  await expect(modal).toBeVisible();
+  await expect(modal.getByLabel("Amount")).toBeDisabled();
+  await expect(modal.getByRole("button", { name: "Paid" })).toBeDisabled();
+  const cancel = modal.getByRole("button", { name: "Cancel" });
+  await expect(cancel).toBeFocused();
+
+  // With nothing else to reach, Tab keeps focus on Cancel instead of leaving the dialog.
+  await page.keyboard.press("Tab");
+  await expect(cancel).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(cancel).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(modal).toBeHidden();
+  await expect(city).toBeFocused();
+});
+
 test("an amount that is not a positive sum keeps the dialog open", async ({ page }) => {
   await openBills(page);
   const modal = dialog(page, "blue-gym");

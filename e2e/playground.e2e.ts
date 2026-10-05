@@ -209,3 +209,35 @@ test("recent activity lists five rows with signed, colored amounts", async ({ pa
     .poll(() => rows.evaluateAll((items) => items.map((item) => Number(getComputedStyle(item).opacity))))
     .toEqual([1, 1, 1, 1, 1]);
 });
+
+test("with reduced motion the Overview numbers land at once and the recent rows mount together", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openPlayground(page);
+  await navItem(page, "Bills").click();
+  await expect(page.locator('[data-view="overview"]')).toHaveCount(0);
+
+  // From the moment the Overview mounts, note every balance text and how many rows each change of the list shows.
+  await page.evaluate(() => {
+    const record = { balances: [] as string[], rowCounts: [] as number[] };
+    (window as unknown as { __reduced: typeof record }).__reduced = record;
+    const stage = document.querySelector(".stage")!;
+    new MutationObserver(() => {
+      const balance = stage.querySelector('[data-stat="balance"] .stat-value')?.textContent;
+      if (balance !== undefined && balance !== null && record.balances.at(-1) !== balance) record.balances.push(balance);
+      const rows = stage.querySelectorAll(".activity-row").length;
+      if (rows > 0 && record.rowCounts.at(-1) !== rows) record.rowCounts.push(rows);
+    }).observe(stage, { subtree: true, childList: true, characterData: true });
+  });
+  await navItem(page, "Overview").click();
+  await expect(statValue(page, "balance")).toHaveText(INITIAL_STATS.balance);
+  await expect(page.getByRole("list", { name: "Recent activity" }).getByRole("listitem")).toHaveCount(5);
+
+  const { balances, rowCounts } = await page.evaluate(
+    () => (window as unknown as { __reduced: { balances: string[]; rowCounts: number[] } }).__reduced,
+  );
+  // At most the empty tile and the final figure; never a count in between.
+  expect(balances.length).toBeLessThanOrEqual(2);
+  expect(balances.at(-1)).toBe(INITIAL_STATS.balance);
+  // The first time any row shows, all five are there: no stagger.
+  expect(rowCounts[0]).toBe(5);
+});

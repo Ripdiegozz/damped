@@ -1,6 +1,7 @@
 import { useLayout } from "@damped/react";
 import { useCallback, useEffect, useRef, type FocusEvent, type Ref } from "react";
 import { useMotion } from "./motion-context";
+import { remainingAfterPause } from "./toast-timer";
 import { useMergedRef } from "./use-merged-ref";
 
 export interface ToastAction {
@@ -14,9 +15,6 @@ export interface ToastData {
   message: string;
   action?: ToastAction;
 }
-
-/** After a pause ends, a toast stays at least this long (or its whole duration, if that is shorter). */
-const MIN_RESUME_MS = 1000;
 
 interface ToastItemProps {
   toast: ToastData;
@@ -53,7 +51,7 @@ export function ToastItem({ toast, after, reflowKey, duration, onDismiss, ref }:
     if (state.id === undefined) return;
     window.clearTimeout(state.id);
     state.id = undefined;
-    state.remaining = Math.max(state.remaining - (performance.now() - state.startedAt), Math.min(MIN_RESUME_MS, duration));
+    state.remaining = remainingAfterPause({ remaining: state.remaining, elapsed: performance.now() - state.startedAt, duration });
   }, [duration]);
 
   useEffect(() => {

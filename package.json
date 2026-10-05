@@ -2,12 +2,14 @@
   "name": "damped-monorepo",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc -p tsconfig.json",
     "e2e": "playwright test",
-    "build": "bun run --filter '*' build"
+    "build": "bun run --filter './packages/*' build",
+    "docs:build": "bun run --filter @damped/docs build",
+    "docs:dev": "bun run --filter @damped/docs dev"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",

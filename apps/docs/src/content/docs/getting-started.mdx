@@ -1,0 +1,20 @@
+---
+title: Getting started
+description: Install damped and animate your first value.
+---
+
+damped is a family of three packages: `@damped/core` for the web, `@damped/react` for React and
+`@damped/native` for React Native.
+
+## Your first spring
+
+A spring is a pure function of time, so you can sample it without running an animation.
+
+```ts
+import { createSpring } from "@damped/core";
+
+const spring = createSpring(0, 100, 0, { duration: 0.5, bounce: 0.15 });
+
+const { position, velocity } = spring.at(0.25);
+console.log(position.toFixed(1), velocity.toFixed(1), spring.settleTime().toFixed(2));
+```

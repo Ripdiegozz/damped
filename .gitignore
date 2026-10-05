@@ -5,3 +5,5 @@ test-results/
 playwright-report/
 .DS_Store
 .bundle-test-*/
+apps/docs/dist/
+apps/docs/.astro/

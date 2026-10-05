@@ -1,0 +1,122 @@
+/* damped docs theme: a calm teal accent on cool neutrals, tuned for WCAG AA text contrast in both
+   themes. Fonts are self-hosted through @fontsource, so the site makes no third-party requests. */
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/fraunces/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
+
+:root {
+  --sl-font:
+    "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sl-font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --damped-font-display: "Fraunces Variable", ui-serif, Georgia, "Times New Roman", serif;
+
+  --sl-text-body: 1rem;
+  --sl-line-height: 1.7;
+  --sl-content-width: 46rem;
+
+  --damped-radius: 0.75rem;
+  --damped-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Dark theme (the default). Body text is gray-2, muted text gray-3; both stay above 4.5:1 on every surface. */
+:root,
+:root[data-theme="dark"] {
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #eceff3;
+  --sl-color-gray-2: #c9d0d9;
+  --sl-color-gray-3: #aab4c0;
+  --sl-color-gray-4: #8691a0;
+  --sl-color-gray-5: #353d49;
+  --sl-color-gray-6: #232a33;
+  --sl-color-gray-7: #181d24;
+  --sl-color-black: #0f1318;
+
+  --sl-color-accent-low: #0c3b37;
+  --sl-color-accent: #14a89a;
+  --sl-color-accent-high: #7fe3d6;
+
+  --sl-color-hairline-light: #2c343f;
+  --sl-color-hairline: #232a33;
+  --damped-glow: rgba(20, 168, 154, 0.16);
+}
+
+/* Light theme. The ramp inverts: "white" is the strongest text colour and "black" the page background. */
+:root[data-theme="light"] {
+  --sl-color-white: #10161d;
+  --sl-color-gray-1: #1c2530;
+  --sl-color-gray-2: #2f3a47;
+  --sl-color-gray-3: #4a5563;
+  --sl-color-gray-4: #5d6877;
+  --sl-color-gray-5: #c3cad3;
+  --sl-color-gray-6: #eaeef2;
+  --sl-color-gray-7: #f4f6f8;
+  --sl-color-black: #ffffff;
+
+  --sl-color-accent-low: #d5f3ee;
+  --sl-color-accent: #0f766e;
+  --sl-color-accent-high: #0b4f49;
+
+  --sl-color-hairline-light: #d9dfe6;
+  --sl-color-hairline: #e6eaee;
+  --damped-glow: rgba(15, 118, 110, 0.1);
+}
+
+/* Display type: a soft serif for headings against a neutral sans for reading. */
+.hero h1,
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+h1#_top {
+  font-family: var(--damped-font-display);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.sl-markdown-content h2 {
+  margin-top: 2.5rem;
+}
+
+.sl-markdown-content :not(pre) > code {
+  border-radius: 0.3rem;
+}
+
+/* A soft glow behind the hero and page headers. */
+.hero,
+.content-panel:first-child {
+  background: radial-gradient(60rem 18rem at 50% -4rem, var(--damped-glow), transparent 70%);
+}
+
+.sl-markdown-content .starlight-aside,
+.sl-markdown-content pre,
+.expressive-code .frame {
+  border-radius: var(--damped-radius);
+}
+
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--sl-color-accent-high);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+.spring-probe {
+  margin: 1.5rem auto;
+  padding: 0.75rem 1rem;
+  max-width: 32rem;
+  text-align: center;
+  border: 1px solid var(--sl-color-hairline-light);
+  border-radius: var(--damped-radius);
+  background: var(--sl-color-accent-low);
+  color: var(--sl-color-text-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a,
+  button {
+    transition:
+      color 160ms var(--damped-ease),
+      background-color 160ms var(--damped-ease),
+      border-color 160ms var(--damped-ease);
+  }
+}

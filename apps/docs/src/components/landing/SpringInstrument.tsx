@@ -180,7 +180,6 @@ export function SpringInstrument() {
     } catch {
       // A pointer that is already gone cannot be captured; the press still works without it.
     }
-    event.currentTarget.focus({ preventScroll: true });
     const percent = pointerPercent(event);
     if (mass.current?.contains(event.target as Node)) {
       dragging.current = true;
@@ -278,7 +277,7 @@ export function SpringInstrument() {
               <path className="instrument__trail-path" ref={trailPath} d="" stroke={`url(#${fadeId})`} vectorEffect="non-scaling-stroke" />
             </svg>
             <span ref={rest} className="instrument__rest" aria-hidden="true" />
-            <span ref={mass} className="instrument__mass" aria-hidden="true" />
+            <span ref={mass} className="instrument__mass-dot" aria-hidden="true" />
           </div>
         </div>
 

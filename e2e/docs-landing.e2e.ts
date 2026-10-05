@@ -40,15 +40,15 @@ test("pressing the track mid-flight retargets the mass, which comes to rest on t
   }, 2);
   expect(runs).toBeGreaterThanOrEqual(2);
   await expect(track).toHaveAttribute("aria-valuenow", "20");
-  await expect.poll(async () => Math.abs((await centreX(root.locator(".instrument__mass"))) - (await centreX(root.locator(".instrument__rest")))), { timeout: 5000 }).toBeLessThan(1);
-  expect(Math.abs((await centreX(root.locator(".instrument__mass"))) - (box.x + box.width * 0.2))).toBeLessThan(1.5);
+  await expect.poll(async () => Math.abs((await centreX(root.locator(".instrument__mass-dot"))) - (await centreX(root.locator(".instrument__rest")))), { timeout: 5000 }).toBeLessThan(1);
+  expect(Math.abs((await centreX(root.locator(".instrument__mass-dot"))) - (box.x + box.width * 0.2))).toBeLessThan(1.5);
   expect(problems).toEqual([]);
 });
 
 test("dragging the mass and letting go springs it back to its rest point, drawing the phase portrait on the way", async ({ page }) => {
   await page.goto("/");
   const root = await demo(page, "spring-instrument");
-  const mass = root.locator(".instrument__mass");
+  const mass = root.locator(".instrument__mass-dot");
   const rest = await centreX(root.locator(".instrument__rest"));
   const from = (await mass.boundingBox())!;
   const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
@@ -95,7 +95,7 @@ test("reduced motion: the mass jumps, Play anyway brings the spring back", async
   await page.mouse.click(box.x + box.width * 0.8, box.y + 40);
   await expect(root).toHaveAttribute("data-state", "settled");
   expect(await runsOf(root)).toBe(before + 1);
-  expect(Math.abs((await centreX(root.locator(".instrument__mass"))) - (box.x + box.width * 0.8))).toBeLessThan(1.5);
+  expect(Math.abs((await centreX(root.locator(".instrument__mass-dot"))) - (box.x + box.width * 0.8))).toBeLessThan(1.5);
 
   await root.getByRole("button", { name: "Play anyway" }).click();
   await page.mouse.click(box.x + box.width * 0.2, box.y + 40);
@@ -113,4 +113,39 @@ test("on a phone the page does not scroll sideways, and only the track gives up 
   expect(await root.getByRole("slider").evaluate((element) => getComputedStyle(element).touchAction)).toBe("none");
   expect(await touch("main")).not.toBe("none");
   expect(await touch(".landing-hero__tagline")).not.toBe("none");
+});
+
+test("a mouse press or drag leaves no focus ring on the track; Tab shows a thin one", async ({ page }) => {
+  await page.goto("/");
+  const root = await demo(page, "spring-instrument");
+  const track = root.getByRole("slider");
+  const ring = () => track.evaluate((element) => ({ visible: element.matches(":focus-visible"), focused: document.activeElement === element, width: getComputedStyle(element).outlineWidth, style: getComputedStyle(element).outlineStyle }));
+
+  const mass = (await root.locator(".instrument__mass-dot").boundingBox())!;
+  await page.mouse.move(mass.x + mass.width / 2, mass.y + mass.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mass.x + 200, mass.y + mass.height / 2, { steps: 6 });
+  await page.mouse.up();
+  const afterMouse = await ring();
+  expect(afterMouse.focused).toBe(true);
+  expect(afterMouse.visible).toBe(false);
+  expect(afterMouse.style).toBe("none");
+  await expect(root).toHaveAttribute("data-state", "settled", { timeout: 10_000 });
+
+  const rail = (await root.locator(".instrument__rail").boundingBox())!;
+  await page.mouse.click(rail.x + rail.width * 0.8, rail.y + 40);
+  expect((await ring()).visible).toBe(false);
+
+  await page.reload();
+  await demo(page, "spring-instrument");
+  // Tab until the track has focus (the header holds a few stops before it).
+  do await page.keyboard.press("Tab");
+  while (!(await ring()).focused && (await page.evaluate(() => document.activeElement?.tagName)) !== "BODY");
+  const afterTab = await ring();
+  expect(afterTab.focused).toBe(true);
+  expect(afterTab.visible).toBe(true);
+  expect(afterTab.style).toBe("solid");
+  // Declared as 1.5px; Chromium snaps outline widths down to whole device pixels.
+  expect(parseFloat(afterTab.width)).toBeGreaterThanOrEqual(1);
+  expect(parseFloat(afterTab.width)).toBeLessThanOrEqual(1.5);
 });

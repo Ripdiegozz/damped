@@ -72,6 +72,16 @@ describe("landing page source", () => {
     }
   });
 
+  test("takes its colours and radius from the shared theme properties, with no private colour tokens or hex values", () => {
+    expect(css).not.toMatch(/--ld-(?!col\b)/);
+    expect(css).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(css).toMatch(/var\(--damped-radius\)/);
+  });
+
+  test("never forces focus from a script: a script focus() reads as :focus-visible after a mouse press and draws the ring", () => {
+    expect(read("src/components/landing/SpringInstrument.tsx")).not.toMatch(/\.focus\(/);
+  });
+
   test("lists each package with its install command and a link to its reference page", () => {
     for (const name of PACKAGES) {
       const slug = name.replace("@damped/", "");

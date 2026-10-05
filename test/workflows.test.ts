@@ -117,6 +117,12 @@ describe("ci workflow", () => {
     expect(text.indexOf("run: bun run docs:build")).toBeLessThan(text.indexOf("run: bun test"));
   });
 
+  test("builds the playground before bun test, so its built-output tests run for real", () => {
+    const text = job("check");
+    expect(text).toContain("run: bun run playground:build");
+    expect(text.indexOf("run: bun run playground:build")).toBeLessThan(text.indexOf("run: bun test"));
+  });
+
   test("still typechecks, builds the playground and checks the README examples", () => {
     const text = job("check");
     for (const step of ["bun run typecheck", "bun run playground:build", "bun run docs:check"]) expect(text, step).toContain(`run: ${step}`);

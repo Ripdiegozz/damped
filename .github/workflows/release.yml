@@ -21,7 +21,11 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
+      # The docs and the playground are built before `bun test`: the tests that read the build output
+      # (landing page, examples, the playground head) fail instead of skipping when a dist/ is missing.
       - run: bun run build
+      - run: bun run docs:build
+      - run: bun run playground:build
       - run: bun test
       - name: Publish @damped/core
         run: npm publish --provenance --access public

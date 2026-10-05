@@ -25,7 +25,8 @@ export interface TscDiagnostic {
 }
 
 const CHECKED_LANGS = new Set(["ts", "tsx", "typescript"]);
-const OPENING_FENCE = /^( {0,3}|\t*)(`{3,}|~{3,})(.*)$/;
+// Any indentation: blocks inside list items sit four or more spaces (or a tab) deep.
+const OPENING_FENCE = /^([ \t]*)(`{3,}|~{3,})(.*)$/;
 
 /** Finds the fenced code blocks of a CommonMark-style document. A longer fence can contain shorter ones. */
 export function extractCodeBlocks(source: string): CodeBlock[] {
@@ -44,7 +45,8 @@ export function extractCodeBlocks(source: string): CodeBlock[] {
 
     const indent = (opening[1] ?? "").length;
     const info = (opening[3] ?? "").trim();
-    const closing = new RegExp(`^ {0,3}\\${marker[0]}{${marker.length},}\\s*$`);
+    // The closing fence may be indented like the opening one (or less, or more), so a nested block never swallows the file.
+    const closing = new RegExp(`^[ \\t]*\\${marker[0]}{${marker.length},}\\s*$`);
     const start = index;
     const body: string[] = [];
     index += 1;

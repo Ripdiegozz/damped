@@ -8,3 +8,4 @@ playwright-report/
 apps/docs/dist/
 apps/docs/.astro/
 .readme-check/
+site/

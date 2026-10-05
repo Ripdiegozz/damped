@@ -24,6 +24,15 @@ afterEach(() => {
 });
 
 const settle = () => act(async () => void (await new Promise((resolve) => setTimeout(resolve, 20))));
+/** Waits (inside act) until `condition` holds, so a test never depends on one fixed delay. */
+const until = (condition: () => boolean, timeoutMs = 3000) =>
+  act(async () => {
+    const begin = performance.now();
+    while (!condition()) {
+      if (performance.now() - begin > timeoutMs) throw new Error("timed out waiting for the condition");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  });
 const demo = (container: HTMLElement) => container.querySelector<HTMLElement>("[data-demo]")!;
 const button = (container: HTMLElement, name: string) =>
   [...container.querySelectorAll("button")].find((candidate) => candidate.textContent?.trim() === name)!;
@@ -59,6 +68,27 @@ describe("FlipReorder", () => {
     expect(demo(container).dataset.state).toBe("animating");
     await settle();
     expect(demo(container).dataset.state).toBe("settled");
+  });
+});
+
+describe("FlipReorder mid-flight", () => {
+  test("pressing another button while the rows move retargets them: every row stays, the last order wins and it settles once", async () => {
+    const container = mount(<FlipReorder />);
+    const names = () => [...container.querySelectorAll(".flip-name")].map((node) => node.textContent);
+    act(() => button(container, "Sort by amount").click());
+    act(() => button(container, "Shuffle").click());
+    act(() => button(container, "Sort by name").click());
+    // Three overlapping layout() calls: all counted, none settled yet.
+    expect(demo(container).dataset.runs).toBe("3");
+    expect(demo(container).dataset.state).toBe("animating");
+    expect(names()).toEqual(["Blue Gym", "City Power", "Corner Grocery", "FiberNet", "Harbor Insurance"]);
+    await until(() => demo(container).dataset.state === "settled");
+    expect(demo(container).dataset.runs).toBe("3");
+    expect(container.querySelectorAll(".flip-row")).toHaveLength(5);
+    act(() => button(container, "Reset").click());
+    expect(names()[0]).toBe("Corner Grocery");
+    expect(demo(container).dataset.runs).toBe("4");
+    await until(() => demo(container).dataset.state === "settled");
   });
 });
 
@@ -108,17 +138,40 @@ describe("MorphCard", () => {
 });
 
 describe("PresenceDemo", () => {
+  const toasts = (container: HTMLElement) => container.querySelectorAll(".toast").length;
+
   test("adds a toast and keeps a removed one mounted until it has left", async () => {
     const container = mount(<PresenceDemo />);
-    const count = () => container.querySelectorAll(".toast").length;
-    expect(count()).toBe(2);
+    expect(toasts(container)).toBe(2);
     act(() => button(container, "Add a toast").click());
-    expect(count()).toBe(3);
+    expect(toasts(container)).toBe(3);
     expect(demo(container).dataset.state).toBe("animating");
     act(() => container.querySelector<HTMLButtonElement>(".toast-dismiss")!.click());
     // Still mounted while its exit runs, and marked inert by damped.
-    expect(count()).toBe(3);
+    expect(toasts(container)).toBe(3);
     expect(container.querySelector(".toast[inert]")).not.toBeNull();
+  });
+
+  test("a removal is one run and the demo settles when the toast has actually left, not on a timer", async () => {
+    const container = mount(<PresenceDemo />);
+    act(() => container.querySelectorAll<HTMLButtonElement>(".toast-dismiss")[0]!.click());
+    expect(demo(container).dataset.runs).toBe("1");
+    expect(demo(container).dataset.state).toBe("animating");
+    // Settled only after Presence reported the exit: the toast is gone from the DOM by then.
+    await until(() => demo(container).dataset.state === "settled");
+    expect(toasts(container)).toBe(1);
+    expect(container.querySelector(".toast[inert]")).toBeNull();
+    expect(demo(container).dataset.runs).toBe("1");
+  });
+
+  test("removing the newest toast twice in a row counts two runs and settles after both have left", async () => {
+    const container = mount(<PresenceDemo />);
+    act(() => button(container, "Remove the newest").click());
+    act(() => button(container, "Remove the newest").click());
+    expect(demo(container).dataset.runs).toBe("2");
+    await until(() => demo(container).dataset.state === "settled");
+    expect(toasts(container)).toBe(0);
+    expect(demo(container).dataset.runs).toBe("2");
   });
 });
 
@@ -180,5 +233,28 @@ describe("CompositorVsJs", () => {
     act(() => button(container, "Stop").click());
     await settle();
     expect(demo(container).dataset.state).toBe("settled");
+  });
+
+  test("unmounting right after Block main thread cancels the pending block instead of busy-looping a detached demo", async () => {
+    const container = mount(<CompositorVsJs />);
+    act(() => button(container, "Block main thread (1 s)").click());
+    // Unmount before the lead-in elapses; the block must never run afterwards.
+    const index = mounted.findIndex((entry) => entry.container === container);
+    const entry = mounted.splice(index, 1)[0]!;
+    act(() => entry.root.unmount());
+    entry.container.remove();
+    const originalNow = performance.now.bind(performance);
+    let reads = 0;
+    performance.now = () => {
+      reads++;
+      return originalNow();
+    };
+    try {
+      await act(async () => void (await new Promise((resolve) => setTimeout(resolve, 900))));
+    } finally {
+      performance.now = originalNow;
+    }
+    // The 1 s busy loop reads the clock hundreds of thousands of times; an idle page reads it a handful.
+    expect(reads).toBeLessThan(1000);
   });
 });

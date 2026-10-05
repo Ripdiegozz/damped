@@ -12,11 +12,12 @@ export default defineConfig({
   use: { baseURL: `http://127.0.0.1:${port}` },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    // The fixtures import the built library and the server serves the built playground, so both are rebuilt before every run.
-    command: "bun run build && bun run playground:build && bun e2e/serve.ts",
+    // The fixtures import the built library and the server serves the assembled site (docs at /, Northbook at /playground/),
+    // so the packages, the playground and the docs are rebuilt and assembled before every run.
+    command: "bun run site:build && bun e2e/serve.ts",
     url: `http://127.0.0.1:${port}/healthz`,
     env: { E2E_PORT: String(port) },
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 180_000,
   },
 });

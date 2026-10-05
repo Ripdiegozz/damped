@@ -1,7 +1,9 @@
 name: Pages
 
-# Publishes the Northbook playground (apps/playground) at the custom domain set in the repository settings,
-# so there is no CNAME file. Pages itself must use "GitHub Actions" as its source.
+# Publishes the docs site (apps/docs) at the root of the custom domain set in the repository settings and the
+# Northbook playground (apps/playground) under /playground/, so there is no CNAME file. `bun run site:build`
+# builds the packages, the playground and the docs and assembles them into site/. Pages itself must use
+# "GitHub Actions" as its source.
 on:
   push:
     branches: [main]
@@ -27,12 +29,11 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
-      - run: bun run build
-      - run: bun run playground:build
+      - run: bun run site:build
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
-          path: apps/playground/dist
+          path: site
 
   deploy:
     needs: build

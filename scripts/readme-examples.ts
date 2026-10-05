@@ -1,4 +1,7 @@
-// Pure helpers behind scripts/check-readme-examples.ts, kept apart so they can be tested.
+// Helpers behind scripts/check-readme-examples.ts, kept apart so they can be tested.
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 export interface CodeBlock {
   /** The markdown file the block is in, relative to the repository root. */
@@ -9,8 +12,20 @@ export interface CodeBlock {
   code: string;
 }
 
-const FENCE = /^(\s*)(`{3,}|~{3,})\s*([^\s`]*)\s*(.*)$/;
+const FENCE = /^(?<indent>\s*)(?<marker>`{3,}|~{3,})\s*(?<language>[^\s`]*)\s*(?<rest>.*)$/;
 const CHECKED = new Set(["ts", "tsx", "typescript"]);
+
+/** The text of a README listed in the checker, or an error that names the file when it is not there. */
+export function readReadme(root: string, file: string): string {
+  try {
+    return readFileSync(join(root, file), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(`${file}: README not found; remove it from READMES in scripts/check-readme-examples.ts or create it`);
+    }
+    throw error;
+  }
+}
 
 /**
  * The TypeScript blocks of a markdown file that should compile. A block whose info string contains `no-check` is a
@@ -23,12 +38,19 @@ export function extractBlocks(markdown: string, file: string): CodeBlock[] {
   for (let index = 0; index < lines.length; index++) {
     const open = FENCE.exec(lines[index]!);
     if (open === null) continue;
-    const [, , marker, language = "", rest = ""] = open;
+    const { marker = "", language = "", rest = "" } = open.groups ?? {};
     const start = index + 1;
     let end = start;
     while (end < lines.length) {
-      const close = FENCE.exec(lines[end]!);
-      if (close !== null && close[2]![0] === marker![0] && close[2]!.length >= marker!.length && close[3] === "" && close[4] === "") break;
+      const close = FENCE.exec(lines[end]!)?.groups;
+      // A closing fence uses the same character, is at least as long as the opening one, and carries no info string.
+      const closes =
+        close !== undefined &&
+        close.marker![0] === marker[0] &&
+        close.marker!.length >= marker.length &&
+        close.language === "" &&
+        close.rest === "";
+      if (closes) break;
       end++;
     }
     if (end >= lines.length) throw new Error(`${file}:${index + 1}: the code fence was never closed`);

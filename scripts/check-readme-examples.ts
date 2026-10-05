@@ -1,6 +1,6 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { extractBlocks, mapDiagnostics, moduleSource, type CodeBlock } from "./readme-examples";
+import { extractBlocks, mapDiagnostics, moduleSource, readReadme, type CodeBlock } from "./readme-examples";
 
 // Dev tooling: type-checks every TypeScript code block of the READMEs against the real sources, so an example that
 // does not match the exported signatures fails `bun run docs:check` (and CI). Each block is compiled as its own module.
@@ -18,9 +18,15 @@ const SCRATCH = ".readme-check";
 
 const blocks: { block: CodeBlock; path: string }[] = [];
 for (const { file, workspace } of READMES) {
-  const found = extractBlocks(readFileSync(join(root, file), "utf8"), file);
-  found.forEach((block, index) => {
-    const slug = file.replace(/[^a-z0-9]+/gi, "-").replace(/-md$/, "");
+  let text: string;
+  try {
+    text = readReadme(root, file);
+  } catch (error) {
+    console.error((error as Error).message);
+    process.exit(1);
+  }
+  const slug = file.replace(/[^a-z0-9]+/gi, "-").replace(/-md$/, "");
+  extractBlocks(text, file).forEach((block, index) => {
     blocks.push({ block, path: join(workspace, SCRATCH, `${slug}-${index + 1}.${block.lang}`) });
   });
 }

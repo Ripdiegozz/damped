@@ -75,9 +75,11 @@ describe("pages workflow", () => {
 
   test("uses the same Bun version as CI", async () => {
     const text = pages();
-    const ci = await Bun.file(join(workflows, "ci.yml")).text();
-    const version = /bun-version: ([\d.]+)/.exec(ci)![1]!;
-    expect(text).toContain(`bun-version: ${version}`);
+    const ci = Bun.file(join(workflows, "ci.yml"));
+    expect(await ci.exists(), ".github/workflows/ci.yml is missing, so there is no Bun version to compare with").toBe(true);
+    const match = /bun-version: ([\d.]+)/.exec(await ci.text());
+    if (match === null) throw new Error(".github/workflows/ci.yml does not set a numeric `bun-version:`");
+    expect(text).toContain(`bun-version: ${match[1]}`);
   });
 });
 

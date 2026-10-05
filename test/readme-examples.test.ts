@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { extractBlocks, mapDiagnostics, moduleSource, type CodeBlock } from "../scripts/readme-examples";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { extractBlocks, mapDiagnostics, moduleSource, readReadme, type CodeBlock } from "../scripts/readme-examples";
 
 const doc = [
   "# Title", // 1
@@ -16,14 +19,14 @@ const doc = [
   "```tsx", // 12
   "const view = <div />;", // 13
   "```", // 14
-  "",
-  "```ts no-check",
-  "this is a fragment",
-  "```",
-  "",
-  "```typescript",
-  "const t: number = 1;",
-  "```",
+  "", // 15
+  "```ts no-check", // 16
+  "this is a fragment", // 17
+  "```", // 18
+  "", // 19
+  "```typescript", // 20
+  "const t: number = 1;", // 21
+  "```", // 22
 ].join("\n");
 
 describe("extractBlocks", () => {
@@ -53,6 +56,28 @@ describe("extractBlocks", () => {
   test("fences inside a longer fence are content", () => {
     const nested = ["````md", "```ts", "not code to check", "```", "````", "", "```ts", "const ok = 1;", "```"].join("\n");
     expect(extractBlocks(nested, "README.md").map((block) => block.code)).toEqual(["const ok = 1;"]);
+  });
+});
+
+describe("readReadme", () => {
+  test("returns the text of a README that exists", () => {
+    const dir = mkdtempSync(join(tmpdir(), "readme-"));
+    try {
+      writeFileSync(join(dir, "README.md"), "# Hello\n");
+      expect(readReadme(dir, "README.md")).toBe("# Hello\n");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("names the missing file instead of leaking a raw ENOENT", () => {
+    const dir = mkdtempSync(join(tmpdir(), "readme-"));
+    try {
+      expect(() => readReadme(dir, "packages/core/README.md")).toThrow(/packages\/core\/README\.md.*not found/);
+      expect(() => readReadme(dir, "packages/core/README.md")).not.toThrow(/ENOENT/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

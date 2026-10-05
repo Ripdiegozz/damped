@@ -325,3 +325,52 @@ test("the morph does not re-render the grid or its cards", async ({ page }) => {
   // The grid itself rendered nothing at all for the click.
   expect((await counts())["bills-grid"]).toBe(before["bills-grid"]);
 });
+
+test("the grid is a single tab stop that follows the arrow keys", async ({ page }) => {
+  await openBills(page);
+  const cards = page.locator("[data-bill-card]");
+  const tabIndexes = () => cards.evaluateAll((elements) => elements.map((element) => (element as HTMLElement).tabIndex));
+  const ids = await cards.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-bill-card")!));
+  const inGrid = () => page.evaluate(() => document.activeElement?.closest("[data-bill-card]") !== null);
+
+  // Initially the first card is the only stop.
+  expect(await tabIndexes()).toEqual([0, -1, -1, -1, -1, -1, -1]);
+
+  // Tab enters the grid once, on that card.
+  await page.getByRole("button", { name: "+ New" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(card(page, ids[0]!)).toBeFocused();
+
+  // Arrows move focus and the tab stop with it.
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(card(page, ids[2]!)).toBeFocused();
+  expect(await tabIndexes()).toEqual([-1, -1, 0, -1, -1, -1, -1]);
+  await page.keyboard.press("End");
+  expect(await tabIndexes()).toEqual([-1, -1, -1, -1, -1, -1, 0]);
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+
+  // Shift+Tab leaves the grid backwards, and Tab comes back to the card that was focused last.
+  await page.keyboard.press("Shift+Tab");
+  expect(await inGrid()).toBe(false);
+  await page.keyboard.press("Tab");
+  await expect(card(page, ids[2]!)).toBeFocused();
+
+  // The next Tab leaves the grid instead of visiting the other cards.
+  await page.keyboard.press("Tab");
+  expect(await inGrid()).toBe(false);
+});
+
+test("clicking a card makes it the tab stop, and closing its dialog keeps it there", async ({ page }) => {
+  await openBills(page);
+  const cards = page.locator("[data-bill-card]");
+  const tabIndexes = () => cards.evaluateAll((elements) => elements.map((element) => (element as HTMLElement).tabIndex));
+
+  await card(page, "blue-gym").click();
+  await page.keyboard.press("Escape");
+  await expect(dialog(page, "blue-gym")).toBeHidden();
+  await expect(card(page, "blue-gym")).toBeFocused();
+  expect(await tabIndexes()).toEqual([-1, -1, -1, 0, -1, -1, -1]);
+});

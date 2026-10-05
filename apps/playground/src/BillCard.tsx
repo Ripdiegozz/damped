@@ -12,6 +12,8 @@ const FOCUSABLE = "input:not([disabled]), button:not([disabled]), [href], select
 interface BillCardProps {
   bill: Bill;
   paid: boolean;
+  /** Whether this card is the grid's tab stop; the others are reached with the arrow keys. */
+  tabStop: boolean;
   onPay(bill: Bill, amount: number): void;
 }
 
@@ -21,7 +23,7 @@ interface BillCardProps {
  * the target synchronously, before React could render different content). The cost is seven hidden dialogs in the
  * DOM, which the browser does not lay out or expose.
  */
-export function BillCard({ bill, paid, onPay }: BillCardProps) {
+export function BillCard({ bill, paid, tabStop, onPay }: BillCardProps) {
   countRender("bill-card");
   const { source, target, open, close, isOpen } = useMorph(BILL_MORPH);
   const backdrop = useSpring<HTMLDivElement>({ opacity: isOpen ? 1 : 0 }, BACKDROP_SPRING);
@@ -126,6 +128,7 @@ export function BillCard({ bill, paid, onPay }: BillCardProps) {
         ref={setCard}
         data-bill-card={bill.id}
         data-paid={paid}
+        tabIndex={tabStop ? 0 : -1}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         onClick={openDialog}

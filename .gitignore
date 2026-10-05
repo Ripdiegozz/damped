@@ -7,3 +7,4 @@ playwright-report/
 .bundle-test-*/
 apps/docs/dist/
 apps/docs/.astro/
+.readme-check/

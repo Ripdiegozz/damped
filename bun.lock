@@ -18,10 +18,24 @@
         "@astrojs/starlight": "0.42.5",
         "@damped/core": "workspace:*",
         "@damped/react": "workspace:*",
-        "@fontsource-variable/fraunces": "*",
-        "@fontsource-variable/inter": "*",
-        "@fontsource-variable/jetbrains-mono": "*",
+        "@fontsource-variable/fraunces": "^5.3.0",
+        "@fontsource-variable/inter": "^5.3.0",
+        "@fontsource-variable/jetbrains-mono": "^5.3.0",
         "astro": "7.3.5",
+        "react": "19.2.3",
+        "react-dom": "19.2.3",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.0",
+        "@types/react-dom": "^19.2.0",
+      },
+    },
+    "apps/playground": {
+      "name": "@damped/playground",
+      "version": "0.0.0",
+      "dependencies": {
+        "@damped/core": "workspace:*",
+        "@damped/react": "workspace:*",
         "react": "19.2.3",
         "react-dom": "19.2.3",
       },
@@ -265,6 +279,8 @@
     "@damped/docs": ["@damped/docs@workspace:apps/docs"],
 
     "@damped/native": ["@damped/native@workspace:packages/native"],
+
+    "@damped/playground": ["@damped/playground@workspace:apps/playground"],
 
     "@damped/react": ["@damped/react@workspace:packages/react"],
 

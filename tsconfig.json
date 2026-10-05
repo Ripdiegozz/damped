@@ -22,11 +22,13 @@
   "include": [
     "packages/*/src",
     "packages/*/test",
-    "apps/docs/src",
+    "apps/*/src",
+    "apps/*/test",
+    "apps/*/*.ts",
     "apps/docs/scripts",
-    "apps/docs/test",
     "test",
     "e2e",
+    "scripts",
     "playwright.config.ts"
   ],
   "exclude": ["apps/docs/src/content.config.ts"]

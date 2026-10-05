@@ -1,20 +1,128 @@
 ---
 title: Getting started
-description: Install damped and animate your first value.
+description: Install damped, pick a package and animate your first element in a few minutes.
+sidebar:
+  order: 1
 ---
 
-damped is a family of three packages: `@damped/core` for the web, `@damped/react` for React and
-`@damped/native` for React Native.
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-## Your first spring
+damped is a family of three packages that share one spring. This page gets you from an empty project to an element that you can interrupt mid-flight.
 
-A spring is a pure function of time, so you can sample it without running an animation.
+## Pick a package
+
+| You build with | Install | What you get |
+| --- | --- | --- |
+| The DOM, with or without a framework | `@damped/core` | `animate`, `layout`, `morph`, `enter` and `exit`, `createSpringValue` and the spring itself. |
+| React 19 | `@damped/react` and `@damped/core` | `useSpring`, `useSpringValue`, `useLayout`, `useMorph` and `<Presence>`. Values reach the DOM without re-rendering on every frame. |
+| React Native with Reanimated 4 (Expo SDK 57) | `@damped/native` | `withDamped` and `toReanimated`, which keep velocity on reversal. See [React Native](/guides/react-native/). |
+
+`@damped/react` builds on `@damped/core`, so the two are installed together.
+
+## Install
+
+```sh frame="none"
+# bun
+bun add @damped/core
+# npm
+npm install @damped/core
+# pnpm
+pnpm add @damped/core
+```
+
+For React, install the React package next to the core:
+
+```sh frame="none"
+# bun
+bun add @damped/react @damped/core
+# npm
+npm install @damped/react @damped/core
+# pnpm
+pnpm add @damped/react @damped/core
+```
+
+<Aside type="caution" title="Not published to npm yet">
+  The packages are not on the npm registry yet, so the commands above will not resolve today. Until they are published, use them from the [repository's](https://github.com/Ripdiegozz/damped) workspace.
+</Aside>
+
+The packages are ES modules with no runtime dependencies. They are tested in Chromium; `@damped/react` needs React 19.
+
+## Your first spring on the web
+
+`animate(element, values, options)` moves an element to the values you give it. `x` and `y` are pixels, `scale` is a ratio, `opacity` runs from 0 to 1.
+
+```ts
+import { animate } from "@damped/core";
+
+const card = document.querySelector<HTMLElement>("#card");
+
+if (card) {
+  let open = false;
+
+  card.addEventListener("click", () => {
+    open = !open;
+    animate(
+      card,
+      { x: open ? 240 : 0, opacity: open ? 0.6 : 1 },
+      { duration: 0.5, bounce: 0.2 },
+    );
+  });
+}
+```
+
+Click the card twice quickly. The second call does not wait for the first one and does not restart from rest: it starts from the position **and the velocity** the card has at that moment, so the card turns around smoothly. That is the property the whole library is built around, and the [interruption guide](/guides/interruption-and-reversal/) explains it.
+
+<Aside title="damped owns the transform">
+  `animate` writes the inline `transform` of the elements it animates and replaces any transform you set there. Put a static transform on a wrapper element.
+</Aside>
+
+## Your first spring in React
+
+`useSpring` returns a ref. Attach it to an element and give the hook the styles the element should spring to.
+
+```tsx
+import { useState } from "react";
+import { useSpring } from "@damped/react";
+
+export function Card() {
+  const [open, setOpen] = useState(false);
+  const ref = useSpring<HTMLButtonElement>(
+    { x: open ? 240 : 0, opacity: open ? 0.6 : 1 },
+    { duration: 0.5, bounce: 0.2 },
+  );
+
+  return (
+    <button ref={ref} type="button" onClick={() => setOpen((value) => !value)}>
+      Corner Grocery
+    </button>
+  );
+}
+```
+
+The component renders when `open` changes and not once per animation frame: every frame is written to the DOM through the ref. Changing `open` again mid-flight retargets the running spring and keeps its velocity.
+
+## See the numbers
+
+A spring is a pure function of time, so you can sample it without animating anything. This is handy for understanding what your `duration` and `bounce` do.
 
 ```ts
 import { createSpring } from "@damped/core";
 
+// Move from 0 to 100, starting at rest.
 const spring = createSpring(0, 100, 0, { duration: 0.5, bounce: 0.15 });
 
 const { position, velocity } = spring.at(0.25);
 console.log(position.toFixed(1), velocity.toFixed(1), spring.settleTime().toFixed(2));
+// 89.5 164.6 1.16
 ```
+
+After a quarter of a second the value is at 89.5 and still moving at 164.6 units per second. It comes to rest after 1.16 s. Note that `duration` is not the time to rest; [Springs explained](/guides/springs-explained/) covers what it is.
+
+## Next
+
+<CardGrid>
+  <LinkCard title="Springs explained" description="Duration, bounce, stiffness and damping, and why the maths is exact." href="/guides/springs-explained/" />
+  <LinkCard title="Interruption and reversal" description="Retarget a moving element and keep its momentum." href="/guides/interruption-and-reversal/" />
+  <LinkCard title="Try the demos" description="Six live demos on the real packages." href="/guides/demos/" />
+  <LinkCard title="Testing" description="Drive animations frame by frame in unit tests." href="/guides/testing/" />
+</CardGrid>

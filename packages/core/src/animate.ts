@@ -1,8 +1,24 @@
+import { canUseCompositor, release, releaseOwned, runCompositor } from "./compositor";
+import {
+  CONFIG,
+  commit,
+  existingState,
+  quiet,
+  runJs,
+  stateFor,
+  valueFor,
+  type AnimatableProperty,
+  type ElementState,
+  type Group,
+  type Job,
+  type RenderHook,
+} from "./element";
 import { frame, type Scheduler } from "./scheduler";
 import { springParams, type SpringOptions } from "./spring";
-import { createSpringValue, type SpringValue } from "./value";
+import { seedSpringValue, type SpringValue } from "./value";
 
-export type AnimatableProperty = "x" | "y" | "scale" | "scaleX" | "scaleY" | "rotate" | "opacity" | "blur";
+export type { AnimatableProperty } from "./element";
+export { IDENTITY_TRANSFORM } from "./element";
 export type AnimationTargets = Partial<Record<AnimatableProperty, number>>;
 export type AnimateOptions = SpringOptions & {
   scheduler?: Scheduler;
@@ -10,6 +26,12 @@ export type AnimateOptions = SpringOptions & {
   reducedMotion?: "user" | "always" | "never";
   /** Applied immediately, as a jump, before animating. */
   from?: AnimationTargets;
+  /**
+   * What plays the animation. `"js"` (default) writes styles from the frame loop. `"compositor"` hands the sampled
+   * spring to the browser's compositor through the Web Animations API, so it keeps moving while the main thread is
+   * busy; without WAAPI, or for a spring that never settles, it falls back to `"js"`.
+   */
+  driver?: "js" | "compositor";
 };
 // Omit applied per union member, so both spring option forms (perceptual and physical) survive.
 export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -21,126 +43,10 @@ export interface AnimationControls {
   stop(): void;
 }
 
-type Group = "transform" | "opacity" | "filter";
-
-interface PropertyConfig {
-  group: Group;
-  initial: number;
-  /** Moves in space and therefore jumps under reduced motion. */
-  spatial: boolean;
-  restDelta: number;
-  restSpeed: number;
-}
-
-// Rest thresholds per unit: settling within 0.01 px (or degree) and 0.1 px/s is below what a display can show,
-// while unitless ratios (scale, opacity) need finer thresholds because their whole range is about 0..1.
-const LENGTH = { restDelta: 0.01, restSpeed: 0.1 };
-const ANGLE = { restDelta: 0.01, restSpeed: 0.1 };
-const RATIO = { restDelta: 0.0005, restSpeed: 0.005 };
-
-const CONFIG: Record<AnimatableProperty, PropertyConfig> = {
-  x: { group: "transform", initial: 0, spatial: true, ...LENGTH },
-  y: { group: "transform", initial: 0, spatial: true, ...LENGTH },
-  rotate: { group: "transform", initial: 0, spatial: true, ...ANGLE },
-  scale: { group: "transform", initial: 1, spatial: true, ...RATIO },
-  scaleX: { group: "transform", initial: 1, spatial: true, ...RATIO },
-  scaleY: { group: "transform", initial: 1, spatial: true, ...RATIO },
-  opacity: { group: "opacity", initial: 1, spatial: false, ...RATIO },
-  blur: { group: "filter", initial: 0, spatial: false, ...LENGTH },
-};
-
-// Below this radius a blur is invisible, so the filter is cleared instead of kept as a compositor layer.
-const MIN_BLUR = 0.01;
-
-export type RenderHook = (scaleX: number, scaleY: number) => void;
-
-interface ElementState {
-  // The scheduler of the first animate() call on an element drives it from then on.
-  scheduler: Scheduler;
-  values: Partial<Record<AnimatableProperty, SpringValue>>;
-  // Token of the animate() call that last targeted each property.
-  owners: Partial<Record<AnimatableProperty, object>>;
-  dirty: Record<Group, boolean>;
-  writeQueued: boolean;
-  // Runs inside the transform write with the effective scale, so extra per-element writes share the single write job.
-  renderHook: RenderHook | undefined;
-}
-
 /*
  * damped owns the inline `transform` of every element it animates (replacing any existing one),
  * `opacity` once opacity is animated, and `filter` once blur is animated.
  */
-/** Transform written for an element whose animated transform values are all at rest. */
-export const IDENTITY_TRANSFORM = "translate3d(0px, 0px, 0) rotate(0deg) scale(1, 1)";
-
-const states = new WeakMap<Element, ElementState>();
-
-function stateFor(element: Element, scheduler: Scheduler): ElementState {
-  let state = states.get(element);
-  if (state === undefined) {
-    state = {
-      scheduler,
-      values: {},
-      owners: {},
-      dirty: { transform: false, opacity: false, filter: false },
-      writeQueued: false,
-      renderHook: undefined,
-    };
-    states.set(element, state);
-  }
-  return state;
-}
-
-function render(element: Element, state: ElementState): void {
-  state.writeQueued = false;
-  const style = (element as Partial<ElementCSSInlineStyle>).style;
-  if (style === undefined) return;
-  const read = (property: AnimatableProperty): number => state.values[property]?.get() ?? CONFIG[property].initial;
-
-  if (state.dirty.transform) {
-    state.dirty.transform = false;
-    const scale = read("scale");
-    const scaleX = scale * read("scaleX");
-    const scaleY = scale * read("scaleY");
-    style.transform = `translate3d(${read("x")}px, ${read("y")}px, 0) rotate(${read("rotate")}deg) scale(${scaleX}, ${scaleY})`;
-    state.renderHook?.(scaleX, scaleY);
-  }
-  if (state.dirty.opacity) {
-    state.dirty.opacity = false;
-    style.opacity = String(read("opacity"));
-  }
-  if (state.dirty.filter) {
-    state.dirty.filter = false;
-    const blur = read("blur");
-    style.filter = blur > MIN_BLUR ? `blur(${blur}px)` : "";
-  }
-}
-
-function markDirty(element: Element, state: ElementState, group: Group): void {
-  state.dirty[group] = true;
-  if (state.writeQueued) return;
-  state.writeQueued = true;
-  // Called from the update phase, so the write phase of the same frame picks it up.
-  state.scheduler.schedule("write", () => render(element, state));
-}
-
-function initialValue(element: Element, property: AnimatableProperty): number {
-  if (property !== "opacity") return CONFIG[property].initial;
-  if (typeof getComputedStyle !== "function") return 1;
-  const opacity = Number.parseFloat(getComputedStyle(element).opacity);
-  return Number.isFinite(opacity) ? opacity : 1;
-}
-
-function valueFor(element: Element, state: ElementState, property: AnimatableProperty): SpringValue {
-  let value = state.values[property];
-  if (value === undefined) {
-    value = createSpringValue(initialValue(element, property), { scheduler: state.scheduler });
-    const group = CONFIG[property].group;
-    value.onChange(() => markDirty(element, state, group));
-    state.values[property] = value;
-  }
-  return value;
-}
 
 export function entries(targets: AnimationTargets | undefined, label: string): [AnimatableProperty, number][] {
   const result: [AnimatableProperty, number][] = [];
@@ -165,12 +71,28 @@ export function toList(target: Element | readonly Element[]): readonly Element[]
   return Array.isArray(target) ? (target as readonly Element[]) : [target as Element];
 }
 
+function deferred(): { promise: Promise<void>; resolve(): void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+interface Claim {
+  element: Element;
+  state: ElementState;
+  value: SpringValue;
+  property: AnimatableProperty;
+}
+
 export function animate(
   target: Element | readonly Element[],
   values: AnimationTargets,
   options: AnimateOptions = {},
 ): AnimationControls {
-  const { scheduler = frame, reducedMotion = "user", from, ...rest } = options;
+  const { scheduler = frame, reducedMotion = "user", from, driver = "js", ...rest } = options;
+  if (driver !== "js" && driver !== "compositor") throw new TypeError(`animate: unknown driver "${String(driver)}"`);
   const springOptions = rest as SpringOptions;
   const targets = entries(values, "animate");
   const starts = entries(from, "animate from");
@@ -180,36 +102,93 @@ export function animate(
 
   const token = {};
   // A property may appear twice (once from `from`, once from `values`); stopping it twice is harmless.
-  const claims: { value: SpringValue; state: ElementState; property: AnimatableProperty }[] = [];
-  const pending: Promise<boolean>[] = [];
+  const claims: Claim[] = [];
+  const waits: Promise<void>[] = [];
 
   for (const element of toList(target)) {
     const state = stateFor(element, scheduler);
+    // A compositor animation still running here is taken down at its exact state; what this call does not claim goes on.
+    const carried = release(element, state);
+    const compositor = driver === "compositor" && canUseCompositor(element);
+    const claimed = new Set<AnimatableProperty>();
+    // Groups changed by jumps, which no animation covers and which therefore need an inline write of their own.
+    const jumped = new Set<Group>();
+    const jobs: Job[] = [];
+
     const claim = (property: AnimatableProperty): SpringValue => {
       const value = valueFor(element, state, property);
       state.owners[property] = token;
-      claims.push({ value, state, property });
+      claims.push({ element, state, value, property });
+      claimed.add(property);
       return value;
     };
-
-    for (const [property, start] of starts) claim(property).jump(start);
-    for (const [property, end] of targets) {
+    const jump = (property: AnimatableProperty, to: number): void => {
       const value = claim(property);
-      if (reduced && CONFIG[property].spatial) {
-        value.jump(end);
-      } else {
-        const { restDelta, restSpeed } = CONFIG[property];
-        pending.push(value.set(end, { restDelta, restSpeed, ...springOptions }));
+      if (!compositor) {
+        value.jump(to);
+        return;
       }
+      quiet(state, () => value.jump(to));
+      jumped.add(CONFIG[property].group);
+    };
+
+    for (const [property, start] of starts) jump(property, start);
+    for (const [property, end] of targets) {
+      if (reduced && CONFIG[property].spatial) {
+        jump(property, end);
+        continue;
+      }
+      const value = claim(property);
+      const wait = deferred();
+      waits.push(wait.promise);
+      const { restDelta, restSpeed } = CONFIG[property];
+      const job: Job = {
+        property,
+        to: end,
+        config: { restDelta, restSpeed, ...springOptions },
+        settle: () => wait.resolve(),
+        moved: false,
+      };
+      if (!compositor) {
+        runJs(element, state, job);
+        continue;
+      }
+      // Stops a JS animation of this property; the compositor continues from its position and velocity.
+      quiet(state, () => seedSpringValue(value, value.get(), value.getVelocity()));
+      jobs.push(job);
     }
+
+    for (const job of carried) {
+      if (claimed.has(job.property)) job.settle(false);
+      else if (compositor) jobs.push(job);
+      else runJs(element, state, job);
+    }
+    if (!compositor) continue;
+
+    // A transform, opacity or filter is animated by one driver at a time, so JS animations in the same group move over.
+    const groups = new Set(jobs.map((job) => CONFIG[job.property].group));
+    for (const property of Object.keys(state.jobs) as AnimatableProperty[]) {
+      const job = state.jobs[property]!;
+      const value = state.values[property]!;
+      // A value that was stopped or jumped this very tick has not reported yet; it must stay stopped.
+      if (claimed.has(property) || !groups.has(CONFIG[property].group) || !value.animating) continue;
+      job.moved = true;
+      delete state.jobs[property];
+      quiet(state, () => seedSpringValue(value, value.get(), value.getVelocity()));
+      jobs.push(job);
+    }
+    commit(element, state, jumped);
+    if (!runCompositor(element, state, jobs)) for (const job of jobs) runJs(element, state, job);
   }
 
   return {
-    finished: Promise.all(pending).then(() => undefined),
+    finished: Promise.all(waits).then(() => undefined),
     stop() {
-      // Properties taken over by a newer call keep animating; `finished` still resolves through their superseded set().
-      for (const { value, state, property } of claims) {
-        if (state.owners[property] === token) value.stop();
+      // Properties taken over by a newer call keep animating; `finished` still resolves through their superseded jobs.
+      for (const { element, state, value, property } of claims) {
+        if (state.owners[property] !== token) continue;
+        releaseOwned(element, state, (other) => state.owners[other] === token);
+        value.stop();
       }
     },
   };
@@ -231,10 +210,12 @@ export function springValueFor(element: Element, scheduler: Scheduler, property:
 
 /** The element's existing value for `property`, if animate() or layout ever created one. */
 export function peekSpringValue(element: Element, property: AnimatableProperty): SpringValue | undefined {
-  return states.get(element)?.values[property];
+  return existingState(element)?.values[property];
 }
 
 /** Installs (or with `undefined` removes) the hook that runs inside every transform write of `element`. */
 export function setRenderHook(element: Element, scheduler: Scheduler, hook: RenderHook | undefined): void {
   stateFor(element, scheduler).renderHook = hook;
 }
+
+export { releaseToJs } from "./compositor";

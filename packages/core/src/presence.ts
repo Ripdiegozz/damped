@@ -3,6 +3,7 @@ import {
   entries,
   identityValue,
   peekSpringValue,
+  releaseToJs,
   toList,
   type AnimatableProperty,
   type AnimateOptions,
@@ -17,9 +18,9 @@ import { springParams, type SpringOptions } from "./spring";
  * the same values and keeps position and velocity. While an element exits it is inert and aria-hidden.
  */
 
-export type EnterOptions = DistributiveOmit<AnimateOptions, "from">;
+export type EnterOptions = DistributiveOmit<AnimateOptions, "from" | "driver">;
 
-export type ExitOptions = AnimateOptions & {
+export type ExitOptions = DistributiveOmit<AnimateOptions, "driver"> & {
   /** What to do once the exit settles without being interrupted: true (default) removes the element from the DOM; false leaves it; a function is called instead. */
   remove?: boolean | ((element: Element) => void);
 };
@@ -98,11 +99,13 @@ export function enter(
     for (const [property] of starts) goals[property] = identityValue(property);
     for (const [property, value] of ends) goals[property] = value;
     interrupt(element);
+    // A compositor animation of the element counts as in flight: its position and velocity move over to the JS values.
+    releaseToJs(element);
 
     const inFlight = (Object.keys(goals) as AnimatableProperty[]).some(
       (property) => peekSpringValue(element, property)?.animating === true,
     );
-    return animate(element, goals, { ...options, ...(inFlight ? {} : { from }) });
+    return animate(element, goals, { ...options, driver: "js", ...(inFlight ? {} : { from }) });
   });
 
   return {
@@ -131,7 +134,7 @@ export function exit(
     interrupt(element);
     const record: ExitRecord = { interrupted: false, properties, restore: hide(element) };
     exits.set(element, record);
-    const controls = animate(element, to, animateOptions);
+    const controls = animate(element, to, { ...animateOptions, driver: "js" });
     return { element, record, controls, finished: controls.finished.then(() => complete(element, record, remove)) };
   });
 

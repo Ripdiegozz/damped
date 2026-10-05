@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { MIN_FRAMES, open } from "./helpers";
 
-// The compositor driver samples the spring into linear keyframes at 60 Hz, so between samples the browser draws a chord
+// The compositor driver samples the spring into linear keyframes at 120 Hz, so between samples the browser draws a chord
 // through the curve instead of the curve itself. The bound below is the measured worst case plus a small margin.
 const SAMPLING_TOLERANCE_PX = 0.5;
 // How long the main thread is blocked, and how long into the animation that starts.
@@ -27,7 +27,7 @@ test("a compositor animation ends exactly on its target with inline styles commi
 
   const result = await page.evaluate(async () => {
     const box = document.getElementById("compositor")!;
-    const controls = window.damped.animate(box, { x: 300 }, { driver: "compositor" });
+    const controls = window.damped.animate(box, { x: 300 }, { driver: window.damped.compositor });
     const running = box.getAnimations().length;
     await controls.finished;
     return {
@@ -65,7 +65,7 @@ test("a compositor animation keeps drawing while the main thread is blocked, a J
   const started = await page.evaluate(async (leadIn) => {
     const spring = { duration: 1, bounce: 0.15 };
     const compositor = document.getElementById("compositor")!;
-    const fast = window.damped.animate(compositor, { x: 300 }, { ...spring, driver: "compositor" });
+    const fast = window.damped.animate(compositor, { x: 300 }, { ...spring, driver: window.damped.compositor });
     const slow = window.damped.animate(document.getElementById("js")!, { x: 300 }, spring);
     Object.assign(window, { settled: Promise.all([fast.finished, slow.finished]) });
     const animation = compositor.getAnimations()[0]!;
@@ -163,7 +163,7 @@ test("a compositor animation retargeted mid-flight keeps its velocity and turns 
   const result = await page.evaluate(async (reversalFrame) => {
     const box = document.getElementById("compositor")!;
     const read = () => new DOMMatrix(getComputedStyle(box).transform).m41;
-    const forward = window.damped.animate(box, { x: 300 }, { driver: "compositor" });
+    const forward = window.damped.animate(box, { x: 300 }, { driver: window.damped.compositor });
 
     // The recorder runs after the library in every frame, so reversing inside its callback makes the next frame (index
     // `reversalFrame`) the first one that shows the reversal, whatever the real frame timing is.
@@ -177,7 +177,7 @@ test("a compositor animation retargeted mid-flight keeps its velocity and turns 
         if (samples.length !== reversalFrame) return;
         reversalIndex = samples.length;
         running.before = box.getAnimations().length;
-        backward = window.damped.animate(box, { x: 0 }, { driver: "compositor" });
+        backward = window.damped.animate(box, { x: 0 }, { driver: window.damped.compositor });
         running.after = box.getAnimations().length;
       },
     );
@@ -231,7 +231,7 @@ test("between its sample points the drawn curve stays within tolerance of the an
 
   const result = await page.evaluate(() => {
     const box = document.getElementById("compositor")!;
-    window.damped.animate(box, { x: 300 }, { driver: "compositor" });
+    window.damped.animate(box, { x: 300 }, { driver: window.damped.compositor });
     const animation = box.getAnimations()[0]!;
     const spring = window.damped.createSpring(0, 300, 0, { duration: 0.5, bounce: 0.15, restDelta: 0.01, restSpeed: 0.1 });
     const duration = Number(animation.effect!.getTiming().duration);

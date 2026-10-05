@@ -1,10 +1,15 @@
-# damped
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/lockup-dark.svg">
+    <img src="assets/brand/lockup-light.svg" alt="damped" width="220">
+  </picture>
+</h1>
 
 Spring animations for the web and for React Native that keep their velocity when they are interrupted.
 
 [![Northbook, the damped playground: counting numbers, a card that becomes a dialog and reverses mid-flight, a toast, and rows that reorder](assets/northbook.gif)](https://damped.dagadev.net)
 
-Try it in [**Northbook**](https://damped.dagadev.net), a fictional personal-finance app built only on these packages. Open a bill, press Escape halfway and watch it turn around; change the duration and bounce of the whole app in the Spring lab.
+Docs and the playground live at [damped.dagadev.net](https://damped.dagadev.net). Try it in [**Northbook**](https://damped.dagadev.net), a fictional personal-finance app built only on these packages. Open a bill, press Escape halfway and watch it turn around; change the duration and bounce of the whole app in the Spring lab.
 
 > damped is a work in progress and is not published to npm yet. The packages below are used from this repository's workspace.
 

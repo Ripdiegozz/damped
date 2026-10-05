@@ -1,0 +1,551 @@
+---
+title: Testing with a fake frame source
+description: Drive damped animations deterministically in unit tests, with no real time, no waiting and no flaky timing.
+sidebar:
+  order: 9
+---
+
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+Animations are the classic source of flaky tests: they depend on timers, on the display's refresh rate and on how busy the machine is. damped avoids that by taking time from exactly one place, and that place can be replaced.
+
+## How time enters damped
+
+Every animation runs on a **scheduler**, and a scheduler asks a **frame source** for the next frame:
+
+```ts
+interface FrameSource {
+  request(callback: (timestamp: number) => void): number;
+  cancel(handle: number): void;
+}
+```
+
+By default the frame source is `requestAnimationFrame`. In a test you build a scheduler on a frame source that only moves when the test says so. `timestamp` is in milliseconds and it is the only clock a spring sees: damped never reads `performance.now()` or `Date.now()` when you provide a source.
+
+Every API that animates takes the scheduler as an option, so you wire it in once per test:
+
+| API | How to pass it |
+| --- | --- |
+| `animate(el, values, { scheduler })` | Option |
+| `createSpringValue(initial, { scheduler })` | Option |
+| `layout`, `snapshot(...).animate`, `morph`, `enter`, `exit` | `scheduler` in their options |
+| `useSpring`, `useSpringValue`, `useLayout`, `useMorph` | `scheduler` in their options |
+| `<Presence options={{ scheduler }}>` | `scheduler` in `options` |
+
+Two properties make this reliable:
+
+- **The first frame an animation runs is `t = 0`.** The start time is the first frame that runs it, not the moment you called `animate`. The next frame at timestamp `T` is `(T - first) / 1000` seconds into the spring.
+- **Springs are analytic.** The state at a given time does not depend on the frames in between, so a test can jump straight to any moment, and the numbers match what users see at any refresh rate.
+
+<Aside type="caution" title="Use a scheduler per test, an element per test">
+  An element is driven by the scheduler of the first `animate` call on it, so create a fresh element in each test and do not mix a fake scheduler with the shared `frame` on one element. The shared `frame` cannot be replaced. Always pass `scheduler` explicitly.
+</Aside>
+
+## Set up a DOM
+
+damped writes inline styles, so the tests need a DOM. With Bun, [happy-dom](https://github.com/capricorn86/happy-dom) is a light option. Register it before the tests run:
+
+```toml
+# bunfig.toml
+[test]
+preload = ["./test/happydom.ts"]
+```
+
+```ts
+// test/happydom.ts
+import { GlobalRegistrator } from "@happy-dom/global-registrator";
+
+GlobalRegistrator.register();
+```
+
+happy-dom has no layout engine, so `getBoundingClientRect()` returns zeros. Tests of `layout`, `morph` and `useLayout` have to supply the boxes, as shown below.
+
+<Aside title="About the examples">
+  The examples are written for `bun test`, which is also what damped's own tests use. `test` and `expect` have the same shape in Vitest and Jest, so the bodies run there unchanged. Each example starts with two `declare` lines for `test` and `expect` so that it compiles on its own; in your project delete them and write `import { expect, test } from "bun:test"` (or from `vitest`). Each also repeats the small frame source below so that it runs on its own. In a project you would keep it in one shared file.
+</Aside>
+
+## A manual frame source
+
+The frame source is a queue of callbacks. `request` stores one, `cancel` removes it and `flush(timestamp)` runs everything that was requested, reporting `timestamp` as the time. `pending` tells you whether anything is waiting, which doubles as an idleness check.
+
+```ts
+import { animate, createScheduler, createSpring, type FrameSource } from "@damped/core";
+
+declare function test(name: string, run: () => void | Promise<void>): void;
+declare function expect(actual: unknown): { toBe(expected: unknown): void; toBeGreaterThan(floor: number): void };
+
+/** A frame source that only moves when the test calls `flush`. */
+function createManualFrames() {
+  let next = 1;
+  const queue = new Map<number, (timestamp: number) => void>();
+  const source: FrameSource = {
+    request: (callback) => (queue.set(next, callback), next++),
+    cancel: (handle) => void queue.delete(handle),
+  };
+  // Runs the frame that was requested, reporting `timestamp` (milliseconds) as its time.
+  const flush = (timestamp: number): void => {
+    const callbacks = [...queue.values()];
+    queue.clear();
+    for (const callback of callbacks) callback(timestamp);
+  };
+  // Runs frames every `step` ms until nothing is requested. Returns the next timestamp.
+  const flushAll = (from = 0, step = 16): number => {
+    let timestamp = from;
+    for (let guard = 0; queue.size > 0 && guard < 10_000; guard++, timestamp += step) flush(timestamp);
+    return timestamp;
+  };
+  return {
+    source,
+    flush,
+    flushAll,
+    get pending() {
+      return queue.size;
+    },
+  };
+}
+
+const IDENTITY = "translate3d(0px, 0px, 0) rotate(0deg) scale(1, 1)";
+const SPRING = { duration: 0.5, bounce: 0.15 } as const;
+
+test("a box slides to 100 px along the spring and then rests", async () => {
+  const frames = createManualFrames();
+  const scheduler = createScheduler(frames.source);
+  const box = document.createElement("div");
+  document.body.append(box);
+
+  const controls = animate(box, { x: 100 }, { ...SPRING, scheduler, reducedMotion: "never" });
+
+  frames.flush(0); // the first frame is t = 0: the start state
+  expect(box.style.transform).toBe(IDENTITY);
+
+  frames.flush(100); // 100 ms later
+  // `animate` rests an x animation at 0.01 px and 0.1 px/s, so the same spring gives the expected position.
+  const expected = createSpring(0, 100, 0, { ...SPRING, restDelta: 0.01, restSpeed: 0.1 }).at(0.1).position;
+  expect(box.style.transform).toBe(`translate3d(${expected}px, 0px, 0) rotate(0deg) scale(1, 1)`);
+
+  frames.flushAll(116);
+  await controls.finished; // promises settle in microtasks, so await them after flushing
+  expect(box.style.transform).toBe("translate3d(100px, 0px, 0) rotate(0deg) scale(1, 1)");
+  expect(frames.pending).toBe(0); // idle means no frame is requested
+  expect(scheduler.active).toBe(false);
+});
+```
+
+What the test shows:
+
+- **Exact values.** Compute the expected state with the public `createSpring(...).at(t)`, using the same rest thresholds that `animate` applies to that property (`0.01` / `0.1` for `x`, `y`, `rotate` and `blur`; `0.0005` / `0.005` for opacity and scale). The strings then match exactly, with no tolerance to tune.
+- **Settled state.** Flush until nothing is pending, then `await controls.finished` and assert the final style. `scheduler.active` and `pending` prove the loop went back to sleep.
+- **Promises.** `finished` and `SpringValue.set()` resolve after the frame callback returns. Flush first, then `await`.
+
+### Frame rate does not change the result
+
+Because the springs are analytic, a test can prove frame-rate independence directly. Run the same animation at 60 Hz and at 144 Hz and compare:
+
+```ts
+import { animate, createScheduler, type FrameSource } from "@damped/core";
+
+declare function test(name: string, run: () => void | Promise<void>): void;
+declare function expect(actual: unknown): { toBe(expected: unknown): void };
+
+function createManualFrames() {
+  let next = 1;
+  const queue = new Map<number, (timestamp: number) => void>();
+  const source: FrameSource = {
+    request: (callback) => (queue.set(next, callback), next++),
+    cancel: (handle) => void queue.delete(handle),
+  };
+  const flush = (timestamp: number): void => {
+    const callbacks = [...queue.values()];
+    queue.clear();
+    for (const callback of callbacks) callback(timestamp);
+  };
+  return { source, flush };
+}
+
+/** Where a box is, in px, after half a second of animation at the given refresh rate. */
+function positionAfterHalfASecond(hz: number): number {
+  const frames = createManualFrames();
+  const box = document.createElement("div");
+  animate(box, { x: 100 }, { duration: 0.5, bounce: 0.15, scheduler: createScheduler(frames.source), reducedMotion: "never" });
+
+  const step = 1000 / hz;
+  for (let frame = 0; frame <= hz / 2; frame++) frames.flush(frame * step);
+
+  return Number(/translate3d\(([-\d.e]+)px/.exec(box.style.transform)?.[1]);
+}
+
+test("60 Hz and 144 Hz agree", () => {
+  const difference = Math.abs(positionAfterHalfASecond(60) - positionAfterHalfASecond(144));
+  expect(difference < 1e-9).toBe(true);
+});
+```
+
+In damped's own suite the state agrees to within 1e-12 at 60 Hz, 144 Hz and an irregular cadence.
+
+### Interruption
+
+Retargeting is the behavior most worth testing, because it is the one that is easy to break and hard to see. Reverse an animation mid-flight and assert that the momentum was kept:
+
+```ts
+import { animate, createScheduler, type FrameSource } from "@damped/core";
+
+declare function test(name: string, run: () => void | Promise<void>): void;
+declare function expect(actual: unknown): { toBeGreaterThan(floor: number): void };
+
+function createManualFrames() {
+  let next = 1;
+  const queue = new Map<number, (timestamp: number) => void>();
+  const source: FrameSource = {
+    request: (callback) => (queue.set(next, callback), next++),
+    cancel: (handle) => void queue.delete(handle),
+  };
+  const flush = (timestamp: number): void => {
+    const callbacks = [...queue.values()];
+    queue.clear();
+    for (const callback of callbacks) callback(timestamp);
+  };
+  return { source, flush };
+}
+
+test("reversing a moving box keeps its momentum", () => {
+  const frames = createManualFrames();
+  const scheduler = createScheduler(frames.source);
+  const options = { duration: 0.5, bounce: 0.15, scheduler, reducedMotion: "never" } as const;
+  const box = document.createElement("div");
+  const x = (): number => Number(/translate3d\(([-\d.e]+)px/.exec(box.style.transform)?.[1]);
+
+  animate(box, { x: 100 }, options);
+  for (const time of [0, 16, 32, 48, 64, 80]) frames.flush(time);
+  const before = x();
+
+  animate(box, { x: 0 }, options); // reverse mid-flight
+  frames.flush(96);
+
+  // Still moving away from 0: the momentum was kept. A restart from rest would have turned back at once.
+  expect(x()).toBeGreaterThan(before);
+});
+```
+
+## Reduced motion
+
+Pass `reducedMotion: "always"` or `"never"` to take the system setting out of the picture. To test that `"user"` follows `prefers-reduced-motion`, stub `matchMedia` for the duration of the test. Without `matchMedia`, `"user"` is treated as off.
+
+```ts
+import { animate, createScheduler, type FrameSource } from "@damped/core";
+
+declare function test(name: string, run: () => void | Promise<void>): void;
+declare function expect(actual: unknown): { toBe(expected: unknown): void; toBeGreaterThan(floor: number): void };
+
+function createManualFrames() {
+  let next = 1;
+  const queue = new Map<number, (timestamp: number) => void>();
+  const source: FrameSource = {
+    request: (callback) => (queue.set(next, callback), next++),
+    cancel: (handle) => void queue.delete(handle),
+  };
+  const flush = (timestamp: number): void => {
+    const callbacks = [...queue.values()];
+    queue.clear();
+    for (const callback of callbacks) callback(timestamp);
+  };
+  const flushAll = (from = 0, step = 16): number => {
+    let timestamp = from;
+    for (let guard = 0; queue.size > 0 && guard < 10_000; guard++, timestamp += step) flush(timestamp);
+    return timestamp;
+  };
+  return { source, flush, flushAll };
+}
+
+test("spatial motion jumps and fades remain", async () => {
+  const frames = createManualFrames();
+  const box = document.createElement("div");
+  const controls = animate(box, { x: 100, opacity: 0 }, { scheduler: createScheduler(frames.source), reducedMotion: "always" });
+
+  frames.flush(0);
+  expect(box.style.transform).toBe("translate3d(100px, 0px, 0) rotate(0deg) scale(1, 1)"); // x jumped
+  expect(Number(box.style.opacity)).toBeGreaterThan(0); // the fade has started, it did not jump
+
+  frames.flushAll(16);
+  await controls.finished;
+  expect(box.style.opacity).toBe("0");
+});
+
+test("'user' follows prefers-reduced-motion", () => {
+  const original = globalThis.matchMedia;
+  globalThis.matchMedia = (query: string) => ({ matches: query.includes("reduce") }) as MediaQueryList;
+  try {
+    const frames = createManualFrames();
+    const box = document.createElement("div");
+    animate(box, { x: 100 }, { scheduler: createScheduler(frames.source) }); // reducedMotion defaults to "user"
+    frames.flush(0);
+    expect(box.style.transform).toBe("translate3d(100px, 0px, 0) rotate(0deg) scale(1, 1)");
+  } finally {
+    globalThis.matchMedia = original;
+  }
+});
+```
+
+## Other APIs
+
+### Spring values
+
+`createSpringValue` is the simplest thing to test: it needs no DOM.
+
+```ts
+import { createScheduler, createSpring, createSpringValue, type FrameSource } from "@damped/core";
+
+declare function test(name: string, run: () => void | Promise<void>): void;
+declare function expect(actual: unknown): { toBe(expected: unknown): void };
+
+function createManualFrames() {
+  let next = 1;
+  const queue = new Map<number, (timestamp: number) => void>();
+  const source: FrameSource = {
+    request: (callback) => (queue.set(next, callback), next++),
+    cancel: (handle) => void queue.delete(handle),
+  };
+  const flush = (timestamp: number): void => {
+    const callbacks = [...queue.values()];
+    queue.clear();
+    for (const callback of callbacks) callback(timestamp);
+  };
+  const flushAll = (from = 0, step = 16): number => {
+    let timestamp = from;
+    for (let guard = 0; queue.size > 0 && guard < 10_000; guard++, timestamp += step) flush(timestamp);
+    return timestamp;
+  };
+  return { source, flush, flushAll };
+}
+
+test("a spring value follows the spring and resolves true when it settles", async () => {
+  const frames = createManualFrames();
+  const value = createSpringValue(0, { scheduler: createScheduler(frames.source) });
+  const seen: number[] = [];
+  value.onChange((next) => seen.push(next));
+
+  const settled = value.set(100, { duration: 0.5, bounce: 0.15 });
+  frames.flush(1_000); // t = 0, whatever the timestamp is
+  frames.flush(1_250); // t = 0.25 s
+  expect(value.get()).toBe(createSpring(0, 100, 0, { duration: 0.5, bounce: 0.15 }).at(0.25).position);
+
+  frames.flushAll(1_266);
+  expect(await settled).toBe(true); // `false` would mean it was superseded
+  expect(value.get()).toBe(100);
+  expect(seen.at(-1)).toBe(100);
+});
+```
+
+### Layout and morph: say where the boxes are
+
+`layout()`, `snapshot()`, `morph()` and `useLayout` read `getBoundingClientRect()`. In a DOM without layout, override it per element to describe where the element is before and after your change.
+
+```ts
+import { createScheduler, layout, type FrameSource } from "@damped/core";
+
+declare function test(name: string, run: () => void | Promise<void>): void;
+declare function expect(actual: unknown): { toBe(expected: unknown): void };
+
+function createManualFrames() {
+  let next = 1;
+  const queue = new Map<number, (timestamp: number) => void>();
+  const source: FrameSource = {
+    request: (callback) => (queue.set(next, callback), next++),
+    cancel: (handle) => void queue.delete(handle),
+  };
+  const flush = (timestamp: number): void => {
+    const callbacks = [...queue.values()];
+    queue.clear();
+    for (const callback of callbacks) callback(timestamp);
+  };
+  const flushAll = (from = 0, step = 16): number => {
+    let timestamp = from;
+    for (let guard = 0; queue.size > 0 && guard < 10_000; guard++, timestamp += step) flush(timestamp);
+    return timestamp;
+  };
+  return { source, flush, flushAll };
+}
+
+// happy-dom has no layout engine, so the test says where the element is.
+function placeAt(element: HTMLElement, box: () => { x: number; y: number; width: number; height: number }): void {
+  element.getBoundingClientRect = () => {
+    const { x, y, width, height } = box();
+    return { x, y, left: x, top: y, width, height, right: x + width, bottom: y + height } as DOMRect;
+  };
+}
+
+test("layout() starts on the previous box and settles on the identity", async () => {
+  const frames = createManualFrames();
+  const item = document.createElement("div");
+  document.body.append(item);
+
+  let moved = false;
+  placeAt(item, () => (moved ? { x: 200, y: 100, width: 100, height: 100 } : { x: 0, y: 0, width: 100, height: 100 }));
+
+  const scheduler = createScheduler(frames.source);
+  const controls = layout(item, () => (moved = true), { scheduler, duration: 0.4, reducedMotion: "never" });
+
+  frames.flush(0);
+  // The element is laid out 200 px right and 100 px down, and is drawn where it used to be.
+  expect(item.style.transform).toBe("translate3d(-200px, -100px, 0) rotate(0deg) scale(1, 1)");
+
+  frames.flushAll(16);
+  await controls.finished;
+  expect(item.style.transform).toBe("translate3d(0px, 0px, 0) rotate(0deg) scale(1, 1)");
+});
+```
+
+### Enter and exit
+
+`exit()` keeps the element in the DOM, `inert` and `aria-hidden`, until the spring settles, then removes it. An `enter()` during the exit cancels the removal.
+
+```ts
+import { createScheduler, enter, exit, type FrameSource } from "@damped/core";
+
+declare function test(name: string, run: () => void | Promise<void>): void;
+declare function expect(actual: unknown): { toBe(expected: unknown): void };
+
+function createManualFrames() {
+  let next = 1;
+  const queue = new Map<number, (timestamp: number) => void>();
+  const source: FrameSource = {
+    request: (callback) => (queue.set(next, callback), next++),
+    cancel: (handle) => void queue.delete(handle),
+  };
+  const flush = (timestamp: number): void => {
+    const callbacks = [...queue.values()];
+    queue.clear();
+    for (const callback of callbacks) callback(timestamp);
+  };
+  const flushAll = (from = 0, step = 16): number => {
+    let timestamp = from;
+    for (let guard = 0; queue.size > 0 && guard < 10_000; guard++, timestamp += step) flush(timestamp);
+    return timestamp;
+  };
+  return { source, flush, flushAll };
+}
+
+test("exit() keeps the element inert until it settles, then removes it", async () => {
+  const frames = createManualFrames();
+  const scheduler = createScheduler(frames.source);
+  const toast = document.createElement("div");
+  document.body.append(toast);
+
+  const leaving = exit(toast, { opacity: 0 }, { scheduler, duration: 0.3, bounce: 0 });
+  frames.flush(0);
+  frames.flush(16);
+  expect(toast.isConnected).toBe(true);
+  expect(toast.hasAttribute("inert")).toBe(true);
+  expect(toast.getAttribute("aria-hidden")).toBe("true");
+
+  frames.flushAll(32);
+  expect(await leaving.finished).toBe(true);
+  expect(toast.isConnected).toBe(false);
+});
+
+test("enter() during an exit cancels the removal", async () => {
+  const frames = createManualFrames();
+  const scheduler = createScheduler(frames.source);
+  const toast = document.createElement("div");
+  document.body.append(toast);
+
+  const leaving = exit(toast, { opacity: 0 }, { scheduler, duration: 0.3, bounce: 0 });
+  for (const time of [0, 16, 32]) frames.flush(time);
+
+  const returning = enter(toast, {}, {}, { scheduler, duration: 0.3, bounce: 0 });
+  frames.flushAll(48);
+
+  expect(await leaving.finished).toBe(false); // interrupted
+  await returning.finished;
+  expect(toast.isConnected).toBe(true);
+  expect(toast.hasAttribute("inert")).toBe(false);
+  expect(toast.style.opacity).toBe("1");
+});
+```
+
+Errors thrown by scheduler jobs, `onChange` listeners and `exit`'s `remove` callback are rethrown from a microtask so they do not break the frame. To assert on one, temporarily replace `globalThis.queueMicrotask` in the test.
+
+## React components
+
+The hooks take the same `scheduler` option, so a component can be driven frame by frame. React needs two things in a test: set `IS_REACT_ACT_ENVIRONMENT` before anything renders, and wrap renders and unmounts in `act()`.
+
+```tsx
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import { createScheduler, type FrameSource } from "@damped/core";
+import { useSpring } from "@damped/react";
+
+declare function test(name: string, run: () => void | Promise<void>): void;
+declare function expect(actual: unknown): { toBe(expected: unknown): void };
+
+function createManualFrames() {
+  let next = 1;
+  const queue = new Map<number, (timestamp: number) => void>();
+  const source: FrameSource = {
+    request: (callback) => (queue.set(next, callback), next++),
+    cancel: (handle) => void queue.delete(handle),
+  };
+  const flush = (timestamp: number): void => {
+    const callbacks = [...queue.values()];
+    queue.clear();
+    for (const callback of callbacks) callback(timestamp);
+  };
+  return {
+    source,
+    flush,
+    get pending() {
+      return queue.size;
+    },
+  };
+}
+
+// React only batches act() updates when this flag is set.
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+test("useSpring springs to the new targets without re-rendering per frame", () => {
+  const frames = createManualFrames();
+  const scheduler = createScheduler(frames.source);
+  let renders = 0;
+
+  function Card({ active }: { active: boolean }) {
+    renders++;
+    const ref = useSpring<HTMLDivElement>({ x: active ? 100 : 0 }, { duration: 0.3, scheduler, reducedMotion: "never" });
+    return <div ref={ref} />;
+  }
+
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+
+  act(() => root.render(<Card active={false} />));
+  act(() => root.render(<Card active />));
+  const rendersBeforeFrames = renders;
+
+  let timestamp = 0;
+  for (let frame = 0; frame < 200 && frames.pending > 0; frame++, timestamp += 16) frames.flush(timestamp);
+
+  expect((container.firstElementChild as HTMLElement).style.transform).toBe("translate3d(100px, 0px, 0) rotate(0deg) scale(1, 1)");
+  expect(renders).toBe(rendersBeforeFrames); // frames never go through React
+
+  act(() => root.unmount());
+  container.remove();
+});
+```
+
+The render-count assertion is how damped proves its guarantee: a component that increments a counter in its body renders no more during hundreds of frames. The same pattern works for `useLayout`, `useMorph` and `<Presence>`.
+
+State updates that a promise reaction causes, for example `<Presence>` dropping a child after its exit settles, happen outside `act`. Await a macrotask inside `await act(async () => ...)` after flushing so React applies them before you assert.
+
+## What you cannot fake
+
+- **The compositor driver** hands the animation to `element.animate`. A fake DOM has no compositor, so unit tests can only check what was requested (the keyframes and options) by replacing `element.animate` with a recording stand-in. That it keeps moving while the main thread is blocked can only be proven in a real browser. damped's own check records composited frames in Chromium with Playwright.
+- **Real layout.** Tests that need real boxes, `getComputedStyle` or the actual `prefers-reduced-motion` setting belong in a browser test: with Playwright, `page.emulateMedia({ reducedMotion: "reduce" })` flips the preference.
+- **React Native.** `withDamped` runs inside Reanimated. damped tests its math against `@damped/core` and its integration against a stand-in for the parts of Reanimated it touches. Nothing replaces running on a device. See the [React Native guide](/guides/react-native/).
+
+## Next
+
+<CardGrid>
+  <LinkCard title="Reduced motion" description="The rule your tests are checking, and the options that control it." href="/guides/reduced-motion/" />
+  <LinkCard title="The compositor driver" description="What can only be verified in a real browser." href="/guides/compositor/" />
+  <LinkCard title="React" description="Hooks, render guarantees and StrictMode." href="/guides/react/" />
+  <LinkCard title="@damped/core reference" description="createScheduler, FrameSource and the scheduler option of every API." href="/reference/core/" />
+</CardGrid>

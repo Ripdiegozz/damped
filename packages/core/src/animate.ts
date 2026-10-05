@@ -1,4 +1,3 @@
-import { canUseCompositor, release, releaseOwned, runCompositor } from "./compositor";
 import {
   CONFIG,
   commit,
@@ -8,6 +7,7 @@ import {
   stateFor,
   valueFor,
   type AnimatableProperty,
+  type Driver,
   type ElementState,
   type Group,
   type Job,
@@ -27,11 +27,12 @@ export type AnimateOptions = SpringOptions & {
   /** Applied immediately, as a jump, before animating. */
   from?: AnimationTargets;
   /**
-   * What plays the animation. `"js"` (default) writes styles from the frame loop. `"compositor"` hands the sampled
-   * spring to the browser's compositor through the Web Animations API, so it keeps moving while the main thread is
-   * busy; without WAAPI, or for a spring that never settles, it falls back to `"js"`.
+   * What plays the animation. `"js"` (default) writes styles from the frame loop. Pass the exported `compositor` to
+   * hand the sampled spring to the browser's compositor through the Web Animations API, so it keeps moving while the
+   * main thread is busy; without WAAPI, or for a spring that never settles, it falls back to `"js"`. The compositor is
+   * a value to import rather than a name so that applications that never use it do not bundle it.
    */
-  driver?: "js" | "compositor";
+  driver?: "js" | Driver;
 };
 // Omit applied per union member, so both spring option forms (perceptual and physical) survive.
 export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -71,6 +72,11 @@ export function toList(target: Element | readonly Element[]): readonly Element[]
   return Array.isArray(target) ? (target as readonly Element[]) : [target as Element];
 }
 
+function isDriver(candidate: unknown): candidate is Driver {
+  const { supports, play } = (candidate ?? {}) as Partial<Driver>;
+  return typeof supports === "function" && typeof play === "function";
+}
+
 function deferred(): { promise: Promise<void>; resolve(): void } {
   let resolve!: () => void;
   const promise = new Promise<void>((done) => {
@@ -80,7 +86,6 @@ function deferred(): { promise: Promise<void>; resolve(): void } {
 }
 
 interface Claim {
-  element: Element;
   state: ElementState;
   value: SpringValue;
   property: AnimatableProperty;
@@ -92,7 +97,9 @@ export function animate(
   options: AnimateOptions = {},
 ): AnimationControls {
   const { scheduler = frame, reducedMotion = "user", from, driver = "js", ...rest } = options;
-  if (driver !== "js" && driver !== "compositor") throw new TypeError(`animate: unknown driver "${String(driver)}"`);
+  if (driver !== "js" && !isDriver(driver)) {
+    throw new TypeError('animate: driver must be "js" or a driver such as the exported compositor');
+  }
   const springOptions = rest as SpringOptions;
   const targets = entries(values, "animate");
   const starts = entries(from, "animate from");
@@ -107,9 +114,9 @@ export function animate(
 
   for (const element of toList(target)) {
     const state = stateFor(element, scheduler);
-    // A compositor animation still running here is taken down at its exact state; what this call does not claim goes on.
-    const carried = release(element, state);
-    const compositor = driver === "compositor" && canUseCompositor(element);
+    // An animation of another driver still running here is taken down at its exact state; what this call does not claim goes on.
+    const carried = state.run?.release() ?? [];
+    const custom = driver !== "js" && driver.supports(element) ? driver : undefined;
     const claimed = new Set<AnimatableProperty>();
     // Groups changed by jumps, which no animation covers and which therefore need an inline write of their own.
     const jumped = new Set<Group>();
@@ -118,13 +125,13 @@ export function animate(
     const claim = (property: AnimatableProperty): SpringValue => {
       const value = valueFor(element, state, property);
       state.owners[property] = token;
-      claims.push({ element, state, value, property });
+      claims.push({ state, value, property });
       claimed.add(property);
       return value;
     };
     const jump = (property: AnimatableProperty, to: number): void => {
       const value = claim(property);
-      if (!compositor) {
+      if (custom === undefined) {
         value.jump(to);
         return;
       }
@@ -149,45 +156,33 @@ export function animate(
         settle: () => wait.resolve(),
         moved: false,
       };
-      if (!compositor) {
+      if (custom === undefined) {
         runJs(element, state, job);
         continue;
       }
-      // Stops a JS animation of this property; the compositor continues from its position and velocity.
+      // Stops a JS animation of this property; the driver continues from its position and velocity.
       quiet(state, () => seedSpringValue(value, value.get(), value.getVelocity()));
       jobs.push(job);
     }
 
     for (const job of carried) {
       if (claimed.has(job.property)) job.settle(false);
-      else if (compositor) jobs.push(job);
+      else if (custom !== undefined) jobs.push(job);
       else runJs(element, state, job);
     }
-    if (!compositor) continue;
+    if (custom === undefined) continue;
 
-    // A transform, opacity or filter is animated by one driver at a time, so JS animations in the same group move over.
-    const groups = new Set(jobs.map((job) => CONFIG[job.property].group));
-    for (const property of Object.keys(state.jobs) as AnimatableProperty[]) {
-      const job = state.jobs[property]!;
-      const value = state.values[property]!;
-      // A value that was stopped or jumped this very tick has not reported yet; it must stay stopped.
-      if (claimed.has(property) || !groups.has(CONFIG[property].group) || !value.animating) continue;
-      job.moved = true;
-      delete state.jobs[property];
-      quiet(state, () => seedSpringValue(value, value.get(), value.getVelocity()));
-      jobs.push(job);
-    }
     commit(element, state, jumped);
-    if (!runCompositor(element, state, jobs)) for (const job of jobs) runJs(element, state, job);
+    if (!custom.play(element, state, jobs)) for (const job of jobs) runJs(element, state, job);
   }
 
   return {
     finished: Promise.all(waits).then(() => undefined),
     stop() {
       // Properties taken over by a newer call keep animating; `finished` still resolves through their superseded jobs.
-      for (const { element, state, value, property } of claims) {
+      for (const { state, value, property } of claims) {
         if (state.owners[property] !== token) continue;
-        releaseOwned(element, state, (other) => state.owners[other] === token);
+        state.run?.releaseOwned((other) => state.owners[other] === token);
         value.stop();
       }
     },
@@ -218,4 +213,4 @@ export function setRenderHook(element: Element, scheduler: Scheduler, hook: Rend
   stateFor(element, scheduler).renderHook = hook;
 }
 
-export { releaseToJs } from "./compositor";
+export { releaseToJs } from "./element";

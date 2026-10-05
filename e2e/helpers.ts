@@ -8,7 +8,7 @@ export const MIN_FRAMES = 5;
 export type Rect = ReturnType<Window["e2e"]["rect"]>;
 
 /** Opens e2e/fixtures/<fixture>.html and waits until the library module has loaded. */
-export async function open(page: Page, fixture: "animate" | "layout" | "morph"): Promise<void> {
+export async function open(page: Page, fixture: "animate" | "compositor" | "layout" | "morph"): Promise<void> {
   await page.goto(`/${fixture}.html`);
   await page.waitForFunction(() => window.damped !== undefined);
 }

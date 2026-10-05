@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { compositor as compositorDriver } from "../src/compositor";
 import { animate, peekSpringValue, type AnimateOptions, type AnimationTargets } from "../src/animate";
 import { layout, snapshot } from "../src/layout";
 import { morph } from "../src/morph";
@@ -11,8 +12,8 @@ import { createFakeSource } from "./fake-frame-source";
 const SPRING = { duration: 0.5, bounce: 0.15 } as const;
 const LEN = { ...SPRING, restDelta: 0.01, restSpeed: 0.1 };
 const RATIO = { ...SPRING, restDelta: 0.0005, restSpeed: 0.005 };
-// 60 Hz in milliseconds: the keyframe step of the compositor driver.
-const STEP = 1000 / 60;
+// 120 Hz in milliseconds: the keyframe step of the compositor driver.
+const STEP = 1000 / 120;
 const originalMatchMedia = globalThis.matchMedia;
 const originalNow = performance.now;
 
@@ -78,7 +79,7 @@ function setup() {
   const fake = createFakeSource();
   const scheduler = createScheduler(fake.source);
   const js = (extra: Partial<AnimateOptions> = {}): AnimateOptions => ({ ...SPRING, scheduler, ...extra });
-  const compositor = (extra: Partial<AnimateOptions> = {}): AnimateOptions => js({ driver: "compositor", ...extra });
+  const compositor = (extra: Partial<AnimateOptions> = {}): AnimateOptions => js({ driver: compositorDriver, ...extra });
   return { fake, scheduler, js, compositor };
 }
 
@@ -115,7 +116,7 @@ function lastOf<T>(list: readonly T[]): T {
 const at = (spring: ReturnType<typeof createSpring>, milliseconds: number) => spring.at(milliseconds / 1000);
 
 describe("sampling", () => {
-  test("the keyframes are the composed styles of the analytic springs at a 60 Hz step, ending exactly on the targets", () => {
+  test("the keyframes are the composed styles of the analytic springs at a 120 Hz step, ending exactly on the targets", () => {
     const { element, animations, compositor } = stage();
     animate(element, { x: 300, opacity: 0.25, blur: 8 }, compositor());
 
@@ -158,7 +159,7 @@ describe("sampling", () => {
     expect(lastOf(keyframes).transform).toBe(transform(0, 50, 10, 2, 1));
   });
 
-  test("a long settle is capped at 180 intervals instead of one keyframe per frame", () => {
+  test("a long settle is capped at 360 intervals instead of one keyframe per frame", () => {
     const { element, animations, compositor } = stage();
     const options = { stiffness: 5, damping: 1 };
     animate(element, { x: 100 }, compositor(options as Partial<AnimateOptions>));
@@ -167,8 +168,8 @@ describe("sampling", () => {
     const duration = spring.settleTime() * 1000;
     expect(duration).toBeGreaterThan(3000);
     const { keyframes } = animations[0]!;
-    expect(keyframes).toHaveLength(181);
-    const step = duration / 180;
+    expect(keyframes).toHaveLength(361);
+    const step = duration / 360;
     expect(keyframes[7]).toEqual({ offset: (7 * step) / duration, transform: transform(at(spring, 7 * step).position) });
     expect(lastOf(keyframes)).toEqual({ offset: 1, transform: transform(100) });
   });
@@ -186,6 +187,18 @@ describe("sampling", () => {
     animate(element, { x: 100 }, compositor({ stiffness: 100, damping: 0 } as Partial<AnimateOptions>));
     expect(animations).toHaveLength(0);
     expect(fake.pending).toBe(1);
+  });
+
+  test("jobs that moved over from the JS driver run on it again, and still report, when the compositor cannot take them", async () => {
+    const { element, js, compositor, fake } = stage();
+    const done = watch(animate(element, { y: 80 }, js()).finished);
+    fake.flush(0);
+    fake.flush(32);
+    animate(element, { x: 100 }, compositor({ stiffness: 100, damping: 0 } as Partial<AnimateOptions>));
+    for (let timestamp = 48; timestamp < 4000; timestamp += 16) fake.flush(timestamp);
+    await tick();
+    expect(done.done).toBe(true);
+    expect(peekSpringValue(element, "y")!.get()).toBe(80);
   });
 
   test("each element gets its own animation", () => {
@@ -557,6 +570,9 @@ describe("validation", () => {
       [{ x: Number.NaN }, {}, RangeError],
       [{ x: 1 }, { duration: -1 }, RangeError],
       [{ x: 1 }, { driver: "gpu" as never }, TypeError],
+      // The driver is a value to import, not a name.
+      [{ x: 1 }, { driver: "compositor" as never }, TypeError],
+      [{ x: 1 }, { driver: {} as never }, TypeError],
       [{ x: 1 }, { from: { y: Number.POSITIVE_INFINITY } }, RangeError],
     ];
     for (const [targets, options, error] of bad) {
@@ -571,7 +587,7 @@ describe("validation", () => {
 describe("layout, morph and presence handover", () => {
   function running() {
     const context = setupLayout();
-    const compositor = (): AnimateOptions => ({ ...SPRING, scheduler: context.scheduler, driver: "compositor" });
+    const compositor = (): AnimateOptions => ({ ...SPRING, scheduler: context.scheduler, driver: compositorDriver });
     const world = createWorld("a");
     const element = createElement();
     world.place(element, { a: A, b: B });
@@ -651,8 +667,8 @@ describe("layout, morph and presence handover", () => {
     const animations = stubAnimate(element);
     const taken = snapshot(element);
     world.state = "b";
-    taken.animate({ ...options(), driver: "compositor" } as never);
-    enter(element, { x: 10 }, {}, { ...options(), driver: "compositor" } as never);
+    taken.animate({ ...options(), driver: compositorDriver } as never);
+    enter(element, { x: 10 }, {}, { ...options(), driver: compositorDriver } as never);
     expect(animations).toHaveLength(0);
     expect(fake.pending).toBe(1);
   });

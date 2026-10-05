@@ -54,15 +54,29 @@ export interface Job {
   moved: boolean;
 }
 
-/** A WAAPI animation that animates the jobs of one element. */
+/**
+ * An animation that a driver other than the JS one is playing for an element. The driver installs it on the element
+ * state when it starts, which is how the code that is not part of the driver (a newer animate(), layout, morph,
+ * stop()) reaches it without importing the driver: an element that never used one has none.
+ */
 export interface Run {
-  animation: Animation;
-  /** performance.now() when the animation was created; the fallback timeline when the animation reports none. */
-  start: number;
-  /** Milliseconds. */
-  duration: number;
-  springs: Partial<Record<AnimatableProperty, Spring>>;
+  /** The jobs still running. */
   jobs: Job[];
+  /**
+   * Takes the animation down at the exact state of this moment: the values receive its position and velocity, the
+   * composed styles are committed inline and the animation is cancelled. Returns the jobs that were still running.
+   */
+  release(): Job[];
+  /** Freezes the jobs `owns` selects at their exact current state; the other jobs keep going. */
+  releaseOwned(owns: (property: AnimatableProperty) => boolean): void;
+}
+
+/** What plays animations other than through the frame loop. The compositor is the only one, and it is opt-in. */
+export interface Driver {
+  /** Whether the driver can animate this element at all (the platform may lack what it needs). */
+  supports(element: Element): boolean;
+  /** Plays the jobs from the current state of their values. Returns false, having done nothing, when it cannot. */
+  play(element: Element, state: ElementState, jobs: Job[]): boolean;
 }
 
 export interface ElementState {
@@ -73,7 +87,7 @@ export interface ElementState {
   owners: Partial<Record<AnimatableProperty, object>>;
   /** Jobs running on SpringValues (the JS driver). */
   jobs: Partial<Record<AnimatableProperty, Job>>;
-  /** The compositor animation of this element, if any. */
+  /** The animation another driver is playing on this element, if any. */
   run: Run | undefined;
   /** While true, value changes do not queue writes: the caller commits the styles itself. */
   muted: boolean;
@@ -197,6 +211,8 @@ export function valueFor(element: Element, state: ElementState, property: Animat
 
 /** Runs a job on the property's SpringValue, i.e. through the frame scheduler. */
 export function runJs(element: Element, state: ElementState, job: Job): void {
+  // A job that returns from another driver reports through this one again.
+  job.moved = false;
   const value = valueFor(element, state, job.property);
   state.jobs[job.property] = job;
   void value.set(job.to, job.config).then((settled) => {
@@ -204,4 +220,11 @@ export function runJs(element: Element, state: ElementState, job: Job): void {
     if (state.jobs[job.property] === job) delete state.jobs[job.property];
     job.settle(settled);
   });
+}
+
+/** Moves a running animation of another driver onto the JS driver, losing neither position nor velocity. */
+export function releaseToJs(element: Element): void {
+  const state = states.get(element);
+  if (state?.run === undefined) return;
+  for (const job of state.run.release()) runJs(element, state, job);
 }

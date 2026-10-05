@@ -5,7 +5,8 @@ import { PaidBadge } from "./PaidBadge";
 import { dueText, parseAmount, type Bill } from "./bills";
 import { countRender } from "./debug";
 import { formatCurrency } from "./format";
-import { BACKDROP_SPRING, BILL_MORPH } from "./motion";
+import { BILL_RADIUS_PX } from "./motion";
+import { useMotion } from "./motion-context";
 
 const FOCUSABLE = "input:not([disabled]), button:not([disabled]), [href], select, textarea, [tabindex]:not([tabindex='-1'])";
 
@@ -25,8 +26,9 @@ interface BillCardProps {
  */
 export function BillCard({ bill, paid, tabStop, onPay }: BillCardProps) {
   countRender("bill-card");
-  const { source, target, open, close, isOpen } = useMorph(BILL_MORPH);
-  const backdrop = useSpring<HTMLDivElement>({ opacity: isOpen ? 1 : 0 }, BACKDROP_SPRING);
+  const { spring } = useMotion();
+  const { source, target, open, close, isOpen } = useMorph({ ...spring("morph"), radius: BILL_RADIUS_PX });
+  const backdrop = useSpring<HTMLDivElement>({ opacity: isOpen ? 1 : 0 }, spring("backdrop"));
   const cardRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);

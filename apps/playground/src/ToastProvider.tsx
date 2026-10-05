@@ -3,7 +3,8 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 import { createPortal } from "react-dom";
 import { ToastItem, type ToastAction, type ToastData } from "./ToastItem";
 import { DEBUG } from "./debug";
-import { SPRINGS, TOAST_ENTER, TOAST_EXIT } from "./motion";
+import { TOAST_ENTER, TOAST_EXIT } from "./motion";
+import { useMotion } from "./motion-context";
 
 /** The stack holds this many toasts; raising one more makes the oldest leave. */
 export const MAX_TOASTS = 4;
@@ -30,6 +31,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastData[]>([]);
   const nextId = useRef(1);
   const [gone, setGone] = useState(0);
+  const { spring } = useMotion();
 
   const show = useCallback((message: string, options: ToastOptions = {}) => {
     const id = nextId.current++;
@@ -46,7 +48,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* In document.body, bottom right (bottom center on narrow screens), above the dialogs. */}
       {createPortal(
         <div className="toast-region">
-          <Presence enter={TOAST_ENTER} exit={TOAST_EXIT} options={SPRINGS.toast} onExitComplete={() => setGone((count) => count + 1)}>
+          <Presence enter={TOAST_ENTER} exit={TOAST_EXIT} options={spring("toast")} onExitComplete={() => setGone((count) => count + 1)}>
             {toasts.map((toast, index) => (
               <ToastItem key={toast.id} toast={toast} after={toasts.length - 1 - index} reflowKey={gone} duration={duration} onDismiss={dismiss} />
             ))}

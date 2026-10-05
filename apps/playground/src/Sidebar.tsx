@@ -1,7 +1,7 @@
 import { useLayout } from "@damped/react";
 import type { CSSProperties } from "react";
 import { Icon } from "./icons";
-import { SPRINGS } from "./motion";
+import { useMotion } from "./motion-context";
 import { VIEWS, type ViewId } from "./views";
 
 const SIDEBAR_RADIUS_PX = 20;
@@ -15,11 +15,12 @@ interface SidebarProps {
 export function Sidebar({ collapsed, active, onSelect }: SidebarProps) {
   // The width is set by CSS on re-render; useLayout plays the change from the old box with a spring. `correct`
   // keeps the content from stretching while the box scales, and `radius` keeps the corners round.
-  const sidebar = useLayout<HTMLElement>([collapsed], { ...SPRINGS.panel, correct: "children", radius: SIDEBAR_RADIUS_PX });
+  const { spring } = useMotion();
+  const sidebar = useLayout<HTMLElement>([collapsed], { ...spring("panel"), correct: "children", radius: SIDEBAR_RADIUS_PX });
   const index = VIEWS.findIndex((view) => view.id === active);
   // The pill is positioned by CSS from --index; the change of index is what useLayout animates, so a click in the
   // middle of a move starts from where the pill is, with the velocity it has.
-  const indicator = useLayout<HTMLSpanElement>([index], SPRINGS.indicator);
+  const indicator = useLayout<HTMLSpanElement>([index], spring("indicator"));
 
   return (
     <aside id="sidebar" className="sidebar" ref={sidebar} data-collapsed={collapsed}>

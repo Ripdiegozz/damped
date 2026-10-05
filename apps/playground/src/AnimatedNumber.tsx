@@ -1,6 +1,6 @@
 import { useSpringValue } from "@damped/react";
 import { useEffect, useLayoutEffect, useRef } from "react";
-import { SPRINGS, prefersReducedMotion } from "./motion";
+import { useMotion } from "./motion-context";
 
 interface AnimatedNumberProps {
   value: number;
@@ -17,6 +17,10 @@ interface AnimatedNumberProps {
 export function AnimatedNumber({ value, format, className }: AnimatedNumberProps) {
   const text = useRef<HTMLSpanElement>(null);
   const spring = useSpringValue(0);
+  const motion = useMotion();
+  // Read when the value changes; moving a slider does not restart a count that is running.
+  const latest = useRef(motion);
+  latest.current = motion;
 
   // Subscribed before paint, so the first frame never shows an empty tile.
   useLayoutEffect(() => {
@@ -28,8 +32,11 @@ export function AnimatedNumber({ value, format, className }: AnimatedNumberProps
   }, [spring, format]);
 
   useEffect(() => {
-    if (prefersReducedMotion()) spring.jump(value);
-    else void spring.set(value, SPRINGS.number);
+    const { spring: springFor, reduced } = latest.current;
+    // A spring value is not an element, so damped cannot apply reducedMotion to it: the count jumps instead.
+    const { reducedMotion: _unused, ...counting } = springFor("number");
+    if (reduced) spring.jump(value);
+    else void spring.set(value, counting);
   }, [spring, value]);
 
   return <span ref={text} className={className} data-target={value} />;

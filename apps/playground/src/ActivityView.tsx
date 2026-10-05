@@ -3,7 +3,8 @@ import { useEffect, useRef, useState, type Ref } from "react";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { CATEGORY_FILTERS, SORTS, netTotal, type ActivityFilter, type ActivityItem, type ActivitySort } from "./activity";
 import { formatShortDate, formatSignedCurrency } from "./format";
-import { ACTIVITY_ROW_ENTER, ACTIVITY_ROW_EXIT, SPRINGS } from "./motion";
+import { ACTIVITY_ROW_ENTER, ACTIVITY_ROW_EXIT } from "./motion";
+import { useMotion } from "./motion-context";
 import { useMergedRef } from "./use-merged-ref";
 
 const CHIPS: readonly { id: ActivityFilter; label: string }[] = [
@@ -26,7 +27,8 @@ interface RowProps {
 function TransactionRow({ item, index, reflowKey, onDelete, ref }: RowProps) {
   // FLIP: a row that changes position (sort, a filter, a row added above it) springs from where it was to where it is.
   // Rows leaving through <Presence> stay in the flow until they are gone, so the others move when `reflowKey` changes.
-  const layoutRef = useLayout<HTMLLIElement>([index, reflowKey], SPRINGS.stack);
+  const { spring } = useMotion();
+  const layoutRef = useLayout<HTMLLIElement>([index, reflowKey], spring("stack"));
   const setRow = useMergedRef(layoutRef, ref);
   const date = formatShortDate(item.date);
   return (
@@ -64,6 +66,7 @@ interface ActivityViewProps {
 }
 
 export function ActivityView({ items, filter, sort, onFilter, onSort, onAdd, onDelete }: ActivityViewProps) {
+  const { spring } = useMotion();
   const [gone, setGone] = useState(0);
   const addButton = useRef<HTMLButtonElement>(null);
   const focusAfterDelete = useRef<string | null>(null);
@@ -116,7 +119,7 @@ export function ActivityView({ items, filter, sort, onFilter, onSort, onAdd, onD
 
       <section className="card tx-card">
         <ul className="tx-list" role="list" aria-label="Transactions">
-          <Presence enter={ACTIVITY_ROW_ENTER} exit={ACTIVITY_ROW_EXIT} options={SPRINGS.row} onExitComplete={() => setGone((count) => count + 1)}>
+          <Presence enter={ACTIVITY_ROW_ENTER} exit={ACTIVITY_ROW_EXIT} options={spring("row")} onExitComplete={() => setGone((count) => count + 1)}>
             {items.map((item, index) => (
               <TransactionRow key={item.id} item={item} index={index} reflowKey={gone} onDelete={remove} />
             ))}

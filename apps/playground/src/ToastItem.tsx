@@ -1,6 +1,6 @@
 import { useLayout } from "@damped/react";
 import { useCallback, useEffect, useRef, type FocusEvent, type Ref } from "react";
-import { SPRINGS } from "./motion";
+import { useMotion } from "./motion-context";
 import { useMergedRef } from "./use-merged-ref";
 
 export interface ToastAction {
@@ -36,7 +36,8 @@ interface ToastItemProps {
 
 export function ToastItem({ toast, after, reflowKey, duration, onDismiss, ref }: ToastItemProps) {
   // Two things move a toast: one added below it pushes it up (`after`), and one that finished leaving frees space (`reflowKey`).
-  const layoutRef = useLayout<HTMLDivElement>([after, reflowKey], SPRINGS.stack);
+  const { spring } = useMotion();
+  const layoutRef = useLayout<HTMLDivElement>([after, reflowKey], spring("stack"));
   const setNode = useMergedRef(layoutRef, ref);
 
   // The dismissal timer pauses while the pointer is over the toast or focus is inside it, and resumes with what was left.

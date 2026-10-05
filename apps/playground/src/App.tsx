@@ -5,13 +5,15 @@ import { BillsView } from "./BillsView";
 import { Overview } from "./Overview";
 import { Placeholder, ViewPanel } from "./ViewPanel";
 import { Sidebar } from "./Sidebar";
+import { SpringLab } from "./SpringLab";
 import { TopBar } from "./TopBar";
 import { activityReducer, draftTransaction, initialActivityState, visibleItems, type ActivityItem } from "./activity";
 import type { Bill } from "./bills";
 import { INITIAL_OVERVIEW, shuffleOverview, type OverviewData } from "./data";
 import { useToast } from "./ToastProvider";
 import { formatCurrency } from "./format";
-import { SPRINGS, VIEW_ENTER, VIEW_EXIT } from "./motion";
+import { LAB_ENTER, LAB_EXIT, VIEW_ENTER, VIEW_EXIT } from "./motion";
+import { useMotion } from "./motion-context";
 import { viewLabel, type ViewId } from "./views";
 
 interface ViewContentProps {
@@ -38,6 +40,7 @@ function ViewContent({ view, overview, paid, onPay, activity }: ViewContentProps
 export function App() {
   const [view, setView] = useState<ViewId>("overview");
   const [collapsed, setCollapsed] = useState(false);
+  const [labOpen, setLabOpen] = useState(false);
   const [overview, setOverview] = useState(INITIAL_OVERVIEW);
   // Kept here, so a paid bill stays paid when the view is left and entered again.
   const [paid, setPaid] = useState<ReadonlySet<string>>(() => new Set());
@@ -62,7 +65,8 @@ export function App() {
     [toast],
   );
   // The content area takes the space the sidebar gives up, so it animates its own box too.
-  const main = useLayout<HTMLElement>([collapsed], { ...SPRINGS.panel, correct: "children" });
+  const { spring } = useMotion();
+  const main = useLayout<HTMLElement>([collapsed], { ...spring("panel"), correct: "children" });
 
   // A plain #main link would add a hash to the URL; this keeps the address as it is.
   const skipToMain = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -81,6 +85,8 @@ export function App() {
           title={viewLabel(view)}
           sidebarExpanded={!collapsed}
           onToggleSidebar={() => setCollapsed((current) => !current)}
+          labOpen={labOpen}
+          onToggleLab={() => setLabOpen((current) => !current)}
           onNew={() => (view === "activity" ? addTransaction() : toast.show("New transaction draft created"))}
           actions={
             view === "overview" ? (
@@ -97,7 +103,7 @@ export function App() {
           absolutely positioned leaving view would need its box pinned first, or it would collapse to its content).
         */}
         <div className="stage">
-          <Presence enter={VIEW_ENTER} exit={VIEW_EXIT} options={SPRINGS.view}>
+          <Presence enter={VIEW_ENTER} exit={VIEW_EXIT} options={spring("view")}>
             <ViewPanel key={view} view={view}>
               <ViewContent
                 view={view}
@@ -120,6 +126,10 @@ export function App() {
           </Presence>
         </div>
       </main>
+      {/* The lab enters and leaves like everything else; its panel is portaled to <body>, away from the transformed <main>. */}
+      <Presence enter={LAB_ENTER} exit={LAB_EXIT} options={spring("view")}>
+        {labOpen ? <SpringLab key="lab" /> : null}
+      </Presence>
     </div>
   );
 }

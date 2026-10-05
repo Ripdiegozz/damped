@@ -1,9 +1,10 @@
 import { useSpring } from "@damped/react";
 import { useEffect, useRef } from "react";
-import { SPRINGS } from "./motion";
+import { useMotion } from "./motion-context";
 
 /** A bar whose fill is a full-width element scaled from its left edge, so it never triggers layout while it moves. */
 export function ProgressBar({ progress, label }: { progress: number; label: string }) {
+  const { spring } = useMotion();
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
@@ -11,7 +12,7 @@ export function ProgressBar({ progress, label }: { progress: number; label: stri
   // `from` only matters for the first animation: the fill grows in from empty, and later targets retarget it.
   const fill = useSpring<HTMLDivElement>(
     { scaleX: progress },
-    { ...SPRINGS.progress, ...(mounted.current ? {} : { from: { scaleX: 0 } }) },
+    { ...spring("progress"), ...(mounted.current ? {} : { from: { scaleX: 0 } }) },
   );
 
   return (

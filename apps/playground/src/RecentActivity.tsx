@@ -2,7 +2,8 @@ import { Presence } from "@damped/react";
 import { useEffect, useState, type Ref } from "react";
 import { RECENT_ACTIVITY, type Transaction } from "./data";
 import { formatShortDate, formatSignedCurrency } from "./format";
-import { ROW_ENTER, SPRINGS, prefersReducedMotion } from "./motion";
+import { ROW_ENTER } from "./motion";
+import { useMotion } from "./motion-context";
 
 /** Delay between two rows appearing. */
 const STAGGER_MS = 70;
@@ -12,8 +13,8 @@ const STAGGER_MS = 70;
  * row every `stepMs`: each mount is a discrete state change, and Presence plays the entrance of the row that arrived.
  * With reduced motion every row is mounted at once and enters together (Presence `initial`).
  */
-function useStaggeredCount(total: number, stepMs: number): number {
-  const [count, setCount] = useState(() => (prefersReducedMotion() ? total : 0));
+function useStaggeredCount(total: number, stepMs: number, reduced: boolean): number {
+  const [count, setCount] = useState(() => (reduced ? total : 0));
   useEffect(() => {
     if (count >= total) return;
     const timer = setTimeout(() => setCount((current) => current + 1), stepMs);
@@ -42,10 +43,11 @@ function ActivityRow({ transaction, ref }: { transaction: Transaction; ref?: Ref
 }
 
 export function RecentActivity() {
-  const count = useStaggeredCount(RECENT_ACTIVITY.length, STAGGER_MS);
+  const { spring, reduced } = useMotion();
+  const count = useStaggeredCount(RECENT_ACTIVITY.length, STAGGER_MS, reduced);
   return (
     <ul className="activity-list" role="list" aria-label="Recent activity">
-      <Presence initial enter={ROW_ENTER} options={SPRINGS.row}>
+      <Presence initial enter={ROW_ENTER} options={spring("row")}>
         {RECENT_ACTIVITY.slice(0, count).map((transaction) => (
           <ActivityRow key={transaction.id} transaction={transaction} />
         ))}

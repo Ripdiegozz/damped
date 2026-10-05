@@ -184,10 +184,11 @@ test.describe("reduced motion", () => {
     expect(problems).toEqual([]);
   });
 
-  test("the landing hero morph still opens and closes", async ({ page }) => {
+  test("the landing hero spring instrument still moves its rest point", async ({ page }) => {
     await page.goto("/");
-    const root = await demo(page, "morph-card");
-    await expectRunAndSettle(root, () => root.locator(".morph-card").click());
-    await expect(root).toHaveAttribute("data-phase", "open");
+    const root = await demo(page, "spring-instrument");
+    await root.getByRole("slider").focus();
+    await expectRunAndSettle(root, () => page.keyboard.press("End"));
+    await expect(root.getByRole("slider")).toHaveAttribute("aria-valuenow", "100");
   });
 });

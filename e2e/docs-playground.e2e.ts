@@ -26,7 +26,7 @@ test("/playground without the trailing slash reaches Northbook too", async ({ pa
 
 test("the docs link to the playground and following the link opens it", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Try the playground" }).click();
+  await page.locator(".landing-hero").getByRole("link", { name: "Playground" }).click();
   await expect(page).toHaveURL(/\/playground\/$/);
   await expect(page.getByText("Northbook").first()).toBeVisible();
 });

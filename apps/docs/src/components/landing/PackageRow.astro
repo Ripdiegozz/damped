@@ -1,0 +1,26 @@
+---
+// One package on the landing page, as a row of the package list: its name and what it is for on the left, the
+// install command and a snippet on the right (the slot, written as fenced code in the MDX so the docs example
+// harness typechecks it), and a link to its reference page.
+interface Props {
+  name: string;
+  purpose: string;
+  href: string;
+  /** Platform line under the name, for example "Web". */
+  platform: string;
+}
+
+const { name, purpose, href, platform } = Astro.props;
+---
+
+<article class="package-row">
+  <div class="package-row__about">
+    <h3 class="package-row__name"><code>{name}</code></h3>
+    <p class="package-row__platform">{platform}</p>
+    <p class="package-row__purpose">{purpose}</p>
+    <a class="package-row__link" {href}>
+      Reference <span aria-hidden="true">&rarr;</span><span class="landing-sr"> for {name}</span>
+    </a>
+  </div>
+  <div class="package-row__code"><slot /></div>
+</article>

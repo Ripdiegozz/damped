@@ -23,7 +23,7 @@ const ZETA = formatDamping(dampingRatio(PARAMS));
 const START = 50;
 const KEY_STEP = 10;
 const TRAIL = { windowMs: 1600, gapMs: 120, height: 100 } as const;
-const PHASE = { size: 100, extent: 100 } as const;
+const PHASE = { size: 100, extent: 105 } as const;
 const PHASE_POINTS = 900;
 // A pointer that rests this long before the release hands no velocity to the mass.
 const STALE_MS = 80;
@@ -71,6 +71,7 @@ export function SpringInstrument() {
   const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const labelId = useId();
   const hintId = useId();
+  const fadeId = useId();
 
   const place = (element: HTMLElement | null, percent: number): void => {
     if (element) element.style.transform = `translate3d(${((percent - START) / 100) * range.current}px,0,0)`;
@@ -267,7 +268,14 @@ export function SpringInstrument() {
               ))}
             </div>
             <svg className="instrument__trail" viewBox={`0 0 100 ${TRAIL.height}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
-              <path className="instrument__trail-path" ref={trailPath} d="" vectorEffect="non-scaling-stroke" />
+              {/* The strip fades with age, so it reads as a recording that is draining away. */}
+              <defs>
+                <linearGradient id={fadeId} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={TRAIL.height}>
+                  <stop offset="0" stopColor="currentColor" stopOpacity="0.95" />
+                  <stop offset="1" stopColor="currentColor" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path className="instrument__trail-path" ref={trailPath} d="" stroke={`url(#${fadeId})`} vectorEffect="non-scaling-stroke" />
             </svg>
             <span ref={rest} className="instrument__rest" aria-hidden="true" />
             <span ref={mass} className="instrument__mass" aria-hidden="true" />

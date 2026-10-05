@@ -116,6 +116,9 @@ Give damped its own identity: a mark built from the physics of the library, a re
   - Contrast, dark/light: body 12.5/13.4, muted 7.7/7.4, link 16.9/19.0, worst code token 5.9/5.5, indicator 6.9/5.0.
   - Open for B4: `landing.css` still has the glow, a card shadow and 10px radii. It is excluded from the scans (`NOT_SCANNED` in `theme.test.ts`); B4 must clean it and drop the exclusion. Also, with `replacesTitle`, the lockup alt and the sr-only title both say "damped".
 
+- 2026-10-05: Merged `feat/branding-meta` into `feat/branding` (`5111236`): `CI=true bun test` 904 pass, `bun run typecheck` 0. Review assessment for `01d2b48..5111236`: medium, `slice_budget_reached`. START asked for consent (61 files, 2978 lines); the user chose "Skip this time", and the exact decline returned `declined_this_candidate` (target `sha256:8282bae4…`).
+- 2026-10-05: Delivery. One honest slicing pass along the existing work units gives stacked PRs: #24 `feat/brand-system` (`ecd4f04`, B1+B2, about 1,100 authored lines plus generated assets) → `main`; #25 `feat/docs-theme` (`e2a1f7f`, B3, about 1,540 lines) → #24; #26 `feat/branding-meta` (B6+B7, 185 lines) → #24. #24 and #25 exceed the budget with no cohesive split, so `size:exception` is recommended and awaits the maintainer; the label is not applied yet. `feat/branding` stays the local integration branch. The PRs are watched in T3.
+
 ## Next step
 
-Native review for the `feat/branding` range; wait for B4 and B5; integrate `feat/branding-meta`, `feat/branding-landing` and `feat/branding-physics`; then B8.
+Maintainer decision on `size:exception` for #24 and #25; CI on #24-#26; wait for B4 and B5; integrate `feat/branding-meta`, `feat/branding-landing` and `feat/branding-physics`; then B8.

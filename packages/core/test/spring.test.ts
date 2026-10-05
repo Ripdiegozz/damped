@@ -122,6 +122,44 @@ describe("at()", () => {
     expect(spring.at(-1)).toEqual(spring.at(0));
   });
 
+  test("NaN time throws RangeError", () => {
+    const spring = createSpring(0, 1, 0);
+    expect(() => spring.at(Number.NaN)).toThrow(RangeError);
+    expect(() => spring.isSettled(Number.NaN)).toThrow(RangeError);
+  });
+
+  test("negative infinity is treated like any negative time", () => {
+    const spring = createSpring(0.1, 0.3, 7);
+    expect(spring.at(Number.NEGATIVE_INFINITY)).toEqual(spring.at(0));
+  });
+
+  const infiniteTimeCases: [string, SpringOptions][] = [
+    ["underdamped", { duration: 0.5, bounce: 0.3 }],
+    ["critically damped", { duration: 0.5, bounce: 0 }],
+    ["overdamped", { duration: 0.5, bounce: -0.5 }],
+    ["heavily overdamped", { stiffness: 100, damping: 60 }],
+  ];
+
+  for (const [name, options] of infiniteTimeCases) {
+    test(`${name}: infinite time is exactly the settled target state`, () => {
+      const spring = createSpring(10, 250, -400, options);
+      expect(spring.at(Number.POSITIVE_INFINITY)).toEqual({ position: 250, velocity: 0 });
+      expect(spring.isSettled(Number.POSITIVE_INFINITY)).toBe(true);
+    });
+  }
+
+  test("infinite time on an undamped spring that starts at rest on the target is settled", () => {
+    const spring = createSpring(4, 4, 0, { stiffness: 100, damping: 0 });
+    expect(spring.at(Number.POSITIVE_INFINITY)).toEqual({ position: 4, velocity: 0 });
+    expect(spring.isSettled(Number.POSITIVE_INFINITY)).toBe(true);
+  });
+
+  test("infinite time on a spring that never settles throws RangeError", () => {
+    const spring = createSpring(0, 1, 0, { stiffness: 100, damping: 0 });
+    expect(() => spring.at(Number.POSITIVE_INFINITY)).toThrow(RangeError);
+    expect(() => spring.isSettled(Number.POSITIVE_INFINITY)).toThrow(RangeError);
+  });
+
   test("exposes its construction inputs", () => {
     const spring = createSpring(2, 5, 3, { stiffness: 100, damping: 10 });
     expect(spring.from).toBe(2);

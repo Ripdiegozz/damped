@@ -169,8 +169,18 @@ export function createSpring(from: number, to: number, velocity = 0, options?: S
       );
   }
 
+  let cachedSettleTime: number | undefined;
+  const settleTime = (): number => (cachedSettleTime ??= settle());
+
   const at = (t: number): SpringState => {
+    if (Number.isNaN(t)) throw new RangeError("time must not be NaN");
     if (!(t > 0)) return { position: from, velocity };
+    if (t === Number.POSITIVE_INFINITY) {
+      if (!Number.isFinite(settleTime())) {
+        throw new RangeError("a spring that never settles has no state at infinite time");
+      }
+      return { position: to, velocity: 0 };
+    }
     const state = displacement(t);
     state.position += to;
     return state;
@@ -180,9 +190,6 @@ export function createSpring(from: number, to: number, velocity = 0, options?: S
     const state = at(t);
     return Math.abs(state.position - to) <= restDelta && Math.abs(state.velocity) <= restSpeed;
   };
-
-  let cachedSettleTime: number | undefined;
-  const settleTime = (): number => (cachedSettleTime ??= settle());
 
   return { from, to, velocity, params, at, isSettled, settleTime };
 }

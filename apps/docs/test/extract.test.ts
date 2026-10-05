@@ -40,6 +40,18 @@ describe("extractCodeBlocks", () => {
     expect(extractCodeBlocks(source)[0]).toMatchObject({ code: "const a = {\n  b: 1,\n};", line: 3 });
   });
 
+  test("closes a tab-indented block on its own tab-indented fence instead of swallowing the rest of the file", () => {
+    const source = ["-\titem", "", `\t${fence}ts`, "\tconst a = 1;", `\t${fence}`, "", "Prose.", "", `${fence}ts`, "const b = 2;", fence].join("\n");
+    const blocks = extractCodeBlocks(source);
+    expect(blocks.map((block) => block.code)).toEqual(["const a = 1;", "const b = 2;"]);
+    expect(blocks[1]).toMatchObject({ line: 9 });
+  });
+
+  test("closes a block nested four spaces deep (a list item) on its fence, however deep it is indented", () => {
+    const source = ["1. Step", "", `    ${fence}ts`, "    const a = 1;", `    ${fence}`, "", `${fence}ts`, "const b = 2;", fence].join("\n");
+    expect(extractCodeBlocks(source).map((block) => block.code)).toEqual(["const a = 1;", "const b = 2;"]);
+  });
+
   test("reads a block that never closes up to the end of the file", () => {
     expect(extractCodeBlocks([`${fence}ts`, "const a = 1;"].join("\n"))).toEqual([
       { lang: "ts", info: "ts", code: "const a = 1;", line: 1 },

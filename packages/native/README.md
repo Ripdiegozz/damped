@@ -157,7 +157,7 @@ The claims about `withDamped` are covered by tests against the core: its traject
 
 ## Why the package ships unminified
 
-`'worklet'` directives mark the functions that Reanimated runs on the UI thread, and the `react-native-worklets` Babel plugin finds them by that string. Minifying the bundle strips the directives, so the package is built without a minifier. The math module imports nothing, because a worklet can only call other worklets. The built file is about 5.3 KB, or 1.6 KB gzip (see [bundle size](../../README.md#bundle-size)); your app's own minifier runs after the plugin.
+`'worklet'` directives mark the functions that Reanimated runs on the UI thread, and the `react-native-worklets` Babel plugin finds them by that string. Minifying the bundle strips the directives, so the package is built without a minifier. The math module imports nothing, because a worklet can only call other worklets. The built file is 5,319 bytes, or 1,609 bytes gzip (see [bundle size](../../README.md#bundle-size)); your app's own minifier runs after the plugin.
 
 ## Limitations
 

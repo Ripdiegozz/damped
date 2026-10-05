@@ -1,2 +1,5 @@
 [test]
 preload = ["./test/happydom.ts"]
+
+[install]
+publicHoistPattern = ["@bruits/satteri-*"]

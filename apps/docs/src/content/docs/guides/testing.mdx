@@ -82,7 +82,8 @@ function createManualFrames() {
     request: (callback) => (queue.set(next, callback), next++),
     cancel: (handle) => void queue.delete(handle),
   };
-  // Runs the frame that was requested, reporting `timestamp` (milliseconds) as its time.
+  // Runs the frame that was requested, reporting `timestamp` (milliseconds) as its time. The queue is copied first,
+  // so a callback that requests another frame lands in the next flush instead of looping inside this one.
   const flush = (timestamp: number): void => {
     const callbacks = [...queue.values()];
     queue.clear();

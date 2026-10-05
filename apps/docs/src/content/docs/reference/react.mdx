@@ -307,7 +307,7 @@ export function Photo() {
 Keeps a removed child mounted until its exit animation settles, and animates children in when they are added.
 
 ```ts nocheck
-export function Presence({ enter, exit, options, initial = false, children }: PresenceProps): ReactElement
+export function Presence({ enter, exit, options, initial = false, onExitComplete, children }: PresenceProps): ReactElement
 ```
 
 | Prop | Type | Default | Description |
@@ -316,6 +316,7 @@ export function Presence({ enter, exit, options, initial = false, children }: Pr
 | `exit` | [`AnimationTargets`](/reference/core/animate/#animationtargets) | none | Where a removed child animates before it is dropped. Without it, removed children disappear at once. |
 | `options` | [`EnterOptions`](/reference/core/presence/#enteroptions) | core defaults | Spring, scheduler and reduced motion, for both directions. |
 | `initial` | `boolean` | `false` | Also animates the children present on the first mount. |
+| `onExitComplete` | `(key: Key) => void` | none | Called once with the key of every child that left. |
 | `children` | `ReactNode` | none | Keyed elements: host elements, or components that take `ref` as a prop. |
 
 **Returns** a `ReactElement` that renders its children, plus the ones still leaving.
@@ -324,6 +325,7 @@ export function Presence({ enter, exit, options, initial = false, children }: Pr
 
 - **Enter.** A child added after the first commit calls [`enter`](/reference/core/presence/#enter) with the `enter` targets. Under StrictMode it enters once.
 - **Exit.** A removed child stays rendered and keeps its position among the remaining ones while [`exit`](/reference/core/presence/#exit) runs with `remove: false`. It is `inert` and `aria-hidden="true"` while it leaves. When the exit completes it is dropped with one re-render.
+- **`onExitComplete`.** After an exit animation it runs in the same batch as the render that removes the child: the child is still in the DOM, so state set here re-renders together with the removal, and a layout snapshot taken in that render still sees the old layout. A child that leaves without an animation (no `exit` targets, or nothing to animate) is reported right after the commit that removed it. It is not called when the exit was interrupted by the key coming back, or when `Presence` unmounted meanwhile.
 - **Key returns during its exit.** The exit is interrupted and the element and its velocity are kept. A key can leave, return and leave again.
 - **Refs.** Each child is cloned with a ref that records its element and forwards to your own `ref`: an object, a callback, a callback that returns a cleanup function, or a component receiving `ref` as a prop. Swapping your ref moves the element to the new one. A child that stays is not re-attached on re-render.
 - **Reduced motion** goes through `options.reducedMotion`, with the core `enter` and `exit` rules.
@@ -360,9 +362,14 @@ function Toast({ toast, ref }: { toast: ToastData; ref?: Ref<HTMLDivElement> }) 
   );
 }
 
-export function Toasts({ toasts }: { toasts: ToastData[] }) {
+export function Toasts({ toasts, onGone }: { toasts: ToastData[]; onGone: (id: string) => void }) {
   return (
-    <Presence enter={{ opacity: 0, y: 16 }} exit={{ opacity: 0, x: 24 }} options={{ duration: 0.3, bounce: 0 }}>
+    <Presence
+      enter={{ opacity: 0, y: 16 }}
+      exit={{ opacity: 0, x: 24 }}
+      options={{ duration: 0.3, bounce: 0 }}
+      onExitComplete={(key) => onGone(String(key))}
+    >
       {toasts.map((toast) => (
         <Toast key={toast.id} toast={toast} />
       ))}
@@ -453,6 +460,8 @@ export interface PresenceProps {
   options?: EnterOptions;
   /** Also animate the children present on the first mount. Default false. */
   initial?: boolean;
+  /** Called once with the key of every child that left. */
+  onExitComplete?: (key: Key) => void;
   /** Keyed elements that are host elements or components that take `ref` as a prop. */
   children?: ReactNode;
 }
@@ -464,6 +473,7 @@ export interface PresenceProps {
 | `exit` | [`AnimationTargets`](/reference/core/animate/#animationtargets) | none | End values of a removed child. |
 | `options` | [`EnterOptions`](/reference/core/presence/#enteroptions) | core defaults | Spring options for both directions. |
 | `initial` | `boolean` | `false` | Animate the children present on the first mount too. |
+| `onExitComplete` | `(key: Key) => void` | none | Called once per child that left, with its key. |
 | `children` | `ReactNode` | none | Keyed elements. |
 
 **Behavior**

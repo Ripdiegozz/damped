@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createScheduler, createSpring, createSpringValue, type Scheduler } from "@damped/core";
 import { bounceFromZeta } from "../src/components/physics/damping";
-import { retarget } from "../src/components/physics/interruption";
+import { retarget } from "../src/components/physics/retarget";
 import { launch } from "../src/components/physics/launch";
 import { createVelocityTracker } from "../src/components/physics/pointer";
 import { createSeries } from "../src/components/physics/series";

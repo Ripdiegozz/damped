@@ -1,0 +1,491 @@
+/* The interactive figures of "Springs explained". The chrome is ink, muted text and hairlines; the accent marks only
+   what moves or rests (the mass, the traces, the current point, the rest point). Built on Starlight variables and the
+   brand tokens, with fallbacks, so the figures follow whichever theme the site wears. */
+
+.physics-figure {
+  --p-ink: var(--sl-color-white, #ededed);
+  --p-muted: var(--sl-color-gray-3, #a1a1aa);
+  --p-line: var(--sl-color-hairline-light, #26262a);
+  --p-paper: var(--sl-color-black, #0a0a0b);
+  --p-accent: var(--damped-accent, #ff5f1f);
+  --p-accent-text: var(--damped-accent-text-dark, #ff6a2e);
+  --p-radius: 6px;
+
+  margin: 2rem 0;
+  padding: 1rem 1.25rem 1.1rem;
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-radius);
+  color: var(--p-ink);
+  font-family: var(--sl-font);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+:root[data-theme="light"] .physics-figure {
+  --p-accent-text: var(--damped-accent-text-light, #c73800);
+}
+
+.physics-figure :is(p, dl, dd, ul, figure) {
+  margin: 0;
+  padding: 0;
+}
+
+:where(.physics-figure svg) {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.physics-title {
+  margin-bottom: 0.9rem;
+  color: var(--p-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.physics-muted {
+  color: var(--p-muted);
+}
+
+.physics-hint,
+.physics-caption,
+.physics-live {
+  margin-top: 0.7rem;
+  color: var(--p-muted);
+  font-size: 0.875rem;
+}
+
+.physics-live {
+  min-height: 3em;
+}
+
+/* Shared SVG parts */
+.physics-axis,
+.physics-grid line {
+  stroke: var(--p-line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.physics-target,
+.physics-start-tick,
+.physics-target-tick,
+.physics-rest-line {
+  stroke: var(--p-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.physics-start-tick,
+.physics-target-tick {
+  stroke-dasharray: none;
+}
+
+.physics-label {
+  fill: var(--p-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 10px;
+}
+
+.physics-ball,
+.physics-head,
+.physics-mass,
+.physics-point,
+.physics-rest {
+  fill: var(--p-accent);
+}
+
+.physics-head,
+.physics-point {
+  stroke: var(--p-paper);
+  stroke-width: 2;
+}
+
+.physics-ticks {
+  fill: none;
+  stroke: var(--p-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.physics-trace,
+.physics-current,
+.physics-trail,
+.physics-damped-line,
+.physics-restart-line,
+.physics-reference,
+.physics-ghost,
+.physics-coil {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.physics-trace,
+.physics-current,
+.physics-trail,
+.physics-damped-line {
+  stroke: var(--p-accent);
+  stroke-width: 2;
+}
+
+.physics-restart-line {
+  stroke: var(--p-ink);
+  stroke-width: 2;
+}
+
+.physics-reference {
+  stroke: var(--p-muted);
+  stroke-width: 1;
+}
+
+.physics-ghost {
+  stroke: var(--p-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.physics-coil {
+  stroke: var(--p-ink);
+  stroke-width: 2;
+}
+
+/* Mass on a spring */
+.physics-stage {
+  touch-action: none;
+  user-select: none;
+}
+
+.physics-wall line {
+  stroke: var(--p-ink);
+  stroke-width: 1.5;
+}
+
+.physics-wall .physics-floor {
+  stroke: var(--p-line);
+  stroke-width: 1;
+}
+
+.physics-wall .physics-rest-line {
+  stroke: var(--p-muted);
+}
+
+.physics-slider {
+  outline: none;
+  cursor: grab;
+}
+
+.physics-slider:active {
+  cursor: grabbing;
+}
+
+.physics-grip {
+  stroke: var(--p-paper);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.physics-hit {
+  fill: transparent;
+}
+
+.physics-focus-ring {
+  fill: none;
+  stroke: var(--p-accent-text);
+  stroke-width: 2;
+  opacity: 0;
+}
+
+.physics-slider:focus-visible .physics-focus-ring {
+  opacity: 1;
+}
+
+.physics-plot {
+  height: 6.5rem;
+  margin-top: 0.75rem;
+  border-block: 1px solid var(--p-line);
+}
+
+.physics-plot-label {
+  margin-top: 0.9rem;
+  margin-bottom: -0.35rem;
+  color: var(--p-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.physics-plot--speed {
+  height: 5rem;
+}
+
+.physics-plot .physics-trace,
+.physics-plot .physics-damped-line,
+.physics-plot .physics-restart-line {
+  stroke-width: 2;
+}
+
+/* Controls */
+.physics-controls {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto;
+  gap: 0.75rem 1.25rem;
+  align-items: end;
+  margin-top: 0.9rem;
+}
+
+.physics-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.physics-field label {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  font-weight: 500;
+}
+
+.physics-field output {
+  color: var(--p-muted);
+  font-family: var(--sl-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.physics-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--p-ink);
+}
+
+.physics-figure :is(button, input, [role="slider"]):focus-visible {
+  outline: 2px solid var(--p-accent-text);
+  outline-offset: 2px;
+}
+
+.physics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.physics-controls + .physics-hint {
+  margin-top: 0.6rem;
+}
+
+.physics-figure > .physics-actions {
+  margin: 0.9rem 0;
+}
+
+/* Buttons and the reduced-motion note come from the demo components and keep their class names. */
+.physics-figure .demo-button {
+  appearance: none;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-radius);
+  background: transparent;
+  color: var(--p-ink);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.physics-figure .demo-button:hover,
+.physics-figure .demo-button[aria-pressed="true"],
+.physics-figure .demo-button--primary {
+  border-color: var(--p-ink);
+}
+
+.physics-figure .demo-button--primary {
+  font-weight: 600;
+}
+
+.physics-figure .demo-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-radius);
+  color: var(--p-muted);
+  font-size: 0.875rem;
+}
+
+.physics-figure .demo-note strong {
+  color: var(--p-ink);
+}
+
+/* Readouts */
+.physics-readouts {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.9rem;
+}
+
+.physics-readouts--wrap {
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+}
+
+.physics-readouts dt {
+  color: var(--p-muted);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.physics-readouts dd {
+  font-family: var(--sl-font-mono);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+.physics-readouts:not(.physics-readouts--wrap) dd {
+  min-width: 7ch;
+}
+
+/* Damping curves */
+.physics-curves {
+  margin-top: 0.9rem;
+}
+
+.physics-lane {
+  height: 2.5rem;
+  margin-top: 0.5rem;
+}
+
+.physics-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin-top: 0.5rem;
+  list-style: none;
+  color: var(--p-ink);
+  font-family: var(--sl-font-mono);
+  font-size: 0.75rem;
+}
+
+.physics-key li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.physics-swatch {
+  display: inline-block;
+  width: 1.25rem;
+  border-top: 1px solid var(--p-muted);
+}
+
+.physics-swatch--current {
+  border-top: 2px solid var(--p-accent);
+}
+
+.physics-swatch--ink {
+  border-top: 2px solid var(--p-ink);
+}
+
+/* Phase portrait */
+.physics-phase-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 20rem) minmax(8rem, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.physics-plane {
+  touch-action: none;
+  user-select: none;
+  cursor: crosshair;
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-radius);
+}
+
+.physics-phase-main .physics-lane {
+  margin-top: 0.4rem;
+}
+
+.physics-phase-aside {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+  color: var(--p-muted);
+  font-size: 0.875rem;
+}
+
+.physics-mark {
+  width: 5.5rem;
+  color: var(--p-ink);
+}
+
+/* Interruption */
+.physics-table {
+  width: 100%;
+  margin-top: 0.9rem;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.physics-table caption {
+  padding-bottom: 0.4rem;
+  color: var(--p-muted);
+  text-align: left;
+}
+
+.physics-table :is(th, td) {
+  padding: 0.35rem 0.5rem 0.35rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--p-line);
+  text-align: left;
+  font-weight: 400;
+}
+
+.physics-table thead th {
+  color: var(--p-muted);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.physics-table td {
+  font-family: var(--sl-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.physics-table tbody th {
+  font-family: var(--sl-font-mono);
+}
+
+@media (max-width: 40rem) {
+  .physics-figure {
+    padding: 0.85rem 0.85rem 1rem;
+  }
+
+  .physics-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .physics-phase-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .physics-phase-aside {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+  }
+}

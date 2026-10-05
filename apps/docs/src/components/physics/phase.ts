@@ -68,6 +68,11 @@ export function phaseScale(box: PhaseBox, domain: number): PhaseScale {
 
 const round = (value: number): number => Math.round(value * 100) / 100;
 
+/** A polyline through `points` in the plot space of `scale`; empty for no points. */
+export function phasePath(points: readonly PhasePoint[], scale: PhaseScale): string {
+  return points.map((point, index) => `${index === 0 ? "M" : "L"}${round(scale.x(point.x))} ${round(scale.y(point.y))}`).join(" ");
+}
+
 export interface Trail {
   readonly size: number;
   push(point: PhasePoint): void;
@@ -90,7 +95,7 @@ export function createTrail(capacity: number): Trail {
       points = [];
     },
     path(scale) {
-      return points.map((point, index) => `${index === 0 ? "M" : "L"}${round(scale.x(point.x))} ${round(scale.y(point.y))}`).join(" ");
+      return phasePath(points, scale);
     },
   };
 }

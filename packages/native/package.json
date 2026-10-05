@@ -12,7 +12,7 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "rm -rf dist && bun build ./src/index.ts --outdir dist --format esm --target browser --external react-native-reanimated --external react-native && tsc -p tsconfig.build.json"
+    "build": "rm -rf dist && bun build.ts && tsc -p tsconfig.build.json"
   },
   "peerDependencies": {
     "react-native-reanimated": ">=4.0.0"

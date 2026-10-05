@@ -1,0 +1,160 @@
+---
+title: Demos
+description: Six live demos of damped, running on the real packages. Try to interrupt them.
+---
+
+import { CompositorVsJs } from "../../../components/demos/CompositorVsJs";
+import { FlipReorder } from "../../../components/demos/FlipReorder";
+import { MorphCard } from "../../../components/demos/MorphCard";
+import { PresenceDemo } from "../../../components/demos/PresenceDemo";
+import { RetargetSpring } from "../../../components/demos/RetargetSpring";
+import { SpringTuner } from "../../../components/demos/SpringTuner";
+
+Every demo below runs on the public APIs of `@damped/core` and `@damped/react`. They are all interruptible: act again while something is still moving. If your system asks for reduced motion, each demo says what it does instead.
+
+## Retarget a spring mid-flight
+
+Click, drag or use the arrow keys on the track. A spring keeps its velocity when the target changes, so the marker curves toward the new target instead of restarting. The trace shows the velocity, and the ticks mark each retarget.
+
+<RetargetSpring client:visible />
+
+```ts
+import { createSpringValue } from "@damped/core";
+
+const marker = createSpringValue(0);
+void marker.set(100, { duration: 0.7, bounce: 0.25 });
+
+// The user changes their mind 200 ms later. The new spring starts from the current position and velocity.
+setTimeout(() => {
+  console.log(`velocity at the retarget: ${marker.getVelocity().toFixed(1)}`);
+  void marker.set(20, { duration: 0.7, bounce: 0.25 });
+}, 200);
+```
+
+## Tune a spring
+
+`bounce` and `duration` describe how a spring should feel. damped turns them into stiffness, damping and mass. The curve is computed analytically, so it matches what Replay plays.
+
+<SpringTuner client:visible />
+
+```ts
+import { createSpring, springParams } from "@damped/core";
+
+const options = { bounce: 0.2, duration: 0.6 };
+console.log(springParams(options)); // { stiffness, damping, mass }
+
+const spring = createSpring(0, 1, 0, options);
+console.log(spring.settleTime().toFixed(2), spring.at(0.3).position.toFixed(3));
+```
+
+## Reorder a list with FLIP
+
+`layout()` records where every row is, lets you change the DOM, then springs each row from its old box to its new one. Press a button again while the rows move: they retarget and keep their velocity.
+
+<FlipReorder client:visible />
+
+```tsx
+import { layout } from "@damped/core";
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
+
+export function Bills({ names }: { names: string[] }) {
+  const list = useRef<HTMLUListElement>(null);
+  const [order, setOrder] = useState(names);
+
+  const reverse = () => {
+    const rows = Array.from(list.current?.children ?? []);
+    layout(rows, () => flushSync(() => setOrder((current) => [...current].reverse())), { duration: 0.55, bounce: 0.12 });
+  };
+
+  return (
+    <>
+      <button type="button" onClick={reverse}>
+        Reverse
+      </button>
+      <ul ref={list}>
+        {order.map((name) => (
+          <li key={name}>{name}</li>
+        ))}
+      </ul>
+    </>
+  );
+}
+```
+
+## Morph a card into a dialog
+
+`useMorph` turns one element into another and back. Open the bill, then press Escape or Close while it is still opening: the morph reverses from where it is, with the velocity it had. Focus moves into the dialog and returns to the card.
+
+<MorphCard client:visible />
+
+```tsx
+import { useMorph } from "@damped/react";
+
+export function Bill() {
+  const { source, target, open, close, isOpen } = useMorph({ duration: 0.5, bounce: 0.1, radius: 16 });
+
+  return (
+    <>
+      <button type="button" ref={source} aria-expanded={isOpen} onClick={() => void open()}>
+        <span>City Power: $84.20</span>
+      </button>
+      <div ref={target} role="dialog" aria-label="City Power bill">
+        <span>Bill for John Doe</span>
+        <button type="button" onClick={() => void close()}>
+          Close
+        </button>
+      </div>
+    </>
+  );
+}
+```
+
+## Enter and exit with Presence
+
+`<Presence>` keeps a removed child mounted until its exit animation settles, and a child that comes back while leaving reverses from where it is.
+
+<PresenceDemo client:visible />
+
+```tsx
+import { Presence } from "@damped/react";
+
+export function Toasts({ messages }: { messages: string[] }) {
+  return (
+    <Presence enter={{ opacity: 0, y: 16 }} exit={{ opacity: 0, x: 40 }} options={{ duration: 0.4, bounce: 0.1 }}>
+      {messages.map((message) => (
+        <p key={message}>{message}</p>
+      ))}
+    </Presence>
+  );
+}
+```
+
+## Compositor driver vs JS driver
+
+By default damped writes styles from animation frames. The opt-in `compositor` driver hands the sampled spring to the browser through the Web Animations API instead, so the animation keeps running when the main thread is busy. Start the balls, then block the main thread.
+
+<CompositorVsJs client:visible />
+
+```ts
+import { animate, compositor } from "@damped/core";
+
+const ball = document.querySelector<HTMLElement>("[data-ball]");
+
+if (ball) {
+  animate(ball, { x: 240 }, { duration: 1.3, bounce: 0.2, driver: compositor });
+}
+```
+
+## Reduced motion
+
+When your system asks for reduced motion, damped makes spatial motion jump and keeps fades. Each demo follows that:
+
+| Demo | What it does with reduced motion on |
+| --- | --- |
+| Retarget a spring | The marker jumps to the target and the velocity stays at zero. "Play anyway" runs the spring. |
+| Tune a spring | Replay puts the ball at the end at once. The curve and numbers still update. "Play anyway" runs the spring. |
+| Reorder a list | The rows jump to their new place. |
+| Morph a card | The card and dialog swap places without travelling. The crossfade stays. |
+| Presence | Toasts appear and leave without moving. The fade stays. |
+| Compositor vs JS | Both balls jump, so there is nothing to compare. "Play anyway" runs the comparison. |

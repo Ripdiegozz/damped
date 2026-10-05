@@ -1,0 +1,102 @@
+---
+title: "@damped/core"
+description: API reference for @damped/core, the framework-agnostic spring engine, scheduler, element animation, layout, morph and presence.
+sidebar:
+  label: Overview
+---
+
+import { Tabs, TabItem, Badge } from "@astrojs/starlight/components";
+
+`@damped/core` is the framework-agnostic package. It has no dependencies, never imports React, and importing it is safe on a server: nothing touches `window`, `document`, `requestAnimationFrame`, `matchMedia` or `getComputedStyle` until you call an API that needs them.
+
+<Tabs syncKey="package-manager">
+  <TabItem label="bun">
+
+```sh
+bun add @damped/core
+```
+
+  </TabItem>
+  <TabItem label="npm">
+
+```sh
+npm install @damped/core
+```
+
+  </TabItem>
+</Tabs>
+
+:::caution[Not published yet]
+The packages have not been published to npm at the time of writing. The commands above are what you will run once they are; until then, use the workspace packages from the repository.
+:::
+
+The package is `sideEffects: false` and tree-shakable. An application that only calls `animate` bundles about 3.95 KB gzip; the whole package is about 6.99 KB gzip. The [compositor driver](/reference/core/compositor/) is a value you import, so it is left out of bundles that never use it.
+
+## All exports
+
+The package exports 13 values and 23 types. Every entry below has its own anchor on the page it links to.
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| [`springParams`](/reference/core/springs/#springparams) | function | [Springs](/reference/core/springs/) |
+| [`createSpring`](/reference/core/springs/#createspring) | function | [Springs](/reference/core/springs/) |
+| [`SpringOptions`](/reference/core/springs/#springoptions), [`SpringParams`](/reference/core/springs/#springparams-1), [`SpringState`](/reference/core/springs/#springstate), [`Spring`](/reference/core/springs/#spring) | types | [Springs](/reference/core/springs/) |
+| [`createScheduler`](/reference/core/scheduler/#createscheduler), [`frame`](/reference/core/scheduler/#frame) | functions | [Scheduler](/reference/core/scheduler/) |
+| [`FrameInfo`](/reference/core/scheduler/#frameinfo), [`FrameSource`](/reference/core/scheduler/#framesource), [`Phase`](/reference/core/scheduler/#phase), [`FrameJob`](/reference/core/scheduler/#framejob), [`Scheduler`](/reference/core/scheduler/#scheduler) | types | [Scheduler](/reference/core/scheduler/) |
+| [`createSpringValue`](/reference/core/spring-value/#createspringvalue) | function | [Spring values](/reference/core/spring-value/) |
+| [`SpringValue`](/reference/core/spring-value/#springvalue), [`SpringValueOptions`](/reference/core/spring-value/#springvalueoptions) | types | [Spring values](/reference/core/spring-value/) |
+| [`animate`](/reference/core/animate/#animate) | function | [animate](/reference/core/animate/) |
+| [`AnimatableProperty`](/reference/core/animate/#animatableproperty), [`AnimationTargets`](/reference/core/animate/#animationtargets), [`AnimateOptions`](/reference/core/animate/#animateoptions), [`AnimationControls`](/reference/core/animate/#animationcontrols) | types | [animate](/reference/core/animate/) |
+| [`compositor`](/reference/core/compositor/#compositor) | value | [Compositor](/reference/core/compositor/) |
+| [`Driver`](/reference/core/compositor/#driver) | type | [Compositor](/reference/core/compositor/) |
+| [`layout`](/reference/core/layout/#layout), [`snapshot`](/reference/core/layout/#snapshot), [`measureLayout`](/reference/core/layout/#measurelayout) | functions | [Layout](/reference/core/layout/) |
+| [`Box`](/reference/core/layout/#box), [`LayoutOptions`](/reference/core/layout/#layoutoptions), [`LayoutSnapshot`](/reference/core/layout/#layoutsnapshot) | types | [Layout](/reference/core/layout/) |
+| [`morph`](/reference/core/morph/#morph) | function | [Morph](/reference/core/morph/) |
+| [`MorphOptions`](/reference/core/morph/#morphoptions), [`MorphControls`](/reference/core/morph/#morphcontrols) | types | [Morph](/reference/core/morph/) |
+| [`enter`](/reference/core/presence/#enter), [`exit`](/reference/core/presence/#exit) | functions | [Presence](/reference/core/presence/) |
+| [`EnterOptions`](/reference/core/presence/#enteroptions), [`ExitOptions`](/reference/core/presence/#exitoptions) | types | [Presence](/reference/core/presence/) |
+
+Anything not in this list is internal and not reachable from the package entry.
+
+## Conventions shared by every API
+
+### Reading the signatures
+
+Signature blocks are declarations excerpted from the source. They have no bodies, so they are marked `nocheck` and are not compiled. Every other `ts` and `tsx` block in this reference is a complete example that is typechecked against the real packages by the docs test suite.
+
+### Two ways to describe a spring
+
+Every API that takes a spring accepts [`SpringOptions`](/reference/core/springs/#springoptions) in one of two forms:
+
+- **Perceptual**: `duration` and `bounce`. This is the form to reach for first. `duration` is the period of the undamped oscillation in seconds, not the time to rest.
+- **Physical**: `stiffness`, `damping` and `mass`. The physical form is selected by the presence of a `stiffness` key; `damping` is then required.
+
+Defaults are `duration: 0.5`, `bounce: 0.15`, `mass: 1`, `restDelta: 0.001` and `restSpeed: 0.01`. [`animate`](/reference/core/animate/) replaces the two rest thresholds per property with values suited to pixels and ratios.
+
+Invalid options throw a `RangeError` with the message `<name> must be <requirement>, received <value>`, before any element is touched or any frame is requested.
+
+### Time and units
+
+The frame source timestamp is in milliseconds. Springs take and report seconds, and velocities are in units per second. A spring is evaluated in closed form, so the state at a given time does not depend on the frame rate or on which times were asked before.
+
+### Interruption
+
+Retargeting a moving spring keeps its position and velocity. Every element API (`animate`, `layout`, `morph`, `enter`, `exit`, the React hooks) hands a running animation to the next one instead of restarting it. See [Interruption and reversal](/guides/interruption-and-reversal/).
+
+### Reduced motion
+
+The element APIs follow `prefers-reduced-motion` through the `reducedMotion` option: spatial properties (`x`, `y`, `rotate`, `scale`, `scaleX`, `scaleY`) jump to their target, and `opacity` and `blur` still animate. Plain numbers (`createSpring`, `createSpringValue`) are never affected; decide for yourself, for instance by calling `jump`. See [Reduced motion](/guides/reduced-motion/).
+
+### Server rendering
+
+Importing any package entry is safe without a DOM. Element APIs need an `Element`, so they run on the client only.
+
+### Errors thrown by your callbacks
+
+A scheduler job, a `SpringValue` listener or an `exit` `remove` callback that throws never breaks the frame, the value or a promise. The error is rethrown from a microtask so it still reaches your error reporting.
+
+### Elements have one scheduler
+
+The first `animate`, `layout`, `morph`, `enter` or `exit` call on an element fixes the scheduler that drives it. Later calls with a different `scheduler` option on the same element are driven by the first one. In tests, use a fresh element per scheduler. See [Testing](/guides/testing/).
+
+**See also**: [Springs explained](/guides/springs-explained/), [Interruption and reversal](/guides/interruption-and-reversal/), [React reference](/reference/react/), [React Native reference](/reference/native/), [Demos](/guides/demos/).

@@ -1,0 +1,120 @@
+---
+title: The compositor driver
+description: Hand a spring to the browser's compositor thread so it keeps moving while the main thread is busy. What it costs and where it does not apply.
+sidebar:
+  order: 5
+---
+
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
+import { CompositorVsJs } from "../../../components/demos/CompositorVsJs";
+
+By default `animate` is driven by JavaScript: a single `requestAnimationFrame` loop evaluates the spring and writes the styles once per frame. That is exact and flexible, but it shares the main thread with everything else on the page. A long task, such as parsing a large response or rendering a heavy view, stops the loop and the animation freezes.
+
+The **compositor driver** is an opt-in alternative. It plays the same spring through the Web Animations API, which browsers can run on the compositor thread, so the motion continues while the main thread is busy.
+
+## Opt in
+
+`compositor` is a value you import and pass as the `driver` option.
+
+```ts
+import { animate, compositor } from "@damped/core";
+
+const ball = document.querySelector<HTMLElement>("[data-ball]");
+
+if (ball) {
+  animate(ball, { x: 300, opacity: 0.6 }, { duration: 1, bounce: 0.15, driver: compositor });
+}
+```
+
+In React, the same option goes into the hook:
+
+```tsx
+import { compositor } from "@damped/core";
+import { useSpring } from "@damped/react";
+
+export function Ball({ right }: { right: boolean }) {
+  const ref = useSpring<HTMLSpanElement>({ x: right ? 300 : 0 }, { duration: 1, driver: compositor });
+  return <span ref={ref} className="ball" />;
+}
+```
+
+Nothing else changes. `controls.finished`, `stop()` and retargeting work as they do with the JS driver.
+
+## What it does
+
+1. It creates the spring as usual: `createSpring(current position, target, current velocity, options)`.
+2. It **samples** the analytic spring every `1000 / 120` ms (120 Hz) into a list of keyframes, one list for all the properties that change: the composed `transform`, `opacity` and `filter`. Animations longer than 3 s use 360 equal intervals instead, so a keyframe list never exceeds 361 entries.
+3. It starts one Web Animation with linear easing and `fill: forwards`. The browser interpolates in a straight line between samples.
+4. When the animation ends, it writes the final values inline and cancels the Web Animation.
+
+The sampling step is the only approximation. Between two samples the browser draws a straight line through a curve, which deviates from the spring by at most `acceleration × step² / 8`: about 0.4 px for a 300 px move over 0.5 s. The step is 120 Hz because that error shrinks with the square of the step, so it is a quarter of what 60 Hz would give. In a Chromium test the worst measured offset for that move stays within 0.5 px.
+
+### Interruption is still exact
+
+Because the spring stays known, damped can recompute the exact position and velocity at any moment. When you retarget or stop a compositor animation, it evaluates the analytic spring at that time (not the browser's interpolated pixel), and the next animation starts from it with the velocity. This works from compositor to JS, from JS to compositor and on one element, so you can mix the drivers freely:
+
+```ts
+import { animate, compositor } from "@damped/core";
+
+const ball = document.querySelector<HTMLElement>("[data-ball]");
+
+if (ball) {
+  animate(ball, { x: 300 }, { duration: 1, driver: compositor });
+
+  // Later, with no driver given, the JS driver continues
+  // from the exact state of the compositor animation.
+  setTimeout(() => animate(ball, { x: 0 }), 400);
+}
+```
+
+A handover can move the element by up to the chord error above (a fraction of a pixel), the difference between the straight line the browser drew and the exact curve.
+
+## Block the main thread
+
+Press **Start**, then **Block main thread (1 s)**. The page runs a busy loop for one second, so no JavaScript, including damped's frame loop, can run.
+
+<CompositorVsJs client:visible />
+
+- The top ball is driven by the JS scheduler. While the loop blocks the page it stops dead. When the loop ends, the next frame evaluates the analytic spring at the new time, so the ball jumps to where it should be and carries on.
+- The bottom ball runs on the compositor driver and does not stop. The browser keeps drawing the sampled keyframes without the main thread.
+
+This is measured, not only demonstrated. In Chromium, with a 250 ms busy loop, the compositor box kept moving (at least 5 distinct composited positions, never backwards) while the identical JS-driven spring stood still, and afterwards it was within 0.5 px of the analytic position. The check records the frames the browser composites, so it sees what is drawn and not what JavaScript believes. While a compositor animation plays it also requests no animation frames from damped's loop.
+
+<Aside type="note">
+  Only Chromium is part of the test suite. The Web Animations API is widely implemented, but damped does not claim the same results in other engines.
+</Aside>
+
+## What it cannot do
+
+- **No `layout()`, `morph()`, `enter()` or `exit()`.** They correct child sizes and border radius on every frame, which needs JavaScript. They always use the JS driver and have no `driver` option. If a `layout` change touches an element that has a compositor animation, damped hands that element to the JS driver first, because the compositor's progress is invisible to measurements.
+- **Only what `animate` writes.** `x`, `y`, `rotate`, `scale`, `scaleX` and `scaleY` (the `transform`), `opacity` and `blur` (the `filter`). That is the same list as the JS driver.
+- **No per-frame hook.** The browser draws the frames; your code is not called for each of them.
+- **Springs that never settle fall back.** With `damping: 0` there is no end to sample, so damped uses the JS driver. It also falls back, with an identical result, when `element.animate` does not exist.
+
+## Trade-offs against the JS driver
+
+| | JS driver (default) | `compositor` |
+| --- | --- | --- |
+| Runs on | The frame loop, main thread | The compositor thread, through `element.animate` |
+| Main thread blocked | The animation stops until frames return | The animation keeps moving |
+| Accuracy | Exact at every frame | At most about 0.4 px off between samples (300 px over 0.5 s) |
+| Used by | Everything | `animate` (and `useSpring`) only |
+| Size | `animate` alone: 3.95 KB gzip | About 0.74 KB gzip more (4.67 KB) |
+
+Start with the default. Reach for `compositor` for animations that matter while the page is busy: a loading indicator that has to keep moving during a heavy render, a long ambient motion, or an interaction on a page with a history of long tasks.
+
+### Tree-shaking
+
+`compositor` is imported by name and the package is `sideEffects: false`. An application that never imports it does not bundle it, which is verified by a test. Importing it adds about 0.74 KB gzip to an application that already uses `animate`.
+
+## Reduced motion
+
+The reduced-motion rule is applied before the driver is involved: when it is on, `x`, `y`, `rotate` and the scale properties jump to their target, and `opacity` and `blur` still animate, for the compositor driver too. The part that still animates can run on the compositor. Pass `reducedMotion: "always"` or `"never"` to override `prefers-reduced-motion`. See the [reduced motion guide](/guides/reduced-motion/).
+
+## Next
+
+<CardGrid>
+  <LinkCard title="Reduced motion" description="The rule every API follows, and how to override it." href="/guides/reduced-motion/" />
+  <LinkCard title="Interruption and reversal" description="Retargeting across drivers keeps the velocity." href="/guides/interruption-and-reversal/" />
+  <LinkCard title="@damped/core reference" description="animate, compositor and the Driver type." href="/reference/core/" />
+</CardGrid>

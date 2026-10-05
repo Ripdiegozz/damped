@@ -1,0 +1,185 @@
+---
+title: Spring values
+description: createSpringValue, the retargetable number that keeps its velocity, and its SpringValue and SpringValueOptions types.
+---
+
+import { Badge } from "@astrojs/starlight/components";
+import { RetargetSpring } from "../../../../components/demos/RetargetSpring";
+
+A spring value is a number that moves with a spring and remembers its velocity. It is the building block under [`animate`](/reference/core/animate/) and under the React hooks, and it is the right tool for anything that is not a style: a counter, a progress bar you draw yourself, a canvas coordinate.
+
+## Functions
+
+### `createSpringValue`
+
+<Badge text="function" variant="default" size="small" />
+
+Creates a [`SpringValue`](#springvalue): a number you can animate toward targets, interrupt, freeze and observe.
+
+```ts nocheck
+export function createSpringValue(initial: number, options: SpringValueOptions = {}): SpringValue
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `initial` | `number` | none | The starting position. Must be finite. |
+| `options` | [`SpringValueOptions`](#springvalueoptions) | `{}` | The scheduler and default rest thresholds. |
+
+**Returns** a [`SpringValue`](#springvalue) at rest at `initial`, with velocity `0`. Creating it requests no frame.
+
+**Behavior**
+
+- Calling `set(target, options)` creates a spring from the current position and velocity and drives it from an `update` loop on the scheduler. One loop job per value, however often you retarget.
+- The first frame after `set()` is `t = 0`: it reports the start state. Later frames advance by the real time between frames.
+- Retargeting while it animates builds the new spring from the last computed state, timed from the frame that produced it, so the next frame advances by a real delta and the velocity is continuous.
+- The frame that settles sets `position` to the target and `velocity` to `0`, notifies the listeners once, resolves the `set()` promise with `true` and ends the loop.
+- There is no `dispose`. `stop()` freezes the value; unsubscribe your listeners yourself. A running spring keeps the value reachable from the scheduler until it settles.
+
+**Edge cases**
+
+- A non-finite `initial` throws `RangeError("initial value must be a finite number, received NaN")`.
+- Server rendering: creating a value touches nothing. Calling `set` on a server uses the default frame source, which falls back to a 16 ms timer without `requestAnimationFrame`.
+- Reduced motion is not applied, because a value is just a number. Decide in your own code and call `jump` instead of `set`.
+
+Click, drag or press an arrow key on the track below. Each new target starts from the current position and velocity, and the velocity trace never jumps.
+
+<RetargetSpring client:visible />
+
+**Example**
+
+```ts
+import { createSpringValue } from "@damped/core";
+
+const progress = createSpringValue(0, { restDelta: 0.01 });
+
+const stopListening = progress.onChange((value, velocity) => {
+  console.log(value.toFixed(1), velocity.toFixed(1));
+});
+
+const settled = await progress.set(100, { duration: 0.6, bounce: 0 }); // true
+const interrupted = progress.set(0); // retargets from the current state
+progress.rebase(50, 0); // replace the state; `interrupted` is still pending
+progress.stop(); // `interrupted` resolves false
+
+stopListening();
+console.log(settled, await interrupted, progress.get());
+```
+
+**See also**: [`SpringValue`](#springvalue), [`SpringValueOptions`](#springvalueoptions), [`createSpring`](/reference/core/springs/#createspring), [`useSpringValue`](/reference/react/#usespringvalue), [Interruption and reversal](/guides/interruption-and-reversal/), [Demos](/guides/demos/)
+
+## Types
+
+### `SpringValueOptions`
+
+<Badge text="type" variant="default" size="small" />
+
+The options of [`createSpringValue`](#createspringvalue): which scheduler drives the value and the default rest thresholds.
+
+```ts nocheck
+export interface SpringValueOptions {
+  /** Scheduler that drives the value. Defaults to the shared `frame` scheduler. */
+  scheduler?: Scheduler;
+  /** Default rest thresholds forwarded to every spring this value creates; per-call options win. */
+  restDelta?: number;
+  restSpeed?: number;
+}
+```
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `scheduler` | [`Scheduler`](/reference/core/scheduler/#scheduler) | the shared [`frame`](/reference/core/scheduler/#frame) | Drives the value with one `update` loop per animation. |
+| `restDelta` | `number` | none; the spring default `0.001` applies | Forwarded to every `set`. A per-call `restDelta` overrides it. |
+| `restSpeed` | `number` | none; the spring default `0.01` applies | Forwarded to every `set`. A per-call `restSpeed` overrides it. |
+
+**Behavior**
+
+- The thresholds are not validated at construction. An invalid value throws a `RangeError` from the next `set()`.
+- The thresholds are in the units of the value. For a value that spans thousands, a larger `restDelta` ends the animation sooner at no visible cost; for a value that spans 0 to 1 the defaults are already proportionate.
+
+**Example**
+
+```ts
+import { createScheduler, createSpringValue, type SpringValueOptions } from "@damped/core";
+
+// A test or a game loop supplies its own scheduler; the value then moves only when that scheduler's frames run.
+const options: SpringValueOptions = { scheduler: createScheduler(), restDelta: 0.5, restSpeed: 5 };
+const counter = createSpringValue(0, options);
+
+void counter.set(1000, { duration: 0.8, bounce: 0 }); // settles within half a unit of 1000
+```
+
+**See also**: [`createSpringValue`](#createspringvalue), [`Scheduler`](/reference/core/scheduler/#scheduler), [`SpringOptions`](/reference/core/springs/#springoptions), [Testing](/guides/testing/)
+
+### `SpringValue`
+
+<Badge text="type" variant="default" size="small" />
+
+A number driven by a spring: read it, move it, interrupt it and observe it.
+
+```ts nocheck
+export interface SpringValue {
+  get(): number;
+  getVelocity(): number;
+  readonly animating: boolean;
+  set(target: number, options?: SpringOptions): Promise<boolean>;
+  jump(value: number): void;
+  rebase(position: number, velocity?: number): void;
+  stop(): void;
+  onChange(listener: (value: number, velocity: number) => void): () => void;
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `get()` | `() => number` | The last computed position. |
+| `getVelocity()` | `() => number` | The last computed velocity in units per second. `0` at rest. |
+| `animating` | `boolean` | `true` from `set()` until it settles or is superseded by `jump` or `stop`. |
+| `set(target, options?)` | `(target: number, options?: SpringOptions) => Promise<boolean>` | Animate to `target`. Resolves `true` once settled there, `false` if a later `set`, `jump` or `stop` superseded it. |
+| `jump(value)` | `(value: number) => void` | Set immediately with zero velocity, cancelling any animation. |
+| `rebase(position, velocity = 0)` | `(position: number, velocity?: number) => void` | Replace the current state without ending the animation. |
+| `stop()` | `() => void` | Freeze at the current value with zero velocity. |
+| `onChange(listener)` | `(listener: (value: number, velocity: number) => void) => () => void` | Subscribe to changes. Returns an unsubscribe function. |
+
+**Behavior**
+
+- **`set`** throws a `RangeError` synchronously, not as a rejected promise, for a non-finite `target` or invalid spring options, and leaves the value untouched. When the value is idle at the target with zero velocity it resolves `true` at once and requests no frame. An earlier pending `set` resolves `false`; the same target while animating still retargets and supersedes.
+- **`jump`** throws for a non-finite value, cancels any animation (its promise resolves `false`), sets the value with `0` velocity and notifies the listeners, also when idle and without requesting a frame.
+- **`rebase`** throws for a non-finite argument and leaves the state untouched. While animating it rebuilds the spring toward the same target with the same options from the new state, notifies, and neither resolves nor supersedes the pending `set`. While idle it behaves like `jump(position)` without cancelling anything: the velocity is ignored and no frame is requested.
+- **`stop`** resolves the pending `set` with `false`, zeroes the velocity and does not notify the listeners. On an idle value it does nothing.
+- **`onChange`** is called with `(value, velocity)` on every change (frames, `jump`, `rebase`), in subscription order. The unsubscribe function is idempotent. Subscribing the same function twice makes two subscriptions. The list is snapshotted, so a listener may unsubscribe itself or others while being notified. A listener that throws neither breaks the value nor starves the others; the error is rethrown from a microtask.
+- `animating` is already `false` when listeners run on the settling frame, so a listener may call `set()` to start a fresh animation.
+- A value can be animated again after `stop()` or `jump()`.
+
+**Edge cases**
+
+- A stopped value away from its target animates on the next `set()`.
+- Unmounting is your job. In React use [`useSpringValue`](/reference/react/#usespringvalue), which stops the value for you.
+
+**Example**
+
+```ts
+import { createSpringValue } from "@damped/core";
+
+const volume = createSpringValue(0.2);
+
+// Mirror the value to the screen without a framework.
+const label = document.querySelector<HTMLElement>("#volume");
+const unsubscribe = volume.onChange((value) => {
+  if (label !== null) label.textContent = `${Math.round(value * 100)}%`;
+});
+
+async function fade(target: number): Promise<void> {
+  const settled = await volume.set(target, { duration: 0.4, bounce: 0 });
+  if (!settled) return; // a newer fade took over
+  console.log("settled at", volume.get());
+}
+
+void fade(1);
+setTimeout(() => {
+  console.log("velocity when interrupted:", volume.getVelocity().toFixed(2));
+  void fade(0); // continues from the current position and velocity
+}, 150);
+setTimeout(unsubscribe, 3000);
+```
+
+**See also**: [`createSpringValue`](#createspringvalue), [`SpringValueOptions`](#springvalueoptions), [`SpringOptions`](/reference/core/springs/#springoptions), [`useSpringValue`](/reference/react/#usespringvalue), [Interruption and reversal](/guides/interruption-and-reversal/)

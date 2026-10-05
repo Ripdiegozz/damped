@@ -1,0 +1,324 @@
+---
+title: Scheduler
+description: createScheduler, the shared frame scheduler, and the frame source, phase and job types of @damped/core.
+---
+
+import { Badge } from "@astrojs/starlight/components";
+
+Every animation in damped runs on a scheduler: one frame request at a time, three ordered phases per frame, and no request at all while nothing is animating. You rarely touch it directly, but it is the seam for tests (give it a hand-driven [`FrameSource`](#framesource)) and for your own per-frame work that should share the frame with damped.
+
+A frame runs `read`, then `update`, then `write`. Within a phase, jobs run in registration order and share one [`FrameInfo`](#frameinfo) object. A job added during a frame joins this frame only if its phase has not started yet; otherwise it runs next frame.
+
+## Functions
+
+### `createScheduler`
+
+<Badge text="function" variant="default" size="small" />
+
+Creates a scheduler that runs its jobs on the frames of a [`FrameSource`](#framesource).
+
+```ts nocheck
+export function createScheduler(source: FrameSource = defaultFrameSource()): Scheduler
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `source` | [`FrameSource`](#framesource) | `requestAnimationFrame` | Where frames come from. The default is chosen when `createScheduler` is called: `requestAnimationFrame` and `cancelAnimationFrame` when both exist, otherwise a 16 ms `setTimeout` whose callback receives `performance.now()` (or `Date.now()`). |
+
+**Returns** a [`Scheduler`](#scheduler).
+
+**Behavior**
+
+- One frame is requested at a time, however many jobs are added.
+- When no job is left after a frame, the scheduler stops requesting frames and resets, so the next wake reports `delta: 0`. Cancelling the last pending job outside a frame withdraws the pending request through `source.cancel`.
+- `schedule(phase, job)` runs a job once. `loop(phase, job)` runs it every frame for as long as it does not return `false`. At runtime any other return value, including `undefined`, keeps the loop going.
+- `delta` is `timestamp - previousTimestamp` and is not clamped: a source with non-monotonic timestamps produces a negative delta.
+- Cancel functions are idempotent and harmless after the job ran. A job may cancel itself, a later job or a sibling before it runs.
+- Nothing runs on import; the default source is created when you call this function.
+
+**Edge cases**
+
+- An unknown phase throws `RangeError('unknown phase "x"')` without leaving a frame requested.
+- A job that throws is dropped (also a loop job), the rest of the frame still runs, and the error is rethrown from a microtask so it is not swallowed. Every failing job is reported.
+- Without `requestAnimationFrame` (a server, a test runner without a DOM) the 16 ms timer fallback is used, so the scheduler still works.
+- Reduced motion does not apply: a scheduler runs whatever you give it.
+
+**Example**
+
+```ts
+import { createScheduler, type FrameSource } from "@damped/core";
+
+// A hand-driven frame source: nothing runs until flush() is called.
+const queue = new Map<number, (timestamp: number) => void>();
+let next = 1;
+const source: FrameSource = {
+  request(callback) {
+    const handle = next++;
+    queue.set(handle, callback);
+    return handle;
+  },
+  cancel(handle) {
+    queue.delete(handle);
+  },
+};
+function flush(timestamp: number): void {
+  const callbacks = [...queue.values()];
+  queue.clear();
+  for (const callback of callbacks) callback(timestamp);
+}
+
+const scheduler = createScheduler(source);
+const order: string[] = [];
+scheduler.schedule("write", () => order.push("write"));
+scheduler.schedule("read", () => order.push("read"));
+flush(0);
+console.log(order, scheduler.active); // ["read", "write"] false
+```
+
+**See also**: [`frame`](#frame), [`Scheduler`](#scheduler), [`FrameSource`](#framesource), [`Phase`](#phase), [Testing](/guides/testing/), [Compositor vs JS](/guides/compositor/)
+
+### `frame`
+
+<Badge text="value" variant="default" size="small" />
+
+The shared scheduler that every API uses when you do not pass a `scheduler` option.
+
+```ts nocheck
+export const frame: Scheduler
+```
+
+**Behavior**
+
+- It forwards to a scheduler that is created on first use with the default frame source, so importing the package never touches `window`.
+- `frame.active` is `false` until something has been scheduled on it.
+- It cannot be replaced. To control time, create your own scheduler with [`createScheduler`](#createscheduler) and pass it through the `scheduler` option of the API under test.
+- Behavior, errors and cancellation are those of [`createScheduler`](#createscheduler).
+
+**Example**
+
+```ts
+import { frame } from "@damped/core";
+
+let remaining = 3;
+frame.loop("update", ({ timestamp, delta }) => {
+  console.log(`frame at ${timestamp.toFixed(0)} ms, ${delta.toFixed(1)} ms after the last`);
+  remaining -= 1;
+  return remaining > 0; // returning false ends the loop
+});
+
+// Read in one phase and write in a later one, so layout is read once per frame.
+const box = document.querySelector<HTMLElement>(".box");
+if (box !== null) {
+  frame.schedule("read", () => {
+    const width = box.getBoundingClientRect().width;
+    frame.schedule("write", () => {
+      box.style.width = `${width + 10}px`; // same frame: the write phase has not run yet
+    });
+  });
+}
+```
+
+**See also**: [`createScheduler`](#createscheduler), [`Scheduler`](#scheduler), [`Phase`](#phase), [`SpringValueOptions`](/reference/core/spring-value/#springvalueoptions)
+
+## Types
+
+### `FrameInfo`
+
+<Badge text="type" variant="default" size="small" />
+
+The time of the current frame, handed to every job.
+
+```ts nocheck
+export interface FrameInfo {
+  /** Frame timestamp in milliseconds, as reported by the frame source. */
+  timestamp: number;
+  /** Milliseconds since the previous frame; 0 on the first frame after waking. */
+  delta: number;
+}
+```
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `timestamp` | `number` | none | The timestamp the frame source reported, in milliseconds. |
+| `delta` | `number` | none | Milliseconds since the previous frame. `0` on the first frame after the scheduler wakes from idle. |
+
+**Behavior**
+
+- All jobs of one frame share the same object. Do not keep and mutate it.
+- Springs take seconds, the timestamp is in milliseconds. Divide by 1000 when you feed it to a spring yourself.
+
+**Example**
+
+```ts
+import { frame, type FrameInfo } from "@damped/core";
+
+const samples: number[] = [];
+
+function sample({ delta }: FrameInfo): boolean {
+  if (delta > 0) samples.push(1000 / delta);
+  return samples.length < 10;
+}
+
+frame.loop("update", sample);
+```
+
+**See also**: [`FrameJob`](#framejob), [`Scheduler`](#scheduler), [`FrameSource`](#framesource)
+
+### `FrameSource`
+
+<Badge text="type" variant="default" size="small" />
+
+Where a scheduler gets its frames: a pair of functions shaped like `requestAnimationFrame` and `cancelAnimationFrame`.
+
+```ts nocheck
+export interface FrameSource {
+  request(callback: (timestamp: number) => void): number;
+  cancel(handle: number): void;
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `request(callback)` | `(callback: (timestamp: number) => void) => number` | Ask for one frame. Call `callback` with a timestamp in milliseconds. Return a handle. |
+| `cancel(handle)` | `(handle: number) => void` | Withdraw a request made with that handle. |
+
+**Behavior**
+
+- The scheduler requests at most one frame at a time and calls `cancel` only to withdraw a request when its last job is cancelled.
+- The timestamps your source reports are the only clock springs see. The scheduler does not validate them.
+- A source may call back synchronously, with any timestamps. That is how tests step through an animation.
+
+**Example**
+
+```ts
+import { createScheduler, type FrameSource } from "@damped/core";
+
+// A 30 fps source, for something that does not need 60.
+const everyThirdFrame: FrameSource = {
+  request: (callback) => window.setTimeout(() => callback(performance.now()), 33),
+  cancel: (handle) => window.clearTimeout(handle),
+};
+
+export const slow = createScheduler(everyThirdFrame);
+```
+
+**See also**: [`createScheduler`](#createscheduler), [`Scheduler`](#scheduler), [Testing](/guides/testing/)
+
+### `Phase`
+
+<Badge text="type" variant="default" size="small" />
+
+One of the three ordered steps of a frame.
+
+```ts nocheck
+export type Phase = "read" | "update" | "write";
+```
+
+| Value | When | Intended use |
+| --- | --- | --- |
+| `"read"` | first | Measure layout. |
+| `"update"` | second | Advance state: springs run here. |
+| `"write"` | last | Write styles. damped writes each element's styles here, once per frame. |
+
+**Behavior**
+
+- Jobs of an earlier phase see the DOM before any write of the same frame, which avoids reading layout after writing.
+- Any other string throws `RangeError('unknown phase "…"')` when scheduling.
+
+**Example**
+
+```ts
+import { frame, type Phase } from "@damped/core";
+
+const phases: readonly Phase[] = ["read", "update", "write"];
+const seen: Phase[] = [];
+
+for (const phase of [...phases].reverse()) {
+  frame.schedule(phase, () => {
+    seen.push(phase);
+  });
+}
+// After the next frame, `seen` is ["read", "update", "write"].
+```
+
+**See also**: [`Scheduler`](#scheduler), [`createScheduler`](#createscheduler), [`FrameJob`](#framejob)
+
+### `FrameJob`
+
+<Badge text="type" variant="default" size="small" />
+
+A function the scheduler runs once in a phase.
+
+```ts nocheck
+export type FrameJob = (frame: FrameInfo) => void;
+```
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `frame` | [`FrameInfo`](#frameinfo) | The current frame. |
+
+**Behavior**
+
+- The return value of a `schedule` job is ignored.
+- A job that throws is dropped and its error is rethrown from a microtask. Other jobs are not affected.
+- `loop` takes a different shape, `(frame: FrameInfo) => boolean`: returning `false` ends it.
+
+**Example**
+
+```ts
+import { frame, type FrameJob } from "@damped/core";
+
+const logFrame: FrameJob = ({ timestamp, delta }) => {
+  console.log(`frame at ${timestamp} ms (+${delta} ms)`);
+};
+
+const cancel = frame.schedule("update", logFrame);
+cancel(); // changed my mind: harmless, also after it ran
+```
+
+**See also**: [`Scheduler`](#scheduler), [`FrameInfo`](#frameinfo), [`Phase`](#phase)
+
+### `Scheduler`
+
+<Badge text="type" variant="default" size="small" />
+
+The scheduler interface: schedule one-shot jobs, run loops, and ask whether a frame is pending.
+
+```ts nocheck
+export interface Scheduler {
+  schedule(phase: Phase, job: FrameJob): () => void;
+  loop(phase: Phase, job: (frame: FrameInfo) => boolean): () => void;
+  readonly active: boolean;
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `schedule(phase, job)` | `(phase: Phase, job: FrameJob) => () => void` | Run `job` once in `phase` of the next frame, or of the current frame if that phase has not run yet. Returns a cancel function. |
+| `loop(phase, job)` | `(phase: Phase, job: (frame: FrameInfo) => boolean) => () => void` | Run `job` every frame in `phase` until it returns `false` or is cancelled. Returns a cancel function. |
+| `active` | `boolean` | `true` while a frame is requested. `false` means the scheduler is idle. |
+
+**Behavior**
+
+- `active` is the idle signal: after every animation settles, it is `false` and no frame is requested.
+- The `scheduler` option of [`createSpringValue`](/reference/core/spring-value/#createspringvalue), [`animate`](/reference/core/animate/#animate), [`layout`](/reference/core/layout/#layout), [`morph`](/reference/core/morph/#morph), [`enter` and `exit`](/reference/core/presence/) takes one of these.
+
+**Example**
+
+```ts
+import { createScheduler, type Scheduler } from "@damped/core";
+
+function isIdle(scheduler: Scheduler): boolean {
+  return !scheduler.active;
+}
+
+const scheduler = createScheduler();
+console.log(isIdle(scheduler)); // true: nothing was scheduled
+
+const stop = scheduler.loop("update", () => true);
+console.log(isIdle(scheduler)); // false: a frame is requested
+stop();
+console.log(isIdle(scheduler)); // true again: cancelling the last job withdraws the request
+```
+
+**See also**: [`createScheduler`](#createscheduler), [`frame`](#frame), [`Phase`](#phase), [`FrameJob`](#framejob), [Testing](/guides/testing/)

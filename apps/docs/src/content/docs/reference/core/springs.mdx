@@ -1,0 +1,294 @@
+---
+title: Springs
+description: springParams, createSpring and the spring option, parameter and state types of @damped/core.
+---
+
+import { Badge } from "@astrojs/starlight/components";
+import { SpringTuner } from "../../../../components/demos/SpringTuner";
+
+The spring engine is a pair of pure functions. [`springParams`](#springparams) turns the options you write into physical parameters, and [`createSpring`](#createspring) returns a spring you can sample at any time. Nothing here touches the DOM or a frame loop, so these APIs also work for non-visual numbers and for tests.
+
+A spring is evaluated in closed form (under-damped, critically damped and over-damped regimes), not stepped. The state at time `t` is the same however it is reached: at 60 Hz, at 144 Hz, or from one call after a two second hitch.
+
+## Functions
+
+### `springParams`
+
+<Badge text="function" variant="default" size="small" />
+
+Converts [`SpringOptions`](#springoptions) to the physical parameters of a spring, applying the defaults and validating every field.
+
+```ts nocheck
+export function springParams(options?: SpringOptions): SpringParams
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `options` | [`SpringOptions`](#springoptions) | `{}` | Either form. With none, `duration: 0.5` and `bounce: 0.15` apply. |
+
+**Returns** a [`SpringParams`](#springparams-1) object. With no argument it is `{ stiffness: 157.91…, damping: 21.36…, mass: 1 }`.
+
+**Behavior**
+
+- The perceptual form is converted with mass 1: `omega = 2π / duration`, `stiffness = omega²`, and `damping = 2 · zeta · omega`, where the damping ratio `zeta` is `1 - bounce` for `bounce >= 0` and `1 / (1 + bounce)` for `bounce < 0`.
+- The physical form passes through, with `mass` defaulting to `1`.
+- It is pure: no side effects, no frame, no DOM. The rest thresholds are validated here too, although the result does not contain them.
+
+**Edge cases**
+
+- Throws a `RangeError` for any invalid field. The thresholds are checked first, so `{ restDelta: 0, duration: 0 }` reports `restDelta`.
+- A physical object without `damping` (possible only by bypassing the types) throws `damping must be a finite number greater than or equal to 0, received undefined`.
+- If both forms are mixed at runtime, the physical one wins and `duration` and `bounce` are ignored. The types forbid the mix.
+- `damping: 0` is valid: the spring never loses energy and never settles.
+
+The tuner below turns `duration` and `bounce` into the curve this function describes. Change them and watch the numbers.
+
+<SpringTuner client:visible />
+
+**Example**
+
+```ts
+import { springParams } from "@damped/core";
+
+const critical = springParams({ duration: 0.5, bounce: 0 });
+// { stiffness: 157.91…, damping: 25.13…, mass: 1 }
+
+const explicit = springParams({ stiffness: 170, damping: 26 });
+// { stiffness: 170, damping: 26, mass: 1 }
+
+console.log(critical.stiffness.toFixed(1), explicit.mass);
+```
+
+**See also**: [`SpringOptions`](#springoptions), [`SpringParams`](#springparams-1), [`createSpring`](#createspring), [Springs explained](/guides/springs-explained/), [`toReanimated`](/reference/native/#toreanimated)
+
+### `createSpring`
+
+<Badge text="function" variant="default" size="small" />
+
+Creates an analytic spring from a start, a target and an initial velocity, and returns an object that reports its state at any time.
+
+```ts nocheck
+export function createSpring(from: number, to: number, velocity = 0, options?: SpringOptions): Spring
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `from` | `number` | none | Start position. |
+| `to` | `number` | none | Target position. |
+| `velocity` | `number` | `0` | Start velocity in units per second. |
+| `options` | [`SpringOptions`](#springoptions) | `{}` | Either form; see [`springParams`](#springparams) for the defaults. |
+
+**Returns** a [`Spring`](#spring).
+
+**Behavior**
+
+- The spring is a pure function of time: it holds no clock and never steps, so asking for `at(0.3)` before or after `at(0.1)` gives the same answer.
+- To retarget a moving spring, create a new one from where the old one is: `createSpring(position, newTarget, velocity, options)`. The new spring continues the trajectory, which is what keeps a reversal smooth.
+- The regimes are exact. The spring is critically damped when the damping ratio is within `1e-6` of 1, under-damped below it and over-damped above it.
+
+**Edge cases**
+
+- Invalid options throw a `RangeError` at creation, not at the first `at()`.
+- `from`, `to` and `velocity` are not validated. `createSpring(NaN, 1).at(0.1)` returns `{ position: NaN, velocity: NaN }`, and `settleTime()` is `NaN`. Validate non-finite input before you call it; `createSpringValue` and `animate` already do.
+- Server rendering, reduced motion and cleanup do not apply: it is a pure calculation with nothing to dispose.
+
+**Example**
+
+```ts
+import { createSpring } from "@damped/core";
+
+// A 100-unit move that starts at rest.
+const spring = createSpring(0, 100, 0, { duration: 0.5, bounce: 0.15 });
+const { position, velocity } = spring.at(0.25); // 89.45…, 164.56…
+const seconds = spring.settleTime(); // 1.159…
+
+// Retarget from where it is, keeping its velocity.
+const next = createSpring(position, 0, velocity, { duration: 0.5, bounce: 0.15 });
+
+console.log(seconds.toFixed(2), spring.isSettled(seconds), next.at(0).position === position);
+```
+
+**See also**: [`Spring`](#spring), [`SpringState`](#springstate), [`SpringOptions`](#springoptions), [`createSpringValue`](/reference/core/spring-value/#createspringvalue), [Interruption and reversal](/guides/interruption-and-reversal/), [Testing](/guides/testing/)
+
+## Types
+
+### `SpringOptions`
+
+<Badge text="type" variant="default" size="small" />
+
+The options every spring-driven API accepts: perceptual (`duration` and `bounce`) or physical (`stiffness`, `damping` and `mass`), each with optional rest thresholds.
+
+```ts nocheck
+export type SpringOptions =
+  | { duration?: number; bounce?: number; restDelta?: number; restSpeed?: number }
+  | { stiffness: number; damping: number; mass?: number; restDelta?: number; restSpeed?: number };
+```
+
+| Field | Type | Default | Valid | Description |
+| --- | --- | --- | --- | --- |
+| `duration` | `number` | `0.5` | finite, `> 0` | Perceptual form. The period of the undamped oscillation in seconds. It is not the time to rest. |
+| `bounce` | `number` | `0.15` | finite, `-1 < bounce < 1` | Perceptual form. `0` is critically damped, positive overshoots, negative is over-damped (slow, no overshoot). |
+| `stiffness` | `number` | none, required in this form | finite, `> 0` | Physical form. Its presence selects the physical form. |
+| `damping` | `number` | none, required in this form | finite, `>= 0` | Physical form. `0` is allowed and never settles. |
+| `mass` | `number` | `1` | finite, `> 0` | Physical form. |
+| `restDelta` | `number` | `0.001` | finite, `> 0` | The spring is at rest when it is this close to the target... |
+| `restSpeed` | `number` | `0.01` | finite, `> 0` | ...and moving no faster than this, in units per second. |
+
+**Behavior**
+
+- The physical form is chosen by the presence of a `stiffness` key. Anything else, including `{}` and `undefined`, is the perceptual form.
+- With the default `duration` and `bounce`, a 100-unit move settles in about 1.16 s at the default thresholds. `duration` is a period, so the time to rest is longer.
+- `animate` and everything built on it replace `restDelta` and `restSpeed` per property (0.01 and 0.1 for lengths and degrees, 0.0005 and 0.005 for ratios and opacity). Your own values override those individually. See [`animate`](/reference/core/animate/#animate).
+- A bad value throws a `RangeError` named after the field, for example `bounce must be a finite number between -1 and 1 (exclusive), received 1`.
+
+Damping ratio, overshoot and settle time for a 100-unit move with `duration: 0.5` and the default thresholds:
+
+| `bounce` | Damping ratio | Peak overshoot | `settleTime()` |
+| --- | --- | --- | --- |
+| `-0.5` | 2.00 | none | 3.46 s |
+| `0` | 1.00 | none | 1.15 s |
+| `0.15` | 0.85 | 0.63 % | 1.16 s |
+| `0.3` | 0.70 | 4.60 % | 1.37 s |
+| `0.5` | 0.50 | 16.30 % | 1.89 s |
+
+**Example**
+
+```ts
+import { createSpring, type SpringOptions } from "@damped/core";
+
+const perceptual: SpringOptions = { duration: 0.4, bounce: 0.2 };
+const physical: SpringOptions = { stiffness: 170, damping: 26, mass: 1, restDelta: 0.01 };
+
+console.log(createSpring(0, 1, 0, perceptual).settleTime().toFixed(2));
+console.log(createSpring(0, 1, 0, physical).settleTime().toFixed(2));
+```
+
+**See also**: [`springParams`](#springparams), [`SpringParams`](#springparams-1), [`AnimateOptions`](/reference/core/animate/#animateoptions), [`DampedSpringOptions`](/reference/native/#dampedspringoptions), [Springs explained](/guides/springs-explained/)
+
+### `SpringParams`
+
+<Badge text="type" variant="default" size="small" />
+
+The physical parameters of a spring, as returned by [`springParams`](#springparams) and held by [`Spring.params`](#spring).
+
+```ts nocheck
+export interface SpringParams {
+  stiffness: number;
+  damping: number;
+  mass: number;
+}
+```
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `stiffness` | `number` | none | Spring constant. |
+| `damping` | `number` | none | Damping coefficient. The damping ratio is `damping / (2 · sqrt(stiffness · mass))`. |
+| `mass` | `number` | `1` from the perceptual form | Mass. |
+
+**Behavior**
+
+- Every field is a finite number. `stiffness` and `mass` are greater than zero, `damping` is zero or greater.
+- The same shape, `DampedParams`, is what [`toReanimated`](/reference/native/#toreanimated) returns for Reanimated's `withSpring`.
+
+**Example**
+
+```ts
+import { springParams, type SpringParams } from "@damped/core";
+
+const params: SpringParams = springParams({ duration: 0.4, bounce: 0.2 });
+const dampingRatio = params.damping / (2 * Math.sqrt(params.stiffness * params.mass));
+
+console.log(dampingRatio.toFixed(2)); // 0.80
+```
+
+**See also**: [`springParams`](#springparams), [`Spring`](#spring), [`DampedParams`](/reference/native/#dampedparams)
+
+### `SpringState`
+
+<Badge text="type" variant="default" size="small" />
+
+A position and a velocity: what [`Spring.at`](#spring) returns.
+
+```ts nocheck
+export interface SpringState {
+  position: number;
+  velocity: number;
+}
+```
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `position` | `number` | none | Where the spring is, in the units of `from` and `to`. |
+| `velocity` | `number` | none | How fast it is moving, in units per second. |
+
+**Behavior**
+
+- `at()` returns a fresh object each time, so you can keep it.
+- Pass both fields to `createSpring` to retarget from a sampled state without a visible jump.
+
+**Example**
+
+```ts
+import { createSpring, type SpringState } from "@damped/core";
+
+const spring = createSpring(0, 100, 0, { duration: 0.5, bounce: 0 });
+const samples: SpringState[] = [0, 0.1, 0.2, 0.4].map((seconds) => spring.at(seconds));
+
+console.log(samples.map((state) => state.position.toFixed(1)).join(", "));
+```
+
+**See also**: [`Spring`](#spring), [`createSpring`](#createspring), [`SpringValue`](/reference/core/spring-value/#springvalue)
+
+### `Spring`
+
+<Badge text="type" variant="default" size="small" />
+
+An analytic spring: the object [`createSpring`](#createspring) returns.
+
+```ts nocheck
+export interface Spring {
+  readonly from: number;
+  readonly to: number;
+  readonly velocity: number;
+  readonly params: SpringParams;
+  at(t: number): SpringState;
+  isSettled(t: number): boolean;
+  settleTime(): number;
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `from` | `number` | The start position you passed. |
+| `to` | `number` | The target you passed. |
+| `velocity` | `number` | The start velocity in units per second. |
+| `params` | [`SpringParams`](#springparams-1) | The physical parameters in use. |
+| `at(t)` | `(t: number) => SpringState` | The state `t` seconds after the start. |
+| `isSettled(t)` | `(t: number) => boolean` | `true` when the position is within `restDelta` of the target and the speed is within `restSpeed` at `t`. |
+| `settleTime()` | `() => number` | The time after which the spring stays within both thresholds. Computed once and cached. |
+
+**Edge cases**
+
+- `at(t)` for `t <= 0`, including `-Infinity`, returns `{ position: from, velocity }`.
+- `at(NaN)` throws `RangeError("time must not be NaN")`.
+- `at(Infinity)` returns `{ position: to, velocity: 0 }`, or throws `RangeError("a spring that never settles has no state at infinite time")` when the spring never settles.
+- `settleTime()` is `Infinity` for an undamped spring (`damping: 0`) that does not start settled, and `0` for one that starts within both thresholds. A spring that starts on its target at rest is settled even when undamped.
+- `settleTime()` carries a `1e-9` margin, so the returned time is strictly on the settled side.
+- The velocity of `at()` is the derivative of the position in closed form, not a finite difference.
+
+**Example**
+
+```ts
+import { createSpring } from "@damped/core";
+
+const spring = createSpring(0, 1, 0, { stiffness: 120, damping: 14 });
+
+for (const seconds of [0, 0.2, 0.4]) {
+  const { position, velocity } = spring.at(seconds);
+  console.log(seconds, position.toFixed(3), velocity.toFixed(3), spring.isSettled(seconds));
+}
+
+console.log(`rests after ${spring.settleTime().toFixed(2)} s`, spring.params.mass);
+```
+
+**See also**: [`createSpring`](#createspring), [`SpringState`](#springstate), [`SpringParams`](#springparams-1), [Springs explained](/guides/springs-explained/), [Testing](/guides/testing/)

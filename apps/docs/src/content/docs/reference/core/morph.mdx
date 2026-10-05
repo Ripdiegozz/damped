@@ -1,0 +1,173 @@
+---
+title: Morph
+description: morph, the shared-element transition between two elements of @damped/core, with MorphOptions and MorphControls.
+---
+
+import { Badge } from "@astrojs/starlight/components";
+import { MorphCard } from "../../../../components/demos/MorphCard";
+
+`morph` turns one element into another: a card into a dialog, a thumbnail into a full view. Both elements stay mounted. The incoming one starts on the box of the outgoing one and settles on its own, the outgoing one travels onto the box of the incoming one, and their content crossfades with a blur.
+
+Reversing is the same call with the arguments swapped. The values that are moving are retargeted, so the reversal continues from the previous visual state with the same velocity instead of restarting from rest.
+
+## Functions
+
+### `morph`
+
+<Badge text="function" variant="default" size="small" />
+
+Morphs `from` into `to` with a spring, interrupting and reversing any morph already running on either element.
+
+```ts nocheck
+export function morph(from: HTMLElement, to: HTMLElement, options: MorphOptions = {}): MorphControls
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `from` | `HTMLElement` | none | The element the morph starts from, usually the one that is always visible. |
+| `to` | `HTMLElement` | none | The element the morph ends on. |
+| `options` | [`MorphOptions`](#morphoptions) | `{}` | Spring, scheduler, reduced motion, correction, radius, crossfade and blur. |
+
+**Returns** [`MorphControls`](#morphcontrols): `finished` resolves to a boolean and `stop()` freezes both elements.
+
+**Preconditions** (not enforced)
+
+- Both elements are visible and laid out at their final boxes when `morph` is called. A hidden element reports a zero box (a finite one), so the morph runs with wrong geometry rather than throwing. Unhide the target first.
+- All the layout assumptions apply to both elements: not rotated, `scale` of `1`, centered `transform-origin`.
+
+**Behavior**
+
+- **Geometry.** `to` starts on the box of `from` and settles at the identity; `from` travels onto the box of `to`. Both are moved with the JS driver. A morph owns `x`, `y`, `scaleX` and `scaleY` of both elements, `opacity` unless `crossfade` is `false`, and the blur of the corrected children.
+- **Crossfade.** With perceptual options the incoming fade uses `duration / 2` and the outgoing fade `duration`, both with `bounce: 0`, so the combined opacity never dips below 0.85 mid-morph (measured at 0.893 or better in a real browser). With physical options both fades use that same spring; it may overshoot, and the browser clamps opacity. Your `restDelta` and `restSpeed` are not forwarded to the fades.
+- **Reversal.** `morph(to, from)` while one runs retargets the same values, keeping position and velocity. A fresh incoming element starts from its current values, not from the identity.
+- **Finishing.** A full open and close cycle ends clean: the card at the identity, and the dialog resting on the card box.
+- **Reduced motion.** The spatial values jump (boxes, radius and corrections are applied), the crossfade and blur still animate, and `finished` resolves `true`.
+- **Server rendering.** Not applicable: it needs laid-out elements.
+
+**Edge cases**
+
+- Throws `TypeError("morph() needs two different elements")` when `from === to`.
+- Throws a `RangeError` for invalid spring options, `radius` or `blur`, and `RangeError("morph() measured a non-finite layout box")` for a non-finite box. All of these are thrown before anything is touched, and a failed morph never cuts the morph that is running.
+- A zero-size box cannot be scaled to, so that axis keeps scale `1` and the inverse scale stays finite.
+
+Open the card, then press Escape or Close while it is still opening. The morph reverses from where it is.
+
+<MorphCard client:visible />
+
+**Example**
+
+```ts
+import { morph } from "@damped/core";
+
+const card = document.querySelector<HTMLElement>(".card");
+const dialog = document.querySelector<HTMLElement>(".dialog");
+
+if (card !== null && dialog !== null) {
+  const options = { duration: 0.5, bounce: 0.1, radius: 16 } as const;
+
+  dialog.hidden = false; // visible and laid out at its final box before morph() measures it
+  const opening = morph(card, dialog, options);
+
+  // Reverse at any point: the same call with the arguments swapped.
+  const closing = morph(dialog, card, options);
+
+  console.log(await opening.finished, await closing.finished); // false, true
+}
+```
+
+**See also**: [`MorphOptions`](#morphoptions), [`MorphControls`](#morphcontrols), [`useMorph`](/reference/react/#usemorph), [`layout`](/reference/core/layout/#layout), [Layout and morph](/guides/layout-and-morph/), [Interruption and reversal](/guides/interruption-and-reversal/), [Demos](/guides/demos/)
+
+## Types
+
+### `MorphOptions`
+
+<Badge text="type" variant="default" size="small" />
+
+The options of [`morph`](#morph): everything in [`LayoutOptions`](/reference/core/layout/#layoutoptions) plus the crossfade and the content blur.
+
+```ts nocheck
+export type MorphOptions = LayoutOptions & {
+  /** Fade `to` in and `from` out. Default true. */
+  crossfade?: boolean;
+  /** Blur radius in px applied to the content children during the morph (incoming: blur → 0, outgoing: 0 → blur). Default 8; 0 disables. */
+  blur?: number;
+};
+```
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| spring options | [`SpringOptions`](/reference/core/springs/#springoptions) | `duration: 0.5`, `bounce: 0.15` | Either form. |
+| `scheduler`, `reducedMotion` | as in [`LayoutOptions`](/reference/core/layout/#layoutoptions) | the shared `frame`, `"user"` | |
+| `correct` | `readonly HTMLElement[] \| "children"` | `"children"` | Differs from `layout`, where it is off. An explicit list is split between the elements that contain each entry; `[]` leaves the children alone. |
+| `radius` | `number` | none | Corrected on both elements, and written at rest on the one that ends at the identity. |
+| `crossfade` | `boolean` | `true` | Animates `to` from opacity `0` to `1` and `from` from `1` to `0`. |
+| `blur` | `number` | `8` | Blur radius in px on the content children: incoming from `blur` to `0`, outgoing from `0` to `blur`. Finite and `>= 0`, otherwise a `RangeError`. `0` writes no filter at all. |
+
+**Behavior**
+
+- The shells never get a filter, so their edges stay crisp; only the corrected children blur.
+- `blur` is independent of `crossfade`.
+
+**Example**
+
+```ts
+import { morph, type MorphOptions } from "@damped/core";
+
+const options: MorphOptions = { duration: 0.5, bounce: 0.1, radius: 16, blur: 6, crossfade: true };
+
+const thumbnail = document.querySelector<HTMLElement>(".thumbnail");
+const full = document.querySelector<HTMLElement>(".full-view");
+if (thumbnail !== null && full !== null) {
+  full.hidden = false;
+  void morph(thumbnail, full, options);
+}
+```
+
+**See also**: [`morph`](#morph), [`LayoutOptions`](/reference/core/layout/#layoutoptions), [`MorphHandle`](/reference/react/#morphhandle), [Layout and morph](/guides/layout-and-morph/)
+
+### `MorphControls`
+
+<Badge text="type" variant="default" size="small" />
+
+What [`morph`](#morph) returns.
+
+```ts nocheck
+export interface MorphControls {
+  /** true if this morph settled; false if a later morph/stop on either element superseded it. Never rejects. */
+  readonly finished: Promise<boolean>;
+  stop(): void;
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `finished` | `Promise<boolean>` | `true` only if this morph settled. `false` when a newer morph that touches either element superseded it, or `stop()` was called while it ran. Never rejects. |
+| `stop()` | `() => void` | Freezes both elements and keeps the applied corrections. |
+
+**Behavior**
+
+- `stop()` after the morph settled changes nothing, and `stop()` on a superseded morph does not stop the newer one.
+- `stop()` before the first frame still reports the morph as stopped (`finished` resolves `false`).
+- Unlike [`AnimationControls`](/reference/core/animate/#animationcontrols), `finished` tells you whether it completed, so you can run follow-up work only when it did, for example to move focus after a close.
+
+**Example**
+
+```ts
+import { morph } from "@damped/core";
+
+const card = document.querySelector<HTMLElement>(".card");
+const dialog = document.querySelector<HTMLElement>(".dialog");
+
+if (card !== null && dialog !== null) {
+  // The dialog is open here, laid out on its own box.
+  const closing = morph(dialog, card, { duration: 0.4 });
+
+  const settled = await closing.finished;
+  if (settled) {
+    dialog.hidden = true; // only when no newer morph cut this one
+    card.focus();
+  }
+}
+```
+
+**See also**: [`morph`](#morph), [`MorphOptions`](#morphoptions), [`MorphHandle`](/reference/react/#morphhandle), [`AnimationControls`](/reference/core/animate/#animationcontrols)

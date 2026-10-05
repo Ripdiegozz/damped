@@ -1,0 +1,222 @@
+---
+title: React Native and Expo
+description: Use damped springs with Reanimated 4 on Expo SDK 57. withDamped keeps velocity on reversal and runs on the UI thread; toReanimated feeds the same spring into withSpring.
+sidebar:
+  order: 8
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+
+`@damped/native` brings the same spring to [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/). It is deliberately small: two functions, `withDamped` and `toReanimated`, and three types. It does not replace Reanimated. It gives you a spring that keeps its velocity when it is interrupted, in the form Reanimated already understands.
+
+:::caution[Not run on a device yet]
+There is no simulator or physical device in this repository's checks. What is verified is the math against `@damped/core`, the behavior against a stand-in for the parts of Reanimated that `withDamped` touches, and that the built bundle is turned into worklets by the `react-native-worklets` Babel plugin. Behavior inside a running app is expected, not observed.
+:::
+
+## Install and set up
+
+`@damped/native` is not published to npm yet; until it is, use it from this repository's workspace. The commands below show the intended setup.
+
+| Requirement | Version |
+| --- | --- |
+| Expo SDK | 57 |
+| `react-native-reanimated` | 4.0 or newer (peer dependency). Developed against 4.5.1. |
+| `react-native-worklets` | 0.10.1 is what the package is developed against. |
+| React Native | 0.86.3 is what it is developed against, with the New Architecture. Reanimated 4 supports only the New Architecture. |
+
+```sh frame="none"
+npx expo install react-native-reanimated react-native-worklets
+npm install @damped/native   # bun add / pnpm add work the same way
+```
+
+Reanimated 4 needs `react-native-worklets` installed next to it. `@damped/native` has no other dependency: Reanimated is a peer.
+
+### The Babel plugin
+
+A worklet is a JavaScript function that Reanimated can run on the UI thread. It is marked with a `"worklet"` directive, and the `react-native-worklets` Babel plugin finds those directives and prepares the functions. `withDamped` is such a worklet, so the plugin has to run over it.
+
+- **In an Expo app** the starter template already includes the Worklets Babel plugin (Reanimated's documentation says so for Expo SDK 50 and later), so there is usually nothing to add.
+- **In a bare app** (React Native Community CLI) add `react-native-worklets/plugin` to `babel.config.js`, and list it last:
+
+```js frame="none"
+module.exports = {
+  presets: [
+    // ...your presets
+  ],
+  plugins: [
+    // ...your other plugins
+    "react-native-worklets/plugin",
+  ],
+};
+```
+
+This is also why `@damped/native` ships **unminified**: minifying strips the directives, and the plugin finds them by that string. The built file is 5,319 bytes, or 1,609 bytes gzip. Your app's own minifier runs after the plugin.
+
+## withDamped
+
+```tsx
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
+import { withDamped } from "@damped/native";
+
+export function SlidingSquare() {
+  const x = useSharedValue(0);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+
+  // Press again while it moves: the new spring starts with the velocity the old one had.
+  const toggle = () => {
+    x.value = withDamped(x.value === 0 ? 200 : 0, { duration: 0.5, bounce: 0.15 }, (finished) => {
+      "worklet";
+      console.log(finished === true ? "settled" : "interrupted");
+    });
+  };
+
+  return <Animated.View onTouchEnd={toggle} style={[{ width: 80, height: 80, backgroundColor: "#16181d" }, style]} />;
+}
+```
+
+`withDamped(toValue, options?, callback?)` is a drop-in for `withSpring`. You assign its result to a shared value, and the animation runs on the **UI thread**: every frame is computed there, so it does not wait for the JavaScript thread. The declared return type is `number`, as with `withSpring`.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `duration` | `0.5` | The period of the underlying oscillation in seconds, not the time to rest. |
+| `bounce` | `0.15` | `0` is critically damped, above `0` overshoots, below `0` is overdamped. Must be between `-1` and `1`, exclusive. |
+| `stiffness`, `damping`, `mass` | none, none, `1` | The physical form. Giving `stiffness` selects it, and then `damping` is required. |
+| `restDelta`, `restSpeed` | `0.001`, `0.01` | The animation ends when it is within `restDelta` of `toValue` and slower than `restSpeed` (units per second). |
+| `velocity` | `0` | Initial velocity in units per second, for a spring that starts from rest (a fling). |
+| `reduceMotion` | `ReduceMotion.System` | See [Reduced motion](#reduced-motion). |
+
+These are the same options, with the same defaults and validation, as the spring options of `@damped/core`; see [Springs explained](/guides/springs-explained/) for what `bounce` and `duration` mean. An invalid value throws a `RangeError` synchronously, where `withDamped` is called.
+
+The callback is Reanimated's usual `(finished?, current?) => void`. It receives `true` when the animation settled and `false` when a later animation interrupted it, and it runs on the UI thread.
+
+### Velocity and interruption
+
+- When a running animation is interrupted, its current velocity becomes the starting velocity of the new one. There is no clipping, so reversing mid-flight turns around smoothly instead of starting from a standstill.
+- The `velocity` option applies only to a spring that starts from rest. A previous animation that is moving always wins; one that finished or has no velocity leaves the option in charge.
+- An animation that starts at its target with no velocity finishes at once.
+
+For a fling, pass the release velocity of a gesture. Because `withDamped` is a worklet, you can call it directly from a gesture handler's worklet callbacks. From JavaScript the call looks like this:
+
+```tsx
+import { useSharedValue } from "react-native-reanimated";
+import { withDamped } from "@damped/native";
+
+export function useDrawer() {
+  const offset = useSharedValue(0);
+
+  // `velocityX` is the release velocity of the gesture, in points per second.
+  const release = (velocityX: number) => {
+    offset.value = withDamped(0, { duration: 0.45, bounce: 0.1, velocity: velocityX });
+  };
+
+  return { offset, release };
+}
+```
+
+### How the spring is evaluated
+
+The state at each frame is computed in closed form from the start of the animation: `t = (now - startTime) / 1000`. It is not integrated frame by frame, so the result does not depend on the frame rate and a long frame does not change where the spring ends up. Under-, critically and over-damped springs are all exact. The trajectory matches `@damped/core` to within `1e-9`, checked by 40 parity tests.
+
+### Composing with other animations
+
+`withDamped` is built with Reanimated's public `defineAnimation`, the mechanism the built-in `with*` helpers are made of, so `withSequence`, `withDelay` and `withRepeat` can take it as an argument. A preceding animation that exposes a velocity hands it over.
+
+```tsx
+import { useSharedValue, withDelay, withSequence } from "react-native-reanimated";
+import { withDamped } from "@damped/native";
+
+export function usePulse() {
+  const scale = useSharedValue(1);
+  const pulse = () => {
+    scale.value = withSequence(withDamped(1.2, { duration: 0.2 }), withDelay(100, withDamped(1, { duration: 0.4, bounce: 0 })));
+  };
+  return { scale, pulse };
+}
+```
+
+This composition is not covered by the package's tests. Treat it as expected behavior that has not been run in an app.
+
+## toReanimated
+
+If you would rather stay on Reanimated's own `withSpring`, `toReanimated(options)` converts damped's options into the physics-based config it accepts.
+
+```tsx
+import { useSharedValue, withSpring } from "react-native-reanimated";
+import { toReanimated } from "@damped/native";
+
+export function useSlide() {
+  const x = useSharedValue(0);
+  const slide = () => {
+    x.value = withSpring(200, toReanimated({ duration: 0.5, bounce: 0.15 }));
+  };
+  return { x, slide };
+}
+```
+
+- The result has only `stiffness`, `damping` and `mass`. The mass is always set explicitly, because `withSpring` defaults it to 4 instead of 1, which would change the motion.
+- Rest thresholds, `velocity` and `reduceMotion` are options of `withSpring` that you set yourself.
+- It validates like `withDamped` and throws a `RangeError` for invalid options.
+- It is a plain function, not a worklet. Call it where you build the config, on the JavaScript thread, as above.
+- You get `withSpring`'s behavior, including the differences in the next section.
+
+## Why not just withSpring
+
+Both solve the same spring equation. They differ in two cases and in how time is handled. This is what Reanimated 4.5.1 does (`src/animation/spring/spring.ts`):
+
+| | `withSpring` (Reanimated 4.5.1) | `withDamped` |
+| --- | --- | --- |
+| Reversal | When a spring is retargeted, a velocity that points away from the new target is set to `0` (lines 189 to 197). The motion starts from a standstill and the momentum is lost. | The velocity is kept. |
+| Damping ratio of 1 or more | Uses the under-damped formula for `zeta < 1` and the critically damped one otherwise (line 116), so `bounce < 0` or a large `damping` behaves like `bounce: 0`. | Uses the exact overdamped solution above 1. |
+| Time | Steps from the previous frame, with each step clamped to 64 ms (line 106). | Evaluates at `now - startTime`. |
+
+### Why reversal velocity matters
+
+Picture a card that was flicked toward `200` and is moving right at some speed. The user taps to send it back to `0`. The velocity points away from the new target. With `withSpring`, the code at lines 189 to 197 sets it to `0`: the card stops dead and then accelerates back, and a person sees a hitch right at the moment they changed their mind. With `withDamped`, the card keeps its momentum, slows down, and turns around. That is how a physical object behaves, and it is the difference between motion that follows the user and motion that restarts.
+
+The same difference decides whether gesture-driven work feels right. A drag that is released with velocity should carry on that way, and a tap that arrives mid-flight should not discard it.
+
+The claims about `withDamped` are covered by tests against the core: its trajectory matches `@damped/core` within `1e-9`, a reversal keeps the velocity that `withSpring` would zero, and a long frame is not clamped. The tests run against a stand-in, not a device. For the same behavior in a real browser, the core's test shows a reversal that continues moving the same way for a moment (+37.0 px, then +27.2 px) before it turns back; that is a Chromium result for `@damped/core`, not a measurement of `@damped/native`.
+
+## Reduced motion
+
+`reduceMotion` follows Reanimated's `ReduceMotion`:
+
+| Value | Behavior |
+| --- | --- |
+| `ReduceMotion.System` (default) | The system setting decides when the animation starts. |
+| `ReduceMotion.Always` | Always reduced. |
+| `ReduceMotion.Never` | Never reduced. |
+
+When motion is reduced, Reanimated skips the animation: the value jumps to `toValue` and the animation ends, and the callback receives `true`. `withDamped` hands the choice to Reanimated this way: only `Always` and `Never` are pinned, and `System` is resolved by Reanimated when the animation starts.
+
+```tsx
+import { ReduceMotion, useSharedValue } from "react-native-reanimated";
+import { withDamped } from "@damped/native";
+
+export function useBadge() {
+  const scale = useSharedValue(1);
+  // A pop that is feedback, not decoration: keep it even if the system asks to reduce motion.
+  const pop = () => {
+    scale.value = withDamped(1.2, { duration: 0.2, reduceMotion: ReduceMotion.Never });
+  };
+  return { scale, pop };
+}
+```
+
+Use `ReduceMotion.Never` sparingly. See [Reduced motion](/guides/reduced-motion/) for the rule the web APIs follow.
+
+## Limitations
+
+- **Not run on a device.** See the note at the top of this page.
+- It targets the Reanimated 4 API (`defineAnimation`, `ReduceMotion`). Older versions are not supported, and only 4.5.1 is exercised by the checks.
+- It animates numbers. Colors, transforms as arrays and other value types are not handled by `withDamped`.
+- It is one spring function, not a replacement for Reanimated's layout animations, gesture integration or transitions. See [When to use Motion or Reanimated instead](/guides/faq/#when-to-use-motion-or-reanimated-instead).
+
+## Next
+
+<CardGrid>
+  <LinkCard title="Interruption and reversal" description="The idea behind withDamped, shown on the web." href="/guides/interruption-and-reversal/" />
+  <LinkCard title="Springs explained" description="What duration and bounce mean, and how they become stiffness and damping." href="/guides/springs-explained/" />
+  <LinkCard title="FAQ" description="Browser support, bundle size, and when to reach for Reanimated or Motion." href="/guides/faq/" />
+  <LinkCard title="Native reference" description="Signatures, options and edge cases of withDamped and toReanimated." href="/reference/native/" />
+</CardGrid>

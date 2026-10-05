@@ -1,0 +1,145 @@
+---
+title: FAQ
+description: Bundle size, server rendering, frame rate independence, browser support, why not CSS transitions, and when to use Motion or Reanimated instead.
+sidebar:
+  order: 10
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+
+## Size and setup
+
+### How big is it?
+
+Small enough to pay only for what you import. The figures below come from `bun run sizes` in the repository: each package is built as it ships, each consumer is bundled and minified the way an application would, and gzip is zlib's default level.
+
+| Consumer | Bundle | Gzip |
+| --- | ---: | ---: |
+| `animate` | 9,613 B | 4,044 B (3.95 KB) |
+| `animate` + `compositor` | 11,602 B | 4,784 B (4.67 KB) |
+| `layout` | 12,748 B | 5,186 B (5.06 KB) |
+| `morph` | 13,356 B | 5,428 B (5.30 KB) |
+| `enter` / `exit` | 11,374 B | 4,616 B (4.51 KB) |
+| full `@damped/core` | 18,198 B | 7,158 B (6.99 KB) |
+| `@damped/react` dist (`@damped/core` and `react` external) | 6,266 B | 2,534 B (2.47 KB) |
+| `useMorph` + `Presence` (`@damped/core` bundled, `react` external) | 19,288 B | 7,600 B (7.42 KB) |
+| `@damped/native` dist (not minified: the worklets plugin needs the directives) | 5,319 B | 1,609 B (1.57 KB) |
+
+- The packages are flagged `sideEffects: false`, so unused exports are dropped. `compositor` is a value you import, and an application that never passes it does not bundle it; it costs about 0.74 KB gzip when you do.
+- An application that only animates pays 3.95 KB. The whole core is 6.99 KB.
+- The Northbook playground, including React and React DOM, is 77,634 B of JavaScript gzip.
+
+### Is it on npm?
+
+Not yet. The three packages are used from the repository's workspace for now, and the docs do not claim a published version.
+
+## How it behaves
+
+### Does it work with server rendering?
+
+Yes. Importing any package on a server is safe: nothing touches `window`, `document`, `requestAnimationFrame`, `matchMedia` or `getComputedStyle` until an animation starts. The React hooks and `<Presence>` render on the server, and the effects that start animations never run there. Element APIs such as `animate` and `layout` need a real element, so they run on the client. Details, including the one hydration note for `useMorph`, are in [React](/guides/react/#server-rendering-and-hydration).
+
+### Does it depend on the frame rate?
+
+No. A spring is computed from its closed-form solution at the time of each frame, not stepped frame by frame. A test drives the same spring at 60 Hz, 144 Hz and an irregular cadence and gets the same state to within `1e-12`; a stepped integrator in the same test diverges by more than `1e-3`. A long frame, such as a 2 second hitch, is not clamped and does not change where the spring ends up. On a 120 Hz display the motion is simply sampled more often.
+
+### Does it use a lot of CPU when idle?
+
+No. There is one `requestAnimationFrame` loop and it sleeps when nothing is animating. Once every animation has settled, no animation frame is requested; a browser test checks that after `animate`, `layout` and `morph` have settled. A compositor animation requests no animation frame at all.
+
+### Which properties can I animate?
+
+`x`, `y`, `rotate`, `scale`, `scaleX`, `scaleY`, `opacity` and `blur`. These are `transform`, `opacity` and `filter`, the properties a browser can move without layout. To animate a change of size or position that comes from layout, use [`layout()` or `morph()`](/guides/layout-and-morph/), which turn the change into transforms. There is no `width`, `height` or `top` animation, by design.
+
+### Why was my own transform overwritten?
+
+damped owns the inline `transform` of an element it animates, and replaces whatever was there. Put a static transform on a wrapper element instead.
+
+### Can I read the velocity of an `animate()` call?
+
+No, `animate()` does not expose it. Use `createSpringValue` (or `useSpringValue` in React), which gives you `get()`, `getVelocity()` and `onChange`. The velocity readout in the [Demos](/guides/demos/) is built that way.
+
+### Can I stagger children?
+
+Not as an option. The core has no per-child delay. The Northbook playground staggers rows with a chain of timeouts on mount.
+
+## Browser support
+
+### Which browsers does it support?
+
+The packages are ES modules with no dependencies and no polyfills. They are tested in Chromium with Playwright; other engines are not part of the test suite.
+
+The Web Animations API (WAAPI) is optional: only the `compositor` driver needs it, and it falls back to the JS driver when `element.animate` is missing or when a spring never settles. `requestAnimationFrame`, `matchMedia` and `getComputedStyle` are optional too. Without them the scheduler uses a 16 ms timer, reduced motion is treated as off, and the initial opacity is taken as `1`.
+
+React needs version 19. React Native needs Reanimated 4 on Expo SDK 57 with the New Architecture; see [React Native and Expo](/guides/react-native/).
+
+### What does the compositor driver do?
+
+It hands a sampled spring to the browser through the Web Animations API, so the animation keeps moving while the main thread is busy. See the [Demos](/guides/demos/) page for the "block main thread" comparison. It is opt-in and works with `animate()` only, because layout and morph need a JavaScript correction on every frame.
+
+## Why not CSS transitions?
+
+For many things, CSS is the right answer: a hover color, a simple fade, anything that does not need to be interrupted. It needs no JavaScript and costs nothing. Use it.
+
+damped is for motion that has to survive being interrupted:
+
+- A CSS transition is a duration and a timing function over a fixed interval. When you retarget it, a new interval starts from the current value, and the speed the element had is not an input. A damped spring retargets from the current position **and** velocity, so a card reversed halfway turns around instead of stopping and restarting.
+- A spring is described by `duration` and `bounce`, and its settling time follows from those. A hand-tuned `cubic-bezier` or a `linear()` curve is fixed when you write it.
+- Layout changes cannot be transitioned directly. `layout()` and `morph()` do the FLIP bookkeeping, correct children and border radius, and keep the velocity when interrupted.
+- Exits need the element to stay in the DOM. `exit()` and `<Presence>` do that, and mark the leaving element `inert`.
+
+They also combine well. Use CSS for simple state changes and damped where a person can interrupt, reverse or reorder.
+
+## How does it compare?
+
+damped is a spring library with layout and morph support, a React adapter and a Reanimated adapter. The rest of this page keeps to what damped documents about itself.
+
+| You need | In damped |
+| --- | --- |
+| Springs that keep velocity when retargeted | Yes, in every API. |
+| Reorder or resize with FLIP, with scale correction | Yes: `layout()`, `snapshot()`, `useLayout`. |
+| A card that becomes a dialog and reverses mid-flight | Yes: `morph()`, `useMorph`. Both elements stay mounted. |
+| Enter and exit with an element that stays until it leaves | Yes: `enter()`, `exit()`, `<Presence>`. |
+| Animation that survives a busy main thread | Yes, with the `compositor` driver for `animate()`. |
+| A shared element across an unmount | No. `useMorph` needs both elements mounted. |
+| Gestures, drag, scroll-linked animation | No. |
+| Keyframes, timelines, sequencing on the web | No. Springs toward targets only. |
+| SVG path morphing | No. Only the eight properties listed earlier. |
+| Frameworks other than React | No. Core is framework-free, but there is no other adapter. |
+
+## When to use Motion or Reanimated instead
+
+damped does a few things and leaves the rest out on purpose. These are the cases where another library is the better fit, and where to find them.
+
+### On the web: Motion
+
+[Motion](https://motion.dev) covers gestures and scroll and works with more than React. Reach for it when you need:
+
+- **Gestures and drag.** damped has none. If your interface is built around dragging, flicking and pressing, use a library that has them.
+- **Scroll-linked animation.** damped animates in time, not against scroll position.
+- **Shared elements across unmounts.** `useMorph` keeps both elements mounted. Motion's `layoutId` can animate between an element React has unmounted and one that mounts. A registry like that is not built in damped yet.
+- **A framework other than React,** or a library with a longer track record and a bigger ecosystem. damped is new and not published to npm yet.
+
+damped also has no SVG path morphing, keyframes, timelines or sequencing: it animates the eight properties listed above toward a target. Motion's documentation will tell you whether and how it covers each of those.
+
+### On React Native: Reanimated
+
+[Reanimated](https://docs.swmansion.com/react-native-reanimated/) is the animation toolkit for React Native, and `@damped/native` is built on it. Stay with Reanimated on its own when you need:
+
+- **Gesture integration, layout animations and transitions.** `@damped/native` is one spring function, `withDamped`, plus a converter. It is not a replacement for any of them.
+- **A library that has been on a device.** `@damped/native` has not been run on a physical device or simulator yet.
+
+If the one thing you miss is a spring that keeps its velocity when it is reversed, you do not have to leave Reanimated: `withDamped` is a drop-in for `withSpring` that keeps the velocity. (`toReanimated` only converts damped's options for `withSpring`, so it keeps `withSpring`'s own reversal behavior.) See [Why not just withSpring](/guides/react-native/#why-not-just-withspring).
+
+### Using them together
+
+Nothing stops you from using damped for some elements and Motion for others on the same page. Just do not animate the same element with both: damped owns the inline `transform` of anything it animates.
+
+## Next
+
+<CardGrid>
+  <LinkCard title="Getting started" description="Install damped and animate your first value." href="/getting-started/" />
+  <LinkCard title="Demos" description="Six live demos you can interrupt." href="/guides/demos/" />
+  <LinkCard title="Springs explained" description="What duration and bounce mean." href="/guides/springs-explained/" />
+  <LinkCard title="React Native and Expo" description="withDamped and toReanimated on Reanimated 4." href="/guides/react-native/" />
+</CardGrid>

@@ -1,0 +1,287 @@
+---
+title: Layout
+description: layout, snapshot and measureLayout, the FLIP layout animation of @damped/core, with Box, LayoutOptions and LayoutSnapshot.
+---
+
+import { Badge } from "@astrojs/starlight/components";
+import { FlipReorder } from "../../../../components/demos/FlipReorder";
+
+Layout animation is FLIP: record where an element is, change the DOM, then spring the element from its old box to its new one. damped expresses the difference as `x`, `y`, `scaleX` and `scaleY` on the same values [`animate`](/reference/core/animate/) uses, so an interruption keeps position and velocity, and children and border radius can be kept undistorted while the parent scales.
+
+**Assumptions** (not enforced): the element is not rotated, its `scale` is `1` and its `transform-origin` is the center. While a layout runs, it owns `x`, `y`, `scaleX` and `scaleY` of the element; animating them elsewhere in the meantime is unsupported. The transform origin of the element is pinned to `50% 50%` once per run and restored at rest.
+
+Layout needs a browser. It reads real boxes, so it never runs on a server, and a test environment without layout (happy-dom reports zeros) has to supply boxes.
+
+## Functions
+
+### `layout`
+
+<Badge text="function" variant="default" size="small" />
+
+Records the boxes of `target`, runs `mutate`, and animates every element from its previous box to its new one.
+
+```ts nocheck
+export function layout(
+  target: Element | readonly Element[],
+  mutate: () => void,
+  options: LayoutOptions = {},
+): AnimationControls
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `target` | `Element \| readonly Element[]` | none | The element or elements whose boxes are recorded. |
+| `mutate` | `() => void` | none | Changes the DOM synchronously: reorder, add a class, change a size. |
+| `options` | [`LayoutOptions`](#layoutoptions) | `{}` | Spring, scheduler, reduced motion, child correction and radius. |
+
+**Returns** [`AnimationControls`](/reference/core/animate/#animationcontrols), combined over all elements.
+
+**Behavior**
+
+- It validates the options first, before `mutate` runs and before any element is touched. Then it takes a [`snapshot`](#snapshot), calls `mutate()` and starts the animation.
+- For each element it measures the new natural box, computes the deltas that map it onto the recorded visual box (`x` and `y` are center differences, `scaleX` and `scaleY` size ratios), `rebase`s the values to those deltas and animates them to the identity with the JS driver.
+- The inverse transform is written inline before `layout` returns, not in the next frame. Even when the DOM change lands between two frames, for example in a promise callback, no paint shows the new box without it: the first rendered frame shows the element on its previous box. Nothing jumps.
+- A box that changes by `0.01` px or less on every field counts as unchanged: nothing is written and no frame is requested, unless the element still has stale values from an earlier layout.
+- **Interruption.** Calling `layout` again while elements move keeps their velocity: translation velocity is carried and scale velocity is rescaled to the new reference size. An interrupted layout still settles at the identity.
+- **Reduced motion.** The element jumps to its new box on the first frame, corrections are cleaned immediately and `finished` resolves.
+- **Idle.** Once everything settles, no frame is requested.
+- `stop()` freezes and keeps the corrections it applied.
+
+**Edge cases**
+
+- A `mutate` that throws propagates, and nothing is started.
+- A zero-size natural box keeps that axis at scale `1`.
+- Invalid spring options throw a `RangeError` before `mutate` runs.
+- Scale is clamped away from `0` (at `0.001`) when computing inverse corrections, so a transient zero scale never produces `Infinity`.
+
+`layout` is the one-call form. When the DOM change happens elsewhere, for example in a framework render, take the [`snapshot`](#snapshot) yourself.
+
+<FlipReorder client:visible />
+
+**Example**
+
+```ts
+import { layout } from "@damped/core";
+
+const list = document.querySelector<HTMLElement>("ul");
+const last = list?.querySelector<HTMLElement>("li:last-child");
+
+if (list !== null && list !== undefined && last !== null && last !== undefined) {
+  // Snapshot, mutate, then animate from the previous box to the new one.
+  const controls = layout(last, () => list.prepend(last), { duration: 0.4, bounce: 0.1 });
+  await controls.finished;
+}
+```
+
+**See also**: [`snapshot`](#snapshot), [`LayoutOptions`](#layoutoptions), [`useLayout`](/reference/react/#uselayout), [`morph`](/reference/core/morph/#morph), [Layout and morph](/guides/layout-and-morph/), [Demos](/guides/demos/)
+
+### `snapshot`
+
+<Badge text="function" variant="default" size="small" />
+
+Records the current boxes of `target` so you can animate from them after you change the DOM yourself.
+
+```ts nocheck
+export function snapshot(target: Element | readonly Element[]): LayoutSnapshot
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `target` | `Element \| readonly Element[]` | none | The element or elements to record. |
+
+**Returns** a [`LayoutSnapshot`](#layoutsnapshot).
+
+**Behavior**
+
+- For each element it records the current visual box (the running transform included), the natural box and the velocities of `x`, `y`, `scaleX` and `scaleY` of its existing values.
+- A running compositor animation is first handed to the JS values at its exact state, so the measurements are correct.
+- It reads layout, so it forces a style recalculation. Take it as late as possible: after the last write you make and before the DOM change.
+
+**Edge cases**
+
+- Nothing is validated until you call `animate()`.
+- Elements animate from where they appear to be, so a snapshot taken while an element is mid-flight records the visual box including the running transform.
+
+**Example**
+
+```ts
+import { snapshot } from "@damped/core";
+
+const list = document.querySelector<HTMLElement>("ul");
+
+if (list !== null) {
+  const items = [...list.querySelectorAll<HTMLElement>("li")];
+  const before = snapshot(items);
+
+  // A framework render or any other DOM change goes here.
+  for (const item of items.reverse()) list.append(item);
+
+  const controls = before.animate({ duration: 0.4, correct: "children", radius: 12 });
+  await controls.finished;
+}
+```
+
+**See also**: [`LayoutSnapshot`](#layoutsnapshot), [`layout`](#layout), [`measureLayout`](#measurelayout)
+
+### `measureLayout`
+
+<Badge text="function" variant="default" size="small" />
+
+Returns the natural layout box of an element in viewport coordinates, ignoring any transform damped is currently applying.
+
+```ts nocheck
+export function measureLayout(element: Element): Box
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `element` | `Element` | none | The element to measure. |
+
+**Returns** a [`Box`](#box).
+
+**Behavior**
+
+- It is `getBoundingClientRect()` with the element's inline `transform` cleared for the measurement and restored byte for byte afterwards, even if the measurement throws.
+- It skips the style writes when the transform is empty, `"none"` or the identity string, because those cannot change the box.
+- It forces a layout read.
+
+**Edge cases**
+
+- It needs a real layout engine. In happy-dom `getBoundingClientRect()` reports zeros.
+- An element without `style` (a non-styleable node) is measured without any write.
+
+**Example**
+
+```ts
+import { animate, measureLayout } from "@damped/core";
+
+const badge = document.querySelector<HTMLElement>(".badge");
+
+if (badge !== null) {
+  void animate(badge, { x: 120 }); // moving...
+  const natural = measureLayout(badge); // ...but this is where it lives in the layout
+  console.log(natural.x, natural.y, natural.width, natural.height);
+}
+```
+
+**See also**: [`Box`](#box), [`snapshot`](#snapshot), [`layout`](#layout)
+
+## Types
+
+### `Box`
+
+<Badge text="type" variant="default" size="small" />
+
+A rectangle in viewport coordinates.
+
+```ts nocheck
+export interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+```
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `x` | `number` | none | Left edge, in px. |
+| `y` | `number` | none | Top edge, in px. |
+| `width` | `number` | none | Width in px. |
+| `height` | `number` | none | Height in px. |
+
+**Behavior**
+
+- `x` and `y` are the left and top of `getBoundingClientRect()`, in viewport coordinates, not relative to the page or to a parent.
+
+**Example**
+
+```ts
+import { measureLayout, type Box } from "@damped/core";
+
+export function center(element: Element): { x: number; y: number } {
+  const box: Box = measureLayout(element);
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+```
+
+**See also**: [`measureLayout`](#measurelayout), [`snapshot`](#snapshot)
+
+### `LayoutOptions`
+
+<Badge text="type" variant="default" size="small" />
+
+The options of [`layout`](#layout) and [`LayoutSnapshot.animate`](#layoutsnapshot): the spring, scheduler and reduced motion options of [`animate`](/reference/core/animate/#animateoptions), plus child correction and radius.
+
+```ts nocheck
+export type LayoutOptions = DistributiveOmit<AnimateOptions, "from" | "driver"> & {
+  correct?: readonly HTMLElement[] | "children";
+  radius?: number;
+};
+```
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| spring options | [`SpringOptions`](/reference/core/springs/#springoptions) | `duration: 0.5`, `bounce: 0.15` | Either form. Validated first. |
+| `scheduler` | [`Scheduler`](/reference/core/scheduler/#scheduler) | the shared [`frame`](/reference/core/scheduler/#frame) | Fixed per element by the first call. |
+| `reducedMotion` | `"user" \| "always" \| "never"` | `"user"` | The element jumps to its new box when reduced motion is on. |
+| `correct` | `readonly HTMLElement[] \| "children"` | none: children are left alone | Children whose size must not distort while the parent scales. Each gets `transform: scale(1/sx, 1/sy)` with `transform-origin: 0 0`, written in the same job as the parent. `"children"` resolves, when `animate()` runs, to the direct element children that have a `style`. An explicit list corrects only those. |
+| `radius` | `number` | none | Border radius in px kept visually constant while the element scales. Written as `${r/sx}px / ${r/sy}px` while scaling and `${r}px` at rest. Finite and `>= 0`, otherwise a `RangeError`. |
+
+**Behavior**
+
+- `from` and `driver` are removed from the type: a layout would ignore them. Both spring option forms stay available.
+- [`morph`](/reference/core/morph/#morphoptions) extends this type and defaults `correct` to `"children"`.
+
+**Example**
+
+```ts
+import { layout, type LayoutOptions } from "@damped/core";
+
+const options: LayoutOptions = { duration: 0.45, bounce: 0.1, correct: "children", radius: 16 };
+
+const card = document.querySelector<HTMLElement>(".card");
+if (card !== null) {
+  void layout(card, () => card.classList.toggle("expanded"), options);
+}
+```
+
+**See also**: [`layout`](#layout), [`LayoutSnapshot`](#layoutsnapshot), [`AnimateOptions`](/reference/core/animate/#animateoptions), [`MorphOptions`](/reference/core/morph/#morphoptions)
+
+### `LayoutSnapshot`
+
+<Badge text="type" variant="default" size="small" />
+
+The recorded boxes returned by [`snapshot`](#snapshot), with one method to animate from them.
+
+```ts nocheck
+export interface LayoutSnapshot {
+  /** Animates every recorded element from its recorded visual box to its current natural layout. */
+  animate(options?: LayoutOptions): AnimationControls;
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `animate(options?)` | `(options?: LayoutOptions) => AnimationControls` | Animates every recorded element from its recorded box to its current natural layout. |
+
+**Behavior**
+
+- `animate` validates the options before it measures or writes anything.
+- Call it after the DOM change. Calling it without a change is a no-op for elements whose box did not move.
+
+**Example**
+
+```ts
+import { snapshot, type LayoutSnapshot } from "@damped/core";
+
+const panel = document.querySelector<HTMLElement>(".panel");
+
+if (panel !== null) {
+  const before: LayoutSnapshot = snapshot(panel);
+  panel.classList.add("wide");
+  void before.animate({ duration: 0.4, correct: "children" });
+}
+```
+
+**See also**: [`snapshot`](#snapshot), [`layout`](#layout), [`LayoutOptions`](#layoutoptions), [`AnimationControls`](/reference/core/animate/#animationcontrols)

@@ -1,0 +1,304 @@
+---
+title: "@damped/native"
+description: API reference for @damped/native, velocity-preserving springs for React Native Reanimated.
+---
+
+import { Tabs, TabItem, Badge } from "@astrojs/starlight/components";
+
+`@damped/native` brings damped's springs to [Reanimated](https://docs.swmansion.com/react-native-reanimated/) shared values. It is one animation, `withDamped`, and one helper, `toReanimated`. It does not replace Reanimated: you keep its shared values, styles, gestures and layout animations, and use `withDamped` where `withSpring` would go.
+
+<Tabs syncKey="package-manager">
+  <TabItem label="Expo">
+
+```sh
+npx expo install react-native-reanimated
+npm install @damped/native
+```
+
+  </TabItem>
+  <TabItem label="bun">
+
+```sh
+bun add react-native-reanimated @damped/native
+```
+
+  </TabItem>
+</Tabs>
+
+:::caution[Not published yet]
+The packages have not been published to npm at the time of writing. The commands above are what you will run once they are; until then, use the workspace packages from the repository.
+:::
+
+## Requirements
+
+- Expo SDK 57, with the New Architecture.
+- `react-native-reanimated` 4.0 or newer as a peer dependency. The package is developed and tested against Reanimated 4.5.1, `react-native-worklets` 0.10.1 and React Native 0.86.3.
+- The package has not been run on a physical device or a simulator yet. Its tests run against a stand-in for the parts of Reanimated that `withDamped` touches, and against the Babel plugin transform of its own sources. Treat on-device behavior as expected, not verified.
+
+Signature blocks are declarations excerpted from the source and are marked `nocheck` because they have no bodies. Every other `ts` and `tsx` block is a complete example that the docs test suite typechecks.
+
+## All exports
+
+| Export | Kind | Worklet |
+| --- | --- | --- |
+| [`withDamped`](#withdamped) | function | yes: marked `"worklet"` |
+| [`toReanimated`](#toreanimated) | function | no: a regular function |
+| [`DampedOptions`](#dampedoptions), [`DampedSpringOptions`](#dampedspringoptions), [`DampedParams`](#dampedparams) | types | |
+
+## How it runs: worklets and the UI thread
+
+Reanimated runs animations on the UI thread, in JavaScript functions called worklets. Two consequences shape this package:
+
+- **`withDamped` is a worklet.** Its source carries a `"worklet"` directive, so you can call it from the JS thread (an event handler) or on the UI thread (a gesture handler, `useAnimatedStyle`, `useAnimatedReaction`). It builds an animation with Reanimated's public `defineAnimation`. The animation's `onStart` and `onFrame` also run on the UI thread. Your `callback` runs there too, so it has to be a worklet; use `runOnJS` to reach the JS thread.
+- **`toReanimated` is not a worklet.** Its own body has no `"worklet"` directive; only the helper it calls does. It is a plain function that returns a plain object: call it on the JS thread and capture the result, and use `withDamped` when you need the animation inside a worklet.
+
+The package ships unminified because `bun build --minify` strips `"worklet"` directives. The shipped build is 5,319 B (1,609 B gzip), and a bundle test fails if a directive is lost. The spring math lives in one module that imports nothing, because a worklet can only call other worklets.
+
+## Why not just `withSpring`
+
+`withSpring` is a fine animation. These are the differences `withDamped` removes, checked against the source of Reanimated 4.5.1 (`src/animation/spring/spring.ts`):
+
+| | `withSpring` in Reanimated 4.5.1 | `withDamped` |
+| --- | --- | --- |
+| Reversal | When a spring is retargeted, a velocity that points away from the new target is set to `0` (lines 189 to 197: "Inertia is only preserved when it already points toward toValue"). Reversing mid-flight starts from a standstill. | Keeps the velocity of the running animation. |
+| Damping ratio | The under-damped formula is used for a damping ratio below 1, and the critically damped formula for everything else (line 116). `bounce < 0` or a large `damping` behaves like `bounce: 0`. | Solves the over-damped case exactly: no overshoot, slower approach. |
+| Time | Steps from the previous frame, each step clamped to 64 ms (line 106). | Evaluates the closed form at `now - startTime`, so frame rate and a long frame do not change where it ends up. |
+| Velocity merging | Adds `config.velocity` to the previous animation's velocity (lines 180 to 187). | A moving previous animation wins; the `velocity` option is used only when there is none. |
+| Mass | Defaults `mass` to `4`. | `mass` defaults to `1`, as in the other damped packages. |
+
+An illustration of the first row, computed with the spring math that `withDamped` matches within `1e-9`. A shared value moves from `0` to `200` with `{ duration: 0.5, bounce: 0.15 }`. After 100 ms it is at 77.6 and moving at 1007.8 per second. You reverse it to `0`:
+
+| Time after the reversal | Keeping the velocity (`withDamped`) | Velocity set to `0` |
+| --- | --- | --- |
+| 0 ms | 77.6 | 77.6 |
+| 16 ms | 89.8 | 76.2 |
+| 32 ms | 95.4 | 72.6 |
+| 50 ms | 95.9 | 66.9 |
+| 80 ms | 88.2 | 55.4 |
+| 120 ms | 70.0 | 39.9 |
+
+With the velocity kept, the value carries on upward for about 43 ms and peaks at 96.3 before it turns, the way a physical object with inertia would. With it cleared, it turns around at once.
+
+The package is covered by 40 parity tests against the core spring within `1e-9`, and by tests that show a reversal keeping the velocity that `withSpring` would clear, and that a 2 s hitch is not clamped. See [React Native](/guides/react-native/) for the full story and [Interruption and reversal](/guides/interruption-and-reversal/) for the idea.
+
+## Functions
+
+### `withDamped`
+
+<Badge text="function" variant="default" size="small" />
+
+A spring animation for Reanimated shared values. The state is computed analytically from the start of the animation, and an interrupted animation hands its velocity to the next one without clipping it.
+
+```ts nocheck
+export function withDamped(toValue: number, options?: DampedOptions, callback?: AnimationCallback): number
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `toValue` | `number` | none | The target. Not validated by the package. |
+| `options` | [`DampedOptions`](#dampedoptions) | `{}` | Spring options, an initial `velocity` and `reduceMotion`. |
+| `callback` | Reanimated's `AnimationCallback`, `(finished?, current?) => void` | none | Called when the animation ends: `true` when it settled, `false` when it was interrupted. Must be a worklet. |
+
+**Returns** a `number`, as `withSpring` does. The value is really an animation object; assign it to a shared value (`x.value = withDamped(...)`).
+
+**Behavior**
+
+- **Evaluation.** Closed form from the start of the animation: `t = max(now - startTime, 0) / 1000` seconds, and the spring state at `t`. Not integrated per frame, so the state does not depend on frame rate or on hitches, and a long frame is not clamped. It matches the core spring within `1e-9`.
+- **Rest.** When the position is within `restDelta` and the speed within `restSpeed`, the value is set to `toValue`, the velocity to `0`, and the animation finishes with `callback(true)`.
+- **Interruption.** The previous animation's `velocity` is inherited when it is a non-zero finite number, otherwise `options.velocity ?? 0` is used. There is no clipping. A `velocity` option never overrides a running animation's velocity. The interrupted animation's callback receives `false`.
+- **Start at the target.** An animation that starts on its target with no velocity finishes at once.
+- **Over-damped springs** (`bounce < 0`, or a large `damping`) approach the target without overshoot.
+- **Reduced motion.** `reduceMotion: ReduceMotion.Always` pins reduced motion: the shared value jumps to `toValue` and the animation ends, with `callback(true)`. `ReduceMotion.Never` pins animated even when the system asks to reduce motion. `ReduceMotion.System` and `undefined` are resolved by Reanimated when the animation starts, so the default follows the system setting.
+- **Composition.** `withSequence`, `withDelay` and `withRepeat` are expected to work, since `withDamped` is built on `defineAnimation`. The package's tests do not cover them: this is expected behavior that has not been run in an app. A preceding animation that exposes a velocity hands it over.
+- **Not handled:** colors, array-valued transforms, anything but numbers, and Reanimated versions older than 4.
+
+**Edge cases**
+
+- It throws synchronously, where it is called, a `RangeError` for invalid spring options (the same messages as the core) and for a non-finite `velocity`: `velocity must be a finite number, received …`.
+- Server rendering does not apply: it is React Native only.
+
+**Example**
+
+```tsx
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
+import { withDamped } from "@damped/native";
+
+export function SlidingSquare() {
+  const x = useSharedValue(0);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+
+  // Press again while it moves: the new spring starts with the velocity the old one had.
+  const toggle = () => {
+    x.value = withDamped(x.value === 0 ? 200 : 0, { duration: 0.5, bounce: 0.15 }, (finished) => {
+      "worklet";
+      console.log(finished === true ? "settled" : "interrupted");
+    });
+  };
+
+  return <Animated.View onTouchEnd={toggle} style={[{ width: 80, height: 80, backgroundColor: "#16181d" }, style]} />;
+}
+```
+
+**See also**: [`DampedOptions`](#dampedoptions), [`toReanimated`](#toreanimated), [`createSpring`](/reference/core/springs/#createspring), [React Native guide](/guides/react-native/), [Reduced motion](/guides/reduced-motion/), [Interruption and reversal](/guides/interruption-and-reversal/)
+
+### `toReanimated`
+
+<Badge text="function" variant="default" size="small" />
+
+Maps damped's perceptual spring options to the physical config of Reanimated's `withSpring`.
+
+```ts nocheck
+export function toReanimated(options?: DampedSpringOptions): DampedParams
+```
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `options` | [`DampedSpringOptions`](#dampedspringoptions) | `{}` | Either form. `duration: 0.5` and `bounce: 0.15` apply when omitted. |
+
+**Returns** [`DampedParams`](#dampedparams): `{ stiffness, damping, mass }`, a valid physics-based `withSpring` config. The `mass` is always explicit, because `withSpring` would otherwise default it to `4`, which changes the motion.
+
+**Behavior**
+
+- It is a regular function, not a worklet. Call it on the JS thread; the result is a plain object you can capture in a worklet.
+- It ignores `restDelta` and `restSpeed`, `velocity` and `reduceMotion`. Pass those to `withSpring` yourself.
+- You then get `withSpring`'s behavior, including the velocity clipping on reversal and the critically damped formula for a damping ratio of 1 or more. Use [`withDamped`](#withdamped) when you want to avoid both.
+
+**Edge cases**
+
+- It throws the same `RangeError`s as the core for invalid options.
+
+**Example**
+
+```tsx
+import { useSharedValue, withSpring } from "react-native-reanimated";
+import { toReanimated } from "@damped/native";
+
+export function useSlide() {
+  const x = useSharedValue(0);
+  const slide = () => {
+    x.value = withSpring(200, toReanimated({ duration: 0.5, bounce: 0.15 }));
+  };
+  return { x, slide };
+}
+```
+
+**See also**: [`withDamped`](#withdamped), [`DampedParams`](#dampedparams), [`springParams`](/reference/core/springs/#springparams), [React Native guide](/guides/react-native/)
+
+## Types
+
+### `DampedSpringOptions`
+
+<Badge text="type" variant="default" size="small" />
+
+The spring options of the native package: the same two forms, defaults and validation as [`SpringOptions`](/reference/core/springs/#springoptions) in the core.
+
+```ts nocheck
+export type DampedSpringOptions =
+  | { duration?: number; bounce?: number; restDelta?: number; restSpeed?: number }
+  | { stiffness: number; damping: number; mass?: number; restDelta?: number; restSpeed?: number };
+```
+
+| Field | Type | Default | Valid | Description |
+| --- | --- | --- | --- | --- |
+| `duration` | `number` | `0.5` | finite, `> 0` | Perceptual form. Period of the undamped oscillation in seconds. |
+| `bounce` | `number` | `0.15` | `-1 < bounce < 1` | Perceptual form. `0` is critically damped, negative is over-damped. |
+| `stiffness` | `number` | none, required in this form | finite, `> 0` | Physical form. |
+| `damping` | `number` | none, required in this form | finite, `>= 0` | Physical form. |
+| `mass` | `number` | `1` | finite, `> 0` | Physical form. |
+| `restDelta` | `number` | `0.001` | finite, `> 0` | Distance from the target that counts as at rest. |
+| `restSpeed` | `number` | `0.01` | finite, `> 0` | Speed that counts as at rest. |
+
+**Behavior**
+
+- Parity with the core is tested: the same grid of `duration` and `bounce` gives the same stiffness and damping, and invalid input throws the same `RangeError`.
+- The physical form is selected by the presence of `stiffness`.
+
+**Example**
+
+```ts
+import { toReanimated, type DampedSpringOptions } from "@damped/native";
+
+const perceptual: DampedSpringOptions = { duration: 0.4, bounce: 0.1 };
+const physical: DampedSpringOptions = { stiffness: 200, damping: 20, mass: 1 };
+
+console.log(toReanimated(perceptual), toReanimated(physical));
+```
+
+**See also**: [`SpringOptions`](/reference/core/springs/#springoptions), [`DampedOptions`](#dampedoptions), [`toReanimated`](#toreanimated)
+
+### `DampedParams`
+
+<Badge text="type" variant="default" size="small" />
+
+The physical parameters of a spring: what [`toReanimated`](#toreanimated) returns, in the shape of a `withSpring` physics config.
+
+```ts nocheck
+export interface DampedParams {
+  stiffness: number;
+  damping: number;
+  mass: number;
+}
+```
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `stiffness` | `number` | none | Spring constant. |
+| `damping` | `number` | none | Damping coefficient. |
+| `mass` | `number` | `1` from the perceptual form | Mass, always explicit. |
+
+**Behavior**
+
+- Same shape as [`SpringParams`](/reference/core/springs/#springparams-1) in the core.
+- It is a plain object, so it can be captured in a worklet.
+
+**Example**
+
+```ts
+import type { DampedParams } from "@damped/native";
+
+const params: DampedParams = { stiffness: 157.9, damping: 25.1, mass: 1 };
+const dampingRatio = params.damping / (2 * Math.sqrt(params.stiffness * params.mass));
+
+console.log(dampingRatio.toFixed(2)); // 1.00: critically damped
+```
+
+**See also**: [`toReanimated`](#toreanimated), [`SpringParams`](/reference/core/springs/#springparams-1), [`DampedSpringOptions`](#dampedspringoptions)
+
+### `DampedOptions`
+
+<Badge text="type" variant="default" size="small" />
+
+The options of [`withDamped`](#withdamped): the spring options plus an initial velocity and a reduced-motion choice.
+
+```ts nocheck
+export type DampedOptions = DampedSpringOptions & {
+  /** Initial velocity in units per second, used when no running animation passes its own. */
+  velocity?: number;
+  reduceMotion?: ReduceMotion;
+};
+```
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| spring options | [`DampedSpringOptions`](#dampedspringoptions) | `duration: 0.5`, `bounce: 0.15` | Either form. |
+| `velocity` | `number` | `0` | Initial velocity in units per second. Used only when no running animation passes its own. Must be finite, otherwise a `RangeError`. |
+| `reduceMotion` | Reanimated's `ReduceMotion` | the system setting | `ReduceMotion.Always` and `ReduceMotion.Never` are pinned. `ReduceMotion.System` and `undefined` are resolved by Reanimated when the animation starts. |
+
+**Behavior**
+
+- `velocity` is how a gesture hands its release speed to the spring: pass the gesture's velocity in units per second.
+- A running animation that is moving always wins over the `velocity` option.
+
+**Example**
+
+```ts
+import { ReduceMotion } from "react-native-reanimated";
+import type { DampedOptions } from "@damped/native";
+
+const fling: DampedOptions = { stiffness: 200, damping: 20, velocity: 1200, reduceMotion: ReduceMotion.Never };
+const gentle: DampedOptions = { duration: 0.6, bounce: 0, reduceMotion: ReduceMotion.System };
+
+console.log(fling.velocity, gentle.duration);
+```
+
+**See also**: [`withDamped`](#withdamped), [`DampedSpringOptions`](#dampedspringoptions), [Reduced motion](/guides/reduced-motion/)

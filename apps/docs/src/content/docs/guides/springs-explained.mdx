@@ -1,0 +1,170 @@
+---
+title: Springs explained
+description: What duration and bounce mean, how they map to stiffness and damping, and why an analytic spring is exact at any moment.
+sidebar:
+  order: 1
+---
+
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
+import { RetargetSpring } from "../../../components/demos/RetargetSpring";
+import { SpringTuner } from "../../../components/demos/SpringTuner";
+
+A spring animation moves a value toward a target the way a mass on a spring would: fast at first, slowing down as it arrives, optionally overshooting. Unlike an easing curve, a spring has a state, a position **and a velocity**, and that state is what makes it interruptible.
+
+## Two ways to describe a spring
+
+Every damped API takes the same options, in one of two forms.
+
+| | Perceptual | Physical |
+| --- | --- | --- |
+| Options | `duration`, `bounce` | `stiffness`, `damping`, `mass` |
+| You say | "About half a second, a little bounce." | "A spring of this stiffness, this much friction, this heavy." |
+| Defaults | `duration: 0.5`, `bounce: 0.15` | `mass: 1`; `stiffness` and `damping` have none |
+| Selected by | Leaving `stiffness` out. | Passing `stiffness` (and then `damping`). |
+
+Both describe the same physics. `springParams` shows the conversion:
+
+```ts
+import { springParams } from "@damped/core";
+
+// The defaults: duration 0.5, bounce 0.15.
+console.log(springParams());
+// { stiffness: 157.91…, damping: 21.36…, mass: 1 }
+
+// No bounce at all: critically damped.
+console.log(springParams({ duration: 0.5, bounce: 0 }));
+// { stiffness: 157.91…, damping: 25.13…, mass: 1 }
+
+// The physical form is returned as it is.
+console.log(springParams({ stiffness: 170, damping: 26, mass: 1 }));
+```
+
+The conversion uses a mass of 1:
+
+```
+omega     = 2π / duration
+stiffness = omega²
+zeta      = 1 - bounce        when bounce >= 0
+            1 / (1 + bounce)  when bounce < 0
+damping   = 2 · zeta · omega
+```
+
+`zeta` is the damping ratio: below 1 the spring overshoots, at 1 it is critically damped and above 1 it is overdamped.
+
+### Which one to use
+
+Start with `duration` and `bounce`. They describe what you see, and they stay meaningful when you change one of them: halving `duration` makes the same motion twice as fast without changing its character. Reach for `stiffness`, `damping` and `mass` when:
+
+- you are porting a motion from a library or a design tool that gives you physical values;
+- you need a different `mass`, for example to make a heavy element lag;
+- you want to reason about the physics, for instance `zeta = damping / (2 · sqrt(stiffness · mass))`.
+
+`bounce` must be between -1 and 1 (exclusive); invalid values throw a `RangeError` that names the option.
+
+## What `duration` is not
+
+`duration` is the **period of the underlying oscillation**, not the time the animation takes to come to rest. A spring approaches its target gradually, so "at rest" needs a definition: damped counts it as settled once it is within `restDelta` of the target and slower than `restSpeed`. `settleTime()` tells you when that happens.
+
+```ts
+import { createSpring } from "@damped/core";
+
+const spring = createSpring(0, 100, 0, { duration: 0.5, bounce: 0.15 });
+
+console.log(spring.settleTime().toFixed(2)); // 1.16
+console.log(spring.isSettled(0.5)); // false
+console.log(spring.isSettled(spring.settleTime())); // true
+```
+
+With the defaults a 100-unit move settles in about 1.16 s through `createSpring`. `animate` uses coarser thresholds suited to pixels (0.01 px, 0.1 px/s), so the same move through `animate({ x: 100 })` rests at 0.94 s. The last digits of a spring's tail are invisible, and stopping there saves frames.
+
+### How `bounce` feels
+
+The overshoot depends only on the damping ratio, so it is the same for any `duration`. The settle times below are for a 100 px move through `animate` at `duration: 0.5`; they grow roughly in proportion to `duration`.
+
+| `bounce` | `zeta` | Peak overshoot | Settles after | Feel |
+| --- | --- | --- | --- | --- |
+| `-0.5` | 2.00 | none | 2.78 s | Heavy and slow, creeps in with no overshoot. |
+| `0` | 1.00 | none | 0.95 s | Fastest approach without overshoot. |
+| `0.15` (default) | 0.85 | 0.63 % | 0.94 s | Settles with a barely visible give. |
+| `0.3` | 0.70 | 4.6 % | 1.11 s | Visibly springy. |
+| `0.5` | 0.50 | 16.3 % | 1.53 s | Playful, wobbles before it rests. |
+
+<Aside type="tip">
+  Prefer a small positive `bounce` (0.1 to 0.2) for most interface motion. It settles about as fast as `bounce: 0`, and the tiny overshoot reads as physical rather than mechanical. Use a negative `bounce` only when overshoot would be wrong, such as a value that must not exceed its target.
+</Aside>
+
+Try it. The sliders redraw the analytic curve and Replay plays a real spring with the same options.
+
+<SpringTuner client:visible />
+
+## Analytic: the exact state at any time
+
+Many animation engines advance a spring by stepping: each frame adds a small change to the position and velocity. That is an approximation, and the result depends on the frame rate. damped solves the spring equation in closed form, so for any time `t` it can compute the exact position and velocity directly, for underdamped, critically damped and overdamped springs alike.
+
+```ts
+import { createSpring, springParams } from "@damped/core";
+
+const options = { duration: 0.5, bounce: 0.15 } as const;
+const { stiffness, damping, mass } = springParams(options);
+
+// Explicit Euler: add acceleration × step each frame.
+function stepped(target: number, seconds: number, hz: number): number {
+  const dt = 1 / hz;
+  let position = 0;
+  let velocity = 0;
+  for (let frame = 0; frame < Math.round(seconds * hz); frame++) {
+    const acceleration = (stiffness * (target - position) - damping * velocity) / mass;
+    position += velocity * dt;
+    velocity += acceleration * dt;
+  }
+  return position;
+}
+
+const exact = createSpring(0, 100, 0, options).at(0.5).position;
+
+console.log(exact.toFixed(3)); // 100.602, the same on every device
+console.log(stepped(100, 0.5, 60).toFixed(3)); // 100.684
+console.log(stepped(100, 0.5, 144).toFixed(3)); // 100.673
+```
+
+Stepping gives a different answer at 60 Hz and at 144 Hz, and neither is the true one. Evaluating the closed form gives the same state whatever frames came before. In damped's tests the state of an animation after a given time is identical at 60 Hz, at 144 Hz and at an irregular frame cadence, to within 1e-12, while an explicit Euler control diverges by more than 1e-3.
+
+What that buys you:
+
+- **Frame-rate independence.** A 120 Hz display, a 60 Hz one and a laggy tab all draw points on the same curve.
+- **Hitches do not distort the motion.** A 2 s stall is not clamped or smoothed: the next frame simply evaluates the curve at the new time.
+- **You can ask questions without animating.** `settleTime()`, `isSettled(t)` and `at(t)` work on a spring that nothing is playing.
+- **Handover to the browser.** The [compositor driver](/guides/compositor/) samples the same curve into keyframes.
+
+## Velocity continuity
+
+A spring's state is `{ position, velocity }`. When the target changes while it is moving, the new spring must start from that state, or the motion visibly jerks.
+
+```ts
+import { createSpring } from "@damped/core";
+
+const options = { duration: 0.5, bounce: 0.15 } as const;
+
+// Heading to 100, interrupted 200 ms in.
+const first = createSpring(0, 100, 0, options);
+const { position, velocity } = first.at(0.2);
+console.log(position.toFixed(1), velocity.toFixed(1)); // 78.6 273.2
+
+// The new target is 0, but the element is still moving forward at 273 units per second.
+const second = createSpring(position, 0, velocity, options);
+console.log(second.at(0.02).position.toFixed(1)); // 80.9: it keeps going forward for a moment, then turns
+```
+
+`animate`, `createSpringValue`, `layout`, `morph` and the React hooks do this for you on every retarget. Drag the marker below while it is moving and watch the velocity trace: it never snaps to zero.
+
+<RetargetSpring client:visible />
+
+An easing curve such as `ease-out` has no velocity to carry. Interrupt it and the new animation starts from rest, so the motion stalls and restarts. [Interruption and reversal](/guides/interruption-and-reversal/) goes through what that looks like and how damped handles reversals of layout, morph and presence.
+
+## Next
+
+<CardGrid>
+  <LinkCard title="Interruption and reversal" description="Retargeting, velocity carry-over and cancellation." href="/guides/interruption-and-reversal/" />
+  <LinkCard title="The compositor driver" description="Run the same spring on the browser's compositor thread." href="/guides/compositor/" />
+  <LinkCard title="@damped/core reference" description="Spring options, createSpring and springParams in full." href="/reference/core/" />
+</CardGrid>

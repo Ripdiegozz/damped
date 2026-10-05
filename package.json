@@ -12,7 +12,11 @@
     "playground:serve": "bun apps/playground/serve.ts",
     "docs:check": "bun scripts/check-readme-examples.ts",
     "sizes": "bun scripts/sizes.ts",
-    "demo:gif": "bun scripts/record-demo.ts"
+    "demo:gif": "bun scripts/record-demo.ts",
+    "docs:build": "bun run --filter @damped/docs build",
+    "docs:dev": "bun run --filter @damped/docs dev",
+    "site:build": "bun apps/docs/scripts/assemble-site.ts",
+    "site:check": "bun apps/docs/scripts/check-site.ts"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",

@@ -1,0 +1,32 @@
+---
+// Replaces Starlight's Hero on pages with `hero` frontmatter (only the landing page has one). Same data, same
+// LinkButton, same `_top` page-title anchor; the difference is the live morph card next to the copy.
+import { LinkButton } from "@astrojs/starlight/components";
+import { MorphCard } from "../demos";
+
+const { data } = Astro.locals.starlightRoute.entry;
+const { title = data.title, tagline, actions = [] } = data.hero ?? {};
+---
+
+<div class="hero landing-hero">
+  <div class="landing-hero__copy">
+    <h1 id="_top" data-page-title set:html={title} />
+    {tagline && <p class="landing-hero__tagline" set:html={tagline} />}
+    {
+      actions.length > 0 && (
+        <div class="landing-hero__actions">
+          {actions.map(({ attrs: { class: className, ...attrs } = {}, icon, link: href, text, variant }) => (
+            <LinkButton {href} {variant} icon={icon?.name} class:list={[className]} {...attrs}>
+              {text}
+              {icon?.html && <Fragment set:html={icon.html} />}
+            </LinkButton>
+          ))}
+        </div>
+      )
+    }
+  </div>
+  <div class="landing-hero__visual">
+    <MorphCard client:load variant="compact" />
+    <p class="landing-hero__hint">Click the card, then press <kbd>Esc</kbd> mid-flight to reverse it.</p>
+  </div>
+</div>

@@ -19,5 +19,17 @@
       "@damped/react": ["./packages/react/src/index.ts"]
     }
   },
-  "include": ["packages/*/src", "packages/*/test", "apps/*/src", "apps/*/test", "apps/*/*.ts", "test", "e2e", "scripts", "playwright.config.ts"]
+  "include": [
+    "packages/*/src",
+    "packages/*/test",
+    "apps/*/src",
+    "apps/*/test",
+    "apps/*/*.ts",
+    "apps/docs/scripts",
+    "test",
+    "e2e",
+    "scripts",
+    "playwright.config.ts"
+  ],
+  "exclude": ["apps/docs/src/content.config.ts"]
 }

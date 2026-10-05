@@ -56,8 +56,8 @@ Give damped its own identity: a mark built from the physics of the library, a re
 
 | ID | Task | Route | Status | Commits |
 | --- | --- | --- | --- | --- |
-| B1 | Brand system: `brand/` sources (mark, small mark, outlined wordmark, lockups, tokens) and the `bun run brand` generator with a drift test | delegated (writer: 2+ non-trivial files) | todo | |
-| B2 | Fix code frames and asides: Expressive Code `styleOverrides`, drop the radius rule, built-output test | inline (one mechanical, understood change) | todo | |
+| B1 | Brand system: `brand/` sources (mark, small mark, outlined wordmark, lockups, tokens) and the `bun run brand` generator with a drift test | delegated (writer: 2+ non-trivial files) | done | `332a80a` `f1096e3` |
+| B2 | Fix code frames and asides: Expressive Code `styleOverrides`, drop the radius rule, built-output test | inline (one mechanical, understood change) | done | `3d62d81` |
 | B3 | Docs theme: Geist/Geist Mono, dark-first tokens, accent rules, Starlight chrome, code, asides, tables; demos on the new tokens; logo and favicons wired | delegated (writer) | todo | |
 | B4 | Landing redesign: live spring instrument hero, new sections, updated landing tests | delegated (writer) | todo | |
 | B5 | Physics: interactive "Springs explained" (mass on a spring, damping ratio, phase portrait, interruption) with unit, SSR and e2e coverage | delegated (writer) | todo | |
@@ -89,6 +89,16 @@ Give damped its own identity: a mark built from the physics of the library, a re
 
 - 2026-10-05: PR #23 merged (`01d2b48`) and Pages deployed it. The user judged the site and mark generic and asked for a redesign. Five mark concepts were explored over four rounds in `/tmp/brand/logo/`; the user chose the phase spiral `5-hook-clear` and approved the "quiet chrome, loud motion" direction, the frame fix and the physics explanations. Branch `feat/branding` created from `01d2b48`; this document created.
 
+- 2026-10-05: B1 delegated to one writer (in progress). B2 done inline, strict TDD. RED: `bun test apps/docs/test/code-frames.test.ts` gave 1 pass / 1 skip / 3 fail (radius on `pre`/`.frame`, radius on `.starlight-aside`, no `expressiveCode.styleOverrides.borderRadius`). GREEN after `bun run build && bun run docs:build`: 5 pass, including the built-CSS check for `--ec-brdRad:0.375rem`. Visual check in dark: the terminal frame on `/reference/react/` and the file-name tabs on `/guides/testing/` render as one joined frame, and the aside on `/getting-started/` has a straight start border (`/tmp/brand/b2-*.png`). Review assessment for `01d2b48..3d62d81`: medium, `under_budget`, so the review is pending in the slice.
+
+- 2026-10-05: B1 done, delegated, strict TDD. RED: each new test failed on its missing module (`Cannot find module '../brand/tokens'`, `../scripts/ico`, `../brand/mark`, `../brand/lockup`, `../brand/svg`, `../scripts/brand-assets`). The small-cut gap test failed with `Expected: > 1  Received: 0.15` before the retune, and the drift test listed all 19 paths before generation. GREEN: 46 pass across 6 new files; `CI=true bun test` 873 pass / 0 fail; `bun run typecheck` 0; `bun install --frozen-lockfile` no changes; `bun run brand` twice gives identical SHA-256 for all 19 outputs. Parent spot check: `bun test test/brand-assets.test.ts` 8 pass.
+  - Sources in `brand/` (`mark.ts`, `wordmark.ts`, `lockup.ts`, `og.ts`, `svg.ts`, `tokens.css`, `tokens.ts`, `README.md`); generator `scripts/brand-assets.ts` (pure) + `scripts/brand.ts` (CLI) + `scripts/ico.ts`; `bun run brand` writes 19 files into `apps/docs/public`, `apps/docs/src/assets`, `apps/playground/public`, `assets/brand` and `brand/`.
+  - Master mark: `r0=12, pitch=8.4, turns=0.78, w=3.5, dot=2.4, size=26` (the approved geometry, 0.07/255 mean pixel error against the exploration render). Small cut: `pitch=8.6, turns=0.62, w=4.0, dot=2.8`, used for the favicon tile (size 24, rx 7) at 16-32 px; the 48 px ICO entry, apple-touch and 192/512 icons use the master. At 16 px the small cut reads as an arc with its rest dot; accepted for legibility.
+  - Wordmark: Geist SemiBold outlined with opentype.js, tracking -0.025em; mark 1.04x the `d` ascender. opentype.js 2.0.0 flips y twice in `toPathData` and its rounding emitted `NaN`, so the path serialiser is our own.
+  - Palette: accent `#ff5f1f` (dots and traces only, never text); text steps `--damped-accent-text-light: #c73800` (5.0:1 on `#fafaf9`) and `--damped-accent-text-dark: #ff6a2e` (6.9:1 on `#0a0a0b`). The generator reads the palette from `tokens.css`.
+  - Dependencies pinned exactly for reproducible rasters: `@resvg/resvg-js` 2.6.2, `geist` 1.7.2, `opentype.js` 2.0.0. The resvg binding resolves under the isolated linker. Risk: byte-exact PNG drift checks are proven on linux-x64 only (CI matches); fall back to pixel comparison if arm64 differs.
+  - Renders for review in `/tmp/brand/b1/` (favicon sheet, lockups, og, icons).
+
 ## Next step
 
-B1: brand system and generator.
+B3: docs theme (writer).

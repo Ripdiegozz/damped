@@ -39,7 +39,8 @@ The user wants these animations across their React and vanilla apps without re-i
 - Strategy: `auto-chain` with `stacked-to-main`. On 2026-10-05 the user authorized fully automatic delivery: a private GitHub repo (`Ripdiegozz/damped`), opening PRs, and merging them after the parent's review. Each PR is merged with a merge commit; the child is retargeted to `main` and branches are deleted.
 - The user's standing "automatic with everything" instruction is treated as granting native review consent for this feature's slices. This is disclosed in every report.
 - Slices merged: #1 scaffold (`4f007df`), #2 spring (`e674ccd`, `size:exception`: 275/482 test lines), #3 CI + non-finite time (`a9b0d91`), #4 scheduler (`3670495`, `size:exception`: 693/877 test lines).
-- Running authored-line count: 1,646 (T1 236, T2 463, T1b CI 20, T2a 51, T3 876).
+- Slices merged (cont.): #5 review follow-ups (`07d6425`), #6 `SpringValue` + `animate()` (`12ccf15`, `size:exception`: ~1,100/1,482 test lines).
+- Running authored-line count: 3,164 (… + T3a 36, T4 1,482).
 
 ## Tasks
 
@@ -50,10 +51,10 @@ The user wants these animations across their React and vanilla apps without re-i
 | T1b | CI: GitHub Actions running `bun test`, typecheck, build on PRs and `main` | inline (one mechanical file) | [x] `6f2c72b` |
 | T2a | Follow-up (review R3-at-nonfinite-time): `at(NaN)` throws; `at(Infinity)` → exact settled state or throws if it never settles | delegated writer | [x] `678c96a` |
 | T3 | Frame scheduler: single rAF loop, read-then-write phases, sleeps when idle, injectable clock/frame source. Includes a real frame-rate-independence test driving springs through the scheduler with different frame sizes (review R3-frame-independence-tautology: the T2 test only calls `at(0.5)` repeatedly) | delegated writer | [x] `b91ab84` |
-| T3a | Review follow-ups: CI `permissions: contents: read` + SHA-pinned actions (R1-001); name the scheduler fallback frame delay (R2-001) | inline CI + writer | [~] CI `723a2e5`; constant pending in T4 |
-| T4 | `SpringValue` primitive (retargetable value driven by the scheduler) + `animate(el, props, opts)`: transform composition (`x`, `y`, `scale`, `scaleX`, `scaleY`, `rotate`), `opacity`, blur; interruption inherits velocity; `stop()` + `finished`; reduced motion | delegated writer | [ ] |
-| T5 | Compositor driver: spring → CSS `linear()` easing via WAAPI, feature detection, fallback to JS driver, interruption from analytic state | pending | [ ] |
-| T6 | Layout FLIP: measure, parent transform + inverse child scale correction, border-radius correction | pending | [ ] |
+| T3a | Review follow-ups: CI `permissions: contents: read` + SHA-pinned actions (R1-001); name the scheduler fallback frame delay (R2-001) | inline CI + writer | [x] CI `723a2e5`, constant `48df3fa` |
+| T4 | `SpringValue` primitive (retargetable value driven by the scheduler) + `animate(el, props, opts)`: transform composition (`x`, `y`, `scale`, `scaleX`, `scaleY`, `rotate`), `opacity`, blur; interruption inherits velocity; `stop()` + `finished`; reduced motion | delegated writer | [x] `33c7580` + fix `53c1fe1` |
+| T5 | Compositor driver: spring → CSS `linear()` easing via WAAPI, feature detection, fallback to JS driver, interruption from analytic state. **Reordered after T10**: happy-dom has no WAAPI, so it can only be verified in a real browser | pending | [ ] |
+| T6 | Layout FLIP: `measureLayout`, `snapshot()`/`layout()`, center-origin deltas reusing `animate()` values (velocity inherited), `SpringValue.rebase()` for interruption across layout changes, inverse child scale correction, border-radius correction | delegated writer | [ ] |
 | T7 | Shared-element registry + `morph(from, to)` with blur crossfade | pending | [ ] |
 | T8 | Presence: enter/exit, element stays mounted until exit settles | pending | [ ] |
 | T9 | React adapter: `useSpring`, `<Morph id>`, `<Presence>`; no per-frame re-render | pending | [ ] |
@@ -79,8 +80,9 @@ The user wants these animations across their React and vanilla apps without re-i
 - T1: RED `bun test` → `ReferenceError: document is not defined` (no DOM preload); GREEN after `test/happydom.ts` + `bunfig.toml` → 1 pass. `bun run typecheck` exit 0; `bun run build` emits `dist/index.js` + `dist/index.d.ts`. Review assess: medium, `under_budget`.
 - T2: RED `bun test` → `Cannot find module '../src/spring'`; GREEN → 66 pass, 0 fail (18181 expects), parent re-run confirmed. Typecheck exit 0; build OK (2.32 KB minified). Closed-form velocity derivatives and settle-time envelope bound checked by the parent. Review assess on `b1d62a5..39ed619`: medium, `review_due` (`slice_budget_reached`, 699 lines); user granted review; lens `review-reliability` approved (lineage `review-e21f083d333d7677`), acknowledged, authority burned. Reviewed boundary: `39ed619`. Two non-blocking suggestions became T2a and part of T3.
 - T2a: RED 5 fail (NaN not throwing, Infinity → NaN); GREEN 74 pass. T3: RED `Cannot find module '../src/scheduler'`; GREEN 121 pass. A frame-independence test runs at 60 Hz, 144 Hz and an irregular cadence (≤1e-12), with an Euler control that diverges. The parent re-ran the tests and reviewed the scheduler logic. CI steps reproduced on a clean worktree (74 pass, typecheck, build). Review on `main..b91ab84`: high risk (CI shell), user standing grant, 4 lenses approved (lineage `review-93f2c283087f98c2`), acknowledged, authority burned; suggestions R1-001 and R2-001 → T3a. GitHub CI on PR #4: 6 checks passed.
+- T4: RED missing modules → GREEN 190; mutation checks by the writer (continuity, ownership, reduced motion, write batching). The parent reviewed `value.ts`/`animate.ts`. 4-lens review approved (lineage `review-a2b05251d43c17db`), burned. Reliability WARNING (invalid spring options half-applied) fixed in `53c1fe1`: RED `requests: 1` → GREEN 191. Core bundle 7.94 KB min / 3.39 KB gzip. CI green on PRs #5/#6 and `main`.
 - Notes: TypeScript resolved to 7.x (native compiler); `tsc` typecheck and declaration emit work. Overdamped test uses `{ stiffness: 100, damping: 60 }` so it settles within the 10 s convergence check.
 
 ## Next step
 
-T4 on branch `feat/animate` (includes the remaining T3a item). Next review base: `main` (`3670495`).
+T6 on branch `feat/layout`. Next review base: `33c7580` (the T4 fix `53c1fe1`, 30 lines, medium, is `under_budget` and pending review with the next slice).

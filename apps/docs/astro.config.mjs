@@ -12,8 +12,19 @@ export default defineConfig({
     starlight({
       title: "damped",
       description: "Interruptible, physically based spring animations for the web, React and React Native.",
+      logo: {
+        // The mark is a spring settling on its target. Two files because an <img> cannot follow the theme colours.
+        dark: "./src/assets/logo-dark.svg",
+        light: "./src/assets/logo-light.svg",
+        alt: "",
+      },
+      favicon: "/favicon.svg",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/Ripdiegozz/damped" }],
-      customCss: ["./src/styles/theme.css", "./src/styles/demos.css"],
+      customCss: ["./src/styles/theme.css", "./src/styles/demos.css", "./src/styles/landing.css"],
+      components: {
+        // The landing hero holds a live island, which the `hero` frontmatter cannot express.
+        Hero: "./src/components/landing/Hero.astro",
+      },
       sidebar: [
         { label: "Start here", items: [{ slug: "getting-started" }] },
         { label: "Guides", items: [{ autogenerate: { directory: "guides" } }] },

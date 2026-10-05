@@ -37,15 +37,16 @@ The user wants these animations across their React and vanilla apps without re-i
 
 - Forecast: well above ~400 authored changed lines across the feature, so delivery will be sliced.
 - Strategy: `ask-on-risk` (default). Chain strategy (`stacked-to-main` or `feature-branch-chain`): pending; asked before the first pull request. No remote exists yet; push/PR are the user's decision.
-- Running authored-line count: 0.
+- Running authored-line count: 699 (T1 236 incl. bun.lock, T2 463).
 
 ## Tasks
 
 | ID | Task | Route | Status |
 |----|------|-------|--------|
-| T1 | Scaffold: Bun workspace, strict tsconfig, happy-dom preload, build scripts, smoke test | inline (mechanical config files) | [ ] |
-| T2 | Analytic spring: exact position/velocity at any `t` (under-, critically, over-damped), `duration`/`bounce` → stiffness/damping, settle detection, velocity continuity on retarget | delegated writer (2 non-trivial files) | [ ] |
-| T3 | Frame scheduler: single rAF loop, read-then-write phases, sleeps when idle, injectable clock/frame source | pending | [ ] |
+| T1 | Scaffold: Bun workspace, strict tsconfig, happy-dom preload, build scripts, smoke test | inline (mechanical config files) | [x] `4b2f9db` |
+| T2 | Analytic spring: exact position/velocity at any `t` (under-, critically, over-damped), `duration`/`bounce` → stiffness/damping, settle detection, velocity continuity on retarget | delegated writer (2 non-trivial files) | [x] `39ed619` |
+| T2a | Follow-up (review R3-at-nonfinite-time): define `at(t)` for non-finite `t` (NaN → RangeError or documented behavior; `Infinity` → settled final state, never NaN) with tests | pending | [ ] |
+| T3 | Frame scheduler: single rAF loop, read-then-write phases, sleeps when idle, injectable clock/frame source. Includes a real frame-rate-independence test driving springs through the scheduler with different frame sizes (review R3-frame-independence-tautology: the T2 test only calls `at(0.5)` repeatedly) | pending | [ ] |
 | T4 | `animate(el, props, opts)`: transform composition (`x`, `y`, `scale`, `scaleX`, `scaleY`, `rotate`), `opacity`, blur; interruption inherits velocity; `stop()` + `finished`; reduced motion | pending | [ ] |
 | T5 | Compositor driver: spring → CSS `linear()` easing via WAAPI, feature detection, fallback to JS driver, interruption from analytic state | pending | [ ] |
 | T6 | Layout FLIP: measure, parent transform + inverse child scale correction, border-radius correction | pending | [ ] |
@@ -68,6 +69,12 @@ The user wants these animations across their React and vanilla apps without re-i
 
 - 2026-10-05: Repository created; name `damped` chosen (free on npm). Plan agreed: phases 1 core → 2 layout → 3 presence + React → 4 demo/GIF.
 
+## Verification evidence
+
+- T1: RED `bun test` → `ReferenceError: document is not defined` (no DOM preload); GREEN after `test/happydom.ts` + `bunfig.toml` → 1 pass. `bun run typecheck` exit 0; `bun run build` emits `dist/index.js` + `dist/index.d.ts`. Review assess: medium, `under_budget`.
+- T2: RED `bun test` → `Cannot find module '../src/spring'`; GREEN → 66 pass, 0 fail (18181 expects), parent re-run confirmed. Typecheck exit 0; build OK (2.32 KB minified). Closed-form velocity derivatives and settle-time envelope bound checked by the parent. Review assess on `b1d62a5..39ed619`: medium, `review_due` (`slice_budget_reached`, 699 lines); user granted review; lens `review-reliability` approved (lineage `review-e21f083d333d7677`), acknowledged, authority burned. Reviewed boundary: `39ed619`. Two non-blocking suggestions became T2a and part of T3.
+- Notes: TypeScript resolved to 7.x (native compiler); `tsc` typecheck and declaration emit work. Overdamped test uses `{ stiffness: 100, damping: 60 }` so it settles within the 10 s convergence check.
+
 ## Next step
 
-T1 scaffold.
+T2a (non-finite `t`), then T3 frame scheduler. Next review base: `39ed619`.

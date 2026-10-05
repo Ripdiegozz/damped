@@ -1,31 +1,39 @@
-/* The interactive figures of "Springs explained". The chrome is ink, muted text and hairlines; the accent marks only
-   what moves or rests (the mass, the traces, the current point, the rest point). Built on Starlight variables and the
-   brand tokens, with fallbacks, so the figures follow whichever theme the site wears. */
+/* The interactive figures of "Springs explained". The chrome is ink, muted text and hairlines on the shared theme
+   properties (theme.css); the accent marks only what moves or rests: `--damped-accent` fills the mass, ball, current
+   point and rest point, `--damped-accent-text` strokes the traces and the focus ring. Buttons and the readout style
+   come from demos.css, which styles `.demo-button` globally. */
 
 .physics-figure {
-  --p-ink: var(--sl-color-white, #ededed);
-  --p-muted: var(--sl-color-gray-3, #a1a1aa);
-  --p-line: var(--sl-color-hairline-light, #26262a);
-  --p-paper: var(--sl-color-black, #0a0a0b);
-  --p-accent: var(--damped-accent, #ff5f1f);
-  --p-accent-text: var(--damped-accent-text-dark, #ff6a2e);
-  --p-radius: 6px;
+  --p-ink: var(--damped-ink);
+  --p-muted: var(--damped-ink-muted);
+  --p-line: var(--damped-hairline);
+  --p-line-strong: var(--damped-hairline-strong);
+  --p-surface: var(--damped-surface);
+  --p-fill: var(--damped-accent);
+  --p-stroke: var(--damped-accent-text);
+  /* demos.css styles `.demo-button` from these; they are defined on `.demo` there, and the figures are not `.demo`. */
+  --demo-surface: var(--damped-surface);
+  --demo-raised: var(--damped-raised);
+  --demo-line: var(--damped-hairline);
+  --demo-line-strong: var(--damped-hairline-strong);
+  --demo-text: var(--sl-color-text);
+  --demo-muted: var(--damped-ink-muted);
+  --demo-ink: var(--damped-ink);
+  --demo-accent: var(--damped-accent);
+  --demo-accent-line: var(--damped-accent-text);
 
   margin: 2rem 0;
   padding: 1rem 1.25rem 1.1rem;
   border: 1px solid var(--p-line);
-  border-radius: var(--p-radius);
+  border-radius: var(--damped-radius);
+  background: var(--p-surface);
   color: var(--p-ink);
   font-family: var(--sl-font);
   font-size: 0.9375rem;
   line-height: 1.5;
 }
 
-:root[data-theme="light"] .physics-figure {
-  --p-accent-text: var(--damped-accent-text-light, #c73800);
-}
-
-.physics-figure :is(p, dl, dd, ul, figure) {
+:where(.physics-figure) :is(p, dl, dd, ul, figure) {
   margin: 0;
   padding: 0;
 }
@@ -39,11 +47,10 @@
 
 .physics-title {
   margin-bottom: 0.9rem;
-  color: var(--p-muted);
-  font-family: var(--sl-font-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: var(--p-ink);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 .physics-muted {
@@ -87,7 +94,7 @@
 
 .physics-label {
   fill: var(--p-muted);
-  font-family: var(--sl-font-mono);
+  font-family: var(--damped-font-mono);
   font-size: 10px;
 }
 
@@ -96,12 +103,12 @@
 .physics-mass,
 .physics-point,
 .physics-rest {
-  fill: var(--p-accent);
+  fill: var(--p-fill);
 }
 
 .physics-head,
 .physics-point {
-  stroke: var(--p-paper);
+  stroke: var(--p-surface);
   stroke-width: 2;
 }
 
@@ -131,7 +138,7 @@
 .physics-current,
 .physics-trail,
 .physics-damped-line {
-  stroke: var(--p-accent);
+  stroke: var(--p-stroke);
   stroke-width: 2;
 }
 
@@ -177,8 +184,12 @@
 }
 
 .physics-slider {
-  outline: none;
   cursor: grab;
+}
+
+/* The ring is drawn by `.physics-focus-ring`, so the default outline of the focused group would double it. */
+.physics-slider:focus-visible {
+  outline: none;
 }
 
 .physics-slider:active {
@@ -186,7 +197,7 @@
 }
 
 .physics-grip {
-  stroke: var(--p-paper);
+  stroke: var(--p-surface);
   stroke-width: 2;
   stroke-linecap: round;
   opacity: 0.55;
@@ -199,7 +210,7 @@
 
 .physics-focus-ring {
   fill: none;
-  stroke: var(--p-accent-text);
+  stroke: var(--p-stroke);
   stroke-width: 2;
   opacity: 0;
 }
@@ -218,7 +229,7 @@
   margin-top: 0.9rem;
   margin-bottom: -0.35rem;
   color: var(--p-muted);
-  font-family: var(--sl-font-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.6875rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -258,7 +269,7 @@
 
 .physics-field output {
   color: var(--p-muted);
-  font-family: var(--sl-font-mono);
+  font-family: var(--damped-font-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -267,8 +278,8 @@
   accent-color: var(--p-ink);
 }
 
-.physics-figure :is(button, input, [role="slider"]):focus-visible {
-  outline: 2px solid var(--p-accent-text);
+.physics-figure :is(button, input):focus-visible {
+  outline: 1.5px solid var(--p-stroke);
   outline-offset: 2px;
 }
 
@@ -287,29 +298,7 @@
   margin: 0.9rem 0;
 }
 
-/* Buttons and the reduced-motion note come from the demo components and keep their class names. */
-.physics-figure .demo-button {
-  appearance: none;
-  padding: 0.4rem 0.8rem;
-  border: 1px solid var(--p-line);
-  border-radius: var(--p-radius);
-  background: transparent;
-  color: var(--p-ink);
-  font: inherit;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.physics-figure .demo-button:hover,
-.physics-figure .demo-button[aria-pressed="true"],
-.physics-figure .demo-button--primary {
-  border-color: var(--p-ink);
-}
-
-.physics-figure .demo-button--primary {
-  font-weight: 600;
-}
-
+/* The buttons are demos.css's `.demo-button`; only the reduced-motion note needs a rule of its own here. */
 .physics-figure .demo-note {
   display: flex;
   flex-wrap: wrap;
@@ -318,9 +307,10 @@
   justify-content: space-between;
   margin-top: 0.9rem;
   padding: 0.6rem 0.8rem;
-  border: 1px solid var(--p-line);
-  border-radius: var(--p-radius);
-  color: var(--p-muted);
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--damped-radius);
+  background: var(--damped-raised);
+  color: var(--p-ink);
   font-size: 0.875rem;
 }
 
@@ -348,7 +338,7 @@
 }
 
 .physics-readouts dd {
-  font-family: var(--sl-font-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
   color: var(--p-ink);
@@ -375,7 +365,7 @@
   margin-top: 0.5rem;
   list-style: none;
   color: var(--p-ink);
-  font-family: var(--sl-font-mono);
+  font-family: var(--damped-font-mono);
   font-size: 0.75rem;
 }
 
@@ -393,7 +383,7 @@
 }
 
 .physics-swatch--current {
-  border-top: 2px solid var(--p-accent);
+  border-top: 2px solid var(--p-stroke);
 }
 
 .physics-swatch--ink {
@@ -413,7 +403,7 @@
   user-select: none;
   cursor: crosshair;
   border: 1px solid var(--p-line);
-  border-radius: var(--p-radius);
+  border-radius: var(--damped-radius);
 }
 
 .physics-phase-main .physics-lane {
@@ -463,15 +453,28 @@
 }
 
 .physics-table td {
-  font-family: var(--sl-font-mono);
+  font-family: var(--damped-font-mono);
   font-variant-numeric: tabular-nums;
 }
 
 .physics-table tbody th {
-  font-family: var(--sl-font-mono);
+  font-family: var(--damped-font-mono);
 }
 
 @media (max-width: 40rem) {
+  /* The wide figures are drawn on a 560 unit canvas and shrink to about 60%: their labels grow to stay readable. */
+  :is(.physics-stage, .physics-curves, .physics-lanes) .physics-label {
+    font-size: 17px;
+  }
+
+  .physics-table {
+    font-size: 0.75rem;
+  }
+
+  .physics-table td {
+    white-space: nowrap;
+  }
+
   .physics-figure {
     padding: 0.85rem 0.85rem 1rem;
   }

@@ -213,3 +213,97 @@ test("a new toast pushes the existing ones up with a spring", async ({ page }) =
   expect(ys.filter((y) => y < before.y - 2 && y > ys.at(-1)! + 2).length).toBeGreaterThanOrEqual(3);
   await expect(toasts(page)).toHaveCount(2);
 });
+
+interface ExitRun {
+  dismiss: number[];
+  raises: number;
+  watch: number[];
+}
+
+/**
+ * Does the given work in one task, then follows the watched toasts until they are gone. Per toast: how far right it
+ * traveled, in how many frames it was visibly on its way, and whether it left only after it was fully transparent.
+ */
+async function runExits(page: Page, run: ExitRun) {
+  return page.evaluate(
+    ({ dismiss, raises, watch }) =>
+      new Promise<Record<number, { travel: number; frames: number }>>((resolve, reject) => {
+        const toastById = (id: number) => document.querySelector<HTMLElement>(`[data-toast-id="${id}"]`)!;
+        const elements = new Map(watch.map((id) => [id, toastById(id)]));
+        const origin = new Map(watch.map((id) => [id, elements.get(id)!.getBoundingClientRect().x]));
+        const result = Object.fromEntries(watch.map((id) => [id, { travel: 0, frames: 0 }]));
+        for (const id of dismiss) toastById(id).querySelector<HTMLButtonElement>(".toast-close")!.click();
+        for (let press = 0; press < raises; press++) document.querySelector<HTMLButtonElement>("button.button.primary")!.click();
+        const deadline = performance.now() + 5000;
+        const tick = () => {
+          let pending = false;
+          for (const [id, element] of elements) {
+            if (!element.isConnected) continue;
+            pending = true;
+            const travel = element.getBoundingClientRect().x - origin.get(id)!;
+            result[id]!.travel = Math.max(result[id]!.travel, travel);
+            if (travel > 1) result[id]!.frames += 1;
+          }
+          if (!pending) resolve(result);
+          else if (performance.now() > deadline) reject(new Error("a toast never finished leaving"));
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+    run,
+  );
+}
+
+const MIN_EXIT_TRAVEL_PX = 8;
+const MIN_EXIT_FRAMES = 3;
+
+test("dismissing two toasts in the same moment plays both exits in full", async ({ page }) => {
+  await openPlayground(page, "?toastMs=60000");
+  for (let press = 0; press < 4; press++) await raise(page);
+  await expect(toasts(page)).toHaveCount(4);
+  for (const id of [1, 2, 3, 4]) await settledBox(page.locator(`[data-toast-id="${id}"]`));
+
+  const exits = await runExits(page, { dismiss: [2, 3], raises: 0, watch: [2, 3] });
+  for (const id of [2, 3]) {
+    expect(exits[id]!.travel, `toast ${id} travel`).toBeGreaterThan(MIN_EXIT_TRAVEL_PX);
+    expect(exits[id]!.frames, `toast ${id} frames`).toBeGreaterThanOrEqual(MIN_EXIT_FRAMES);
+  }
+  await expect(toasts(page)).toHaveCount(2);
+  const ids = await toasts(page).evaluateAll((elements) => elements.map((element) => Number(element.getAttribute("data-toast-id"))));
+  expect(ids).toEqual([1, 4]);
+});
+
+test("dismissing two toasts one after the other keeps both exits whole", async ({ page }) => {
+  await openPlayground(page, "?toastMs=60000");
+  for (let press = 0; press < 4; press++) await raise(page);
+  await expect(toasts(page)).toHaveCount(4);
+  for (const id of [1, 2, 3, 4]) await settledBox(page.locator(`[data-toast-id="${id}"]`));
+
+  const first = runExits(page, { dismiss: [2], raises: 0, watch: [2, 3] });
+  // The second dismissal lands while the first toast is still on its way out.
+  await page.waitForTimeout(40);
+  await page.locator('[data-toast-id="3"] .toast-close').click();
+  const exits = await first;
+  for (const id of [2, 3]) {
+    expect(exits[id]!.travel, `toast ${id} travel`).toBeGreaterThan(MIN_EXIT_TRAVEL_PX);
+    expect(exits[id]!.frames, `toast ${id} frames`).toBeGreaterThanOrEqual(MIN_EXIT_FRAMES);
+  }
+  await expect(toasts(page)).toHaveCount(2);
+});
+
+test("a toast evicted at capacity and one dismissed at the same time both leave in full", async ({ page }) => {
+  await openPlayground(page, "?toastMs=60000");
+  for (let press = 0; press < 4; press++) await raise(page);
+  await expect(toasts(page)).toHaveCount(4);
+  for (const id of [1, 2, 3, 4]) await settledBox(page.locator(`[data-toast-id="${id}"]`));
+
+  // Toast 3 is dismissed (4 -> 3 toasts); the first press fills the stack again, the second evicts toast 1 while 3 is leaving.
+  const exits = await runExits(page, { dismiss: [3], raises: 2, watch: [1, 3] });
+  for (const id of [1, 3]) {
+    expect(exits[id]!.travel, `toast ${id} travel`).toBeGreaterThan(MIN_EXIT_TRAVEL_PX);
+    expect(exits[id]!.frames, `toast ${id} frames`).toBeGreaterThanOrEqual(MIN_EXIT_FRAMES);
+  }
+  await expect(toasts(page)).toHaveCount(4);
+  const ids = await toasts(page).evaluateAll((elements) => elements.map((element) => Number(element.getAttribute("data-toast-id"))));
+  expect(ids).toEqual([2, 4, 5, 6]);
+});

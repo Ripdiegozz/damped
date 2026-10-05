@@ -40,7 +40,7 @@ export function layout(
 
 - It validates the options first, before `mutate` runs and before any element is touched. Then it takes a [`snapshot`](#snapshot), calls `mutate()` and starts the animation.
 - For each element it measures the new natural box, computes the deltas that map it onto the recorded visual box (`x` and `y` are center differences, `scaleX` and `scaleY` size ratios), `rebase`s the values to those deltas and animates them to the identity with the JS driver.
-- The first rendered frame shows the element on its previous box. Nothing jumps.
+- The inverse transform is written inline before `layout` returns, not in the next frame. Even when the DOM change lands between two frames, for example in a promise callback, no paint shows the new box without it: the first rendered frame shows the element on its previous box. Nothing jumps.
 - A box that changes by `0.01` px or less on every field counts as unchanged: nothing is written and no frame is requested, unless the element still has stale values from an earlier layout.
 - **Interruption.** Calling `layout` again while elements move keeps their velocity: translation velocity is carried and scale velocity is rescaled to the new reference size. An interrupted layout still settles at the identity.
 - **Reduced motion.** The element jumps to its new box on the first frame, corrections are cleaned immediately and `finished` resolves.

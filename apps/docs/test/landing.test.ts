@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { builtOutputMode, textOf } from "./built-output";
 
 const docsRoot = resolve(import.meta.dir, "..");
 const read = (path: string): string => readFileSync(join(docsRoot, path), "utf8");
@@ -79,10 +80,16 @@ describe("landing page source", () => {
   });
 });
 
-// The built page is the real proof; it only exists after `bun run docs:build`, which CI runs after `bun test`.
-// The docs smoke e2e covers the same page in a browser.
+// The built page is the real proof; it only exists after `bun run docs:build`. CI builds the docs before `bun test`
+// and sets CI=true, so there a missing build fails instead of skipping. The docs smoke e2e covers the same page in a browser.
 const built = join(docsRoot, "dist/index.html");
-describe.skipIf(!existsSync(built))("landing page build output", () => {
+const mode = builtOutputMode(existsSync(built));
+if (mode === "fail") {
+  test("the docs are built before the tests that read the build output run", () => {
+    throw new Error("apps/docs/dist/index.html is missing: run `bun run docs:build` before `bun test` (CI requires it)");
+  });
+}
+describe.skipIf(mode !== "run")("landing page build output", () => {
   const html = existsSync(built) ? readFileSync(built, "utf8") : "";
 
   test("renders the hero actions as links", () => {
@@ -100,6 +107,26 @@ describe.skipIf(!existsSync(built))("landing page build output", () => {
   test("shows the three package cards", () => {
     for (const name of PACKAGES) expect(html).toContain(name);
     for (const slug of ["core", "react", "native"]) expect(html).toContain(`href="/reference/${slug}/"`);
+  });
+
+  test("each package card holds its own install commands and a snippet that imports that package", () => {
+    const cards = html.split('<article class="package-card"').slice(1).map((card) => textOf(card.split("</article>")[0] ?? ""));
+    expect(cards).toHaveLength(PACKAGES.length);
+    const expected: Record<string, { install: string[]; snippet: string }> = {
+      "@damped/core": { install: ["bun add @damped/core", "npm install @damped/core"], snippet: 'import { animate } from "@damped/core"' },
+      "@damped/react": {
+        install: ["bun add @damped/react @damped/core", "npm install @damped/react @damped/core"],
+        snippet: 'import { useSpring } from "@damped/react"',
+      },
+      "@damped/native": { install: ["bun add @damped/native", "npm install @damped/native"], snippet: 'import { withDamped } from "@damped/native"' },
+    };
+    for (const [index, name] of PACKAGES.entries()) {
+      const card = cards[index] ?? "";
+      expect(card, name).toContain(name);
+      for (const command of expected[name]!.install) expect(card, `${name}: ${command}`).toContain(command);
+      expect(card, `${name} snippet`).toContain(expected[name]!.snippet);
+      expect(card, `${name} reference link`).toContain("Reference");
+    }
   });
 
   test("requests nothing from another origin", () => {

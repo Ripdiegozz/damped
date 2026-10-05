@@ -92,3 +92,14 @@ Keeps removed children mounted until their `exit` animation settles, then drops 
 - Children must be keyed elements, either host elements or components that pass the `ref` prop on to an element (React 19). A missing key throws, in development and in production, because index keys would make exit animations play on the wrong child. Your own `ref` on a child still receives the element.
 - `enter` is where an added child starts (it animates to its identity values), `exit` is where a removed one goes. Without `exit`, removed children disappear at once.
 - Children present when `<Presence>` first mounts do not animate in; pass `initial` to animate them too.
+- `onExitComplete(key)` is called once for each child whose exit settled. It runs in the same batch as the render that removes the child, so the child is still in the DOM when it is called, and state set from it re-renders together with the removal. That is the moment to snapshot layout: bump a counter in `onExitComplete` and use it in the `deps` of `useLayout` on the siblings, so they spring into the space the child leaves. It is not called when the exit was interrupted (the key came back), when no `exit` targets were given, or when `<Presence>` unmounted meanwhile.
+
+```tsx
+const [gone, setGone] = useState(0);
+<Presence exit={{ opacity: 0, x: 24 }} onExitComplete={() => setGone((count) => count + 1)}>
+  {items.map((item) => (
+    <Row key={item.id} reflowKey={gone} />
+  ))}
+</Presence>;
+// Row: const ref = useLayout([reflowKey]); the render the callback causes still sees the old layout.
+```

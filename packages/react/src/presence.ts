@@ -7,6 +7,7 @@ import {
   isValidElement,
   useRef,
   useState,
+  type Key,
   type ReactElement,
   type ReactNode,
   type Ref,
@@ -22,6 +23,13 @@ export interface PresenceProps {
   options?: EnterOptions;
   /** Also animate the children present on the first mount. Default false. */
   initial?: boolean;
+  /**
+   * Called once with the key of each child whose exit settled, in the same batch as the render that removes it: the
+   * child is still in the DOM when this runs, so state set here re-renders together with the removal (a layout
+   * snapshot taken in that render still sees the old layout). It is not called when the exit was interrupted by the
+   * key coming back, when there is nothing to exit (no `exit` targets) or when Presence unmounted meanwhile.
+   */
+  onExitComplete?: (key: Key) => void;
   /** Keyed elements that are host elements or components that take `ref` as a prop. */
   children?: ReactNode;
 }
@@ -45,6 +53,8 @@ interface Core {
   retained: Map<string, ChildElement>;
   phases: Map<string, "present" | "exiting">;
   refs: Map<string, Entry>;
+  /** False between an unmount and a (StrictMode) remount; exits that settle then report nowhere. */
+  active: boolean;
 }
 
 const KEY_ERROR =
@@ -123,11 +133,18 @@ function refFor(core: Core, key: string, userRef: Ref<Element> | undefined): Ref
  * throws), either host elements or components that pass `ref` on to an element; damped writes the animated values to
  * those elements directly, so React only renders when the set of children changes.
  */
-export function Presence({ enter: enterFrom, exit: exitTo, options, initial = false, children }: PresenceProps): ReactElement {
+export function Presence({
+  enter: enterFrom,
+  exit: exitTo,
+  options,
+  initial = false,
+  onExitComplete,
+  children,
+}: PresenceProps): ReactElement {
   const present = collect(children);
   const [slots, setSlots] = useState<Slot[]>(() => present.order.map((key) => ({ key, exiting: false })));
   const holder = useRef<Core | null>(null);
-  holder.current ??= { mounted: false, elements: new Map(), retained: new Map(), phases: new Map(), refs: new Map() };
+  holder.current ??= { mounted: false, elements: new Map(), retained: new Map(), phases: new Map(), refs: new Map(), active: true };
   const core = holder.current;
 
   const next = merge(slots, present.order, exitTo === undefined ? undefined : new Set(core.retained.keys()));
@@ -135,6 +152,13 @@ export function Presence({ enter: enterFrom, exit: exitTo, options, initial = fa
   if (!sameSlots(slots, next)) setSlots(next);
 
   const items = next.map((slot) => ({ ...slot, element: present.elements.get(slot.key) ?? core.retained.get(slot.key)! }));
+
+  useIsomorphicLayoutEffect(() => {
+    core.active = true;
+    return () => {
+      core.active = false;
+    };
+  }, [core]);
 
   useIsomorphicLayoutEffect(() => {
     const firstCommit = !core.mounted;
@@ -152,6 +176,8 @@ export function Presence({ enter: enterFrom, exit: exitTo, options, initial = fa
         const kept = current.filter((slot) => !(slot.key === key && slot.exiting));
         return kept.length === current.length ? current : kept;
       });
+      // Right after the state update and not inside it, so both land in one render.
+      if (core.active) onExitComplete?.(readable(key));
     };
 
     for (const { key, exiting, element } of items) {
@@ -173,7 +199,8 @@ export function Presence({ enter: enterFrom, exit: exitTo, options, initial = fa
           drop(key);
         } else {
           void exit(node, exitTo, { ...options, remove: false }).finished.then((completed) => {
-            if (completed) drop(key);
+            // A key that came back meanwhile is present again; its newer exit (if any) reports for itself.
+            if (completed && core.phases.get(key) === "exiting") drop(key);
           });
         }
       }

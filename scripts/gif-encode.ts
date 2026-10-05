@@ -1,16 +1,5 @@
 // Pure helpers behind scripts/record-demo.ts, kept apart so they can be tested.
 
-/** The frame rate ffprobe prints: a fraction such as `25/1`, or a plain number. */
-export function parseFrameRate(text: string): number {
-  const [numerator, denominator = 1] = text.trim().split("/").map(Number);
-  const rate = numerator! / denominator;
-  if (!(Number.isFinite(rate) && rate > 0)) throw new Error(`could not read a frame rate from "${text.trim()}"`);
-  return rate;
-}
-
-/** A GIF rate above the recording's own would only repeat frames. */
-export const chooseFps = (sourceFps: number, maxFps: number): number => Math.min(maxFps, Math.round(sourceFps));
-
 /**
  * The part of the recording to keep, in seconds: from `leadIn` before the first action to `tail` after the last one.
  * Times are wall-clock milliseconds taken when the page was created, when the scene started and when it ended.
@@ -25,3 +14,22 @@ export function trimWindow(
 }
 
 export const gifFilter = (fps: number, width: number): string => `fps=${fps},scale=${width}:-1:flags=lanczos`;
+
+const MIN_FRAME_S = 0.001;
+const quote = (file: string): string => `'${file.replaceAll("'", "'\\''")}'`;
+
+/**
+ * An ffconcat list that plays the given frames for as long as each one was on screen, until `endTime` (seconds, on the
+ * same clock as the frame times). The last file is listed again without a duration, which the demuxer needs in order
+ * to honor the duration of the one before it.
+ */
+export function concatList(frames: readonly { file: string; time: number }[], endTime: number): string {
+  if (frames.length === 0) throw new Error("no frames to list");
+  const lines = ["ffconcat version 1.0"];
+  frames.forEach((frame, index) => {
+    const next = frames[index + 1]?.time ?? endTime;
+    lines.push(`file ${quote(frame.file)}`, `duration ${Math.max(next - frame.time, MIN_FRAME_S).toFixed(6)}`);
+  });
+  lines.push(`file ${quote(frames.at(-1)!.file)}`, "");
+  return lines.join("\n");
+}

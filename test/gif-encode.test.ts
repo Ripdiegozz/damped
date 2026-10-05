@@ -1,31 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chooseFps, gifFilter, parseFrameRate, trimWindow } from "../scripts/gif-encode";
-
-describe("parseFrameRate", () => {
-  test("reads the fraction ffprobe prints", () => {
-    expect(parseFrameRate("25/1\n")).toBe(25);
-    expect(parseFrameRate("30000/1001")).toBeCloseTo(29.97, 2);
-  });
-
-  test("reads a plain number", () => {
-    expect(parseFrameRate("24")).toBe(24);
-  });
-
-  test("rejects anything that is not a positive rate", () => {
-    for (const text of ["", "0/0", "abc", "-5/1", "25/0"]) expect(() => parseFrameRate(text), text).toThrow(/frame rate/);
-  });
-});
-
-describe("chooseFps", () => {
-  test("never goes above what the recording has, since extra frames would only repeat", () => {
-    expect(chooseFps(25, 30)).toBe(25);
-    expect(chooseFps(60, 30)).toBe(30);
-  });
-
-  test("rounds a fractional rate", () => {
-    expect(chooseFps(29.97, 30)).toBe(30);
-  });
-});
+import { concatList, gifFilter, trimWindow } from "../scripts/gif-encode";
 
 describe("trimWindow", () => {
   test("starts a little before the first action and ends a little after the last", () => {
@@ -42,5 +16,45 @@ describe("trimWindow", () => {
 describe("gifFilter", () => {
   test("sets the rate and scales to the width with Lanczos, keeping the aspect ratio", () => {
     expect(gifFilter(25, 800)).toBe("fps=25,scale=800:-1:flags=lanczos");
+  });
+});
+
+describe("concatList", () => {
+  test("lists each frame with how long it stays, and repeats the last file as ffmpeg's concat demuxer needs", () => {
+    const list = concatList(
+      [
+        { file: "a.png", time: 10 },
+        { file: "b.png", time: 10.5 },
+      ],
+      11.25,
+    );
+    expect(list.split("\n")).toEqual([
+      "ffconcat version 1.0",
+      "file 'a.png'",
+      "duration 0.500000",
+      "file 'b.png'",
+      "duration 0.750000",
+      "file 'b.png'",
+      "",
+    ]);
+  });
+
+  test("never gives a frame a zero or negative duration", () => {
+    const list = concatList(
+      [
+        { file: "a.png", time: 1 },
+        { file: "b.png", time: 1 },
+      ],
+      1,
+    );
+    for (const match of list.matchAll(/duration (\S+)/g)) expect(Number(match[1])).toBeGreaterThan(0);
+  });
+
+  test("quotes file names that contain a quote", () => {
+    expect(concatList([{ file: "it's.png", time: 0 }], 1)).toContain("file 'it'\\''s.png'");
+  });
+
+  test("needs at least one frame", () => {
+    expect(() => concatList([], 1)).toThrow(/no frames/);
   });
 });

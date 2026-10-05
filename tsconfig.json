@@ -11,8 +11,10 @@
     "noImplicitOverride": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": { "damped": ["./packages/core/src/index.ts"] }
   },
   "include": ["packages/*/src", "packages/*/test", "test", "e2e", "playwright.config.ts"]
 }

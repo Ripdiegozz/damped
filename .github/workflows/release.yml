@@ -21,6 +21,10 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
+      - name: Configure npm auth
+        run: printf '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n' > ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       # The docs and the playground are built before `bun test`: the tests that read the build output
       # (landing page, examples, the playground head) fail instead of skipping when a dist/ is missing.
       - run: bun run build

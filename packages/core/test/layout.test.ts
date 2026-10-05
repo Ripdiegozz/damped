@@ -923,3 +923,11 @@ describe("validation", () => {
     expect(fake.requests).toBe(0);
   });
 });
+
+describe("types", () => {
+  test("layout options do not accept `from`, which a layout would ignore", () => {
+    // @ts-expect-error `from` is not part of LayoutOptions.
+    const options: LayoutOptions = { from: { x: 1 } };
+    expect(options).toBeDefined();
+  });
+});

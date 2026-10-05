@@ -28,7 +28,10 @@ export interface Box {
   height: number;
 }
 
-export type LayoutOptions = AnimateOptions & {
+// Omit applied per union member, so both spring option forms (perceptual and physical) survive.
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+export type LayoutOptions = DistributiveOmit<AnimateOptions, "from"> & {
   /** Children whose size must not distort while the parent scales; each gets scale(1/scaleX, 1/scaleY) with transform-origin 0 0. */
   correct?: readonly HTMLElement[] | "children";
   /** Border radius in px kept visually constant while the element scales (written as `${r/sx}px / ${r/sy}px`, and `${r}px` at rest). */
@@ -36,7 +39,7 @@ export type LayoutOptions = AnimateOptions & {
 };
 
 export interface LayoutSnapshot {
-  /** Animates every recorded element from its recorded visual box to its current natural layout. `options.from` is ignored. */
+  /** Animates every recorded element from its recorded visual box to its current natural layout. */
   animate(options?: LayoutOptions): AnimationControls;
 }
 
@@ -136,8 +139,10 @@ function runFor(element: Element): Run {
   return run;
 }
 
+// Pinned once per run: rewriting it every frame would invalidate style for nothing.
 function pinOrigin(run: Run, element: HTMLElement, origin: string): void {
-  if (!run.origins.has(element)) run.origins.set(element, element.style.transformOrigin);
+  if (run.origins.has(element)) return;
+  run.origins.set(element, element.style.transformOrigin);
   element.style.transformOrigin = origin;
 }
 
@@ -161,7 +166,7 @@ function combine(controls: readonly AnimationControls[]): AnimationControls {
 }
 
 function animateRecorded(recorded: readonly Recorded[], options: LayoutOptions): AnimationControls {
-  const { correct, radius, from: _from, ...animateOptions } = options;
+  const { correct, radius, ...animateOptions } = options;
   const scheduler = animateOptions.scheduler ?? frame;
   const controls: AnimationControls[] = [];
 

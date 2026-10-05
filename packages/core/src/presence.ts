@@ -63,8 +63,16 @@ function complete(element: Element, record: ExitRecord, remove: ExitOptions["rem
   }
   exits.delete(element);
   if (remove === false || typeof remove === "function") record.restore();
-  if (typeof remove === "function") remove(element);
-  else if (remove !== false) element.remove();
+  if (typeof remove === "function") {
+    try {
+      remove(element);
+    } catch (error) {
+      // Like the scheduler and value listeners: the exit still completed, and the error surfaces without being swallowed.
+      queueMicrotask(() => {
+        throw error;
+      });
+    }
+  } else if (remove !== false) element.remove();
   return true;
 }
 

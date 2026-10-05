@@ -567,3 +567,31 @@ describe("types", () => {
     expect(() => exit(element, { x: 1 }, { scheduler, duration: 0.3, bounce: 0.2, remove: false })).not.toThrow();
   });
 });
+
+describe("remove callback errors", () => {
+  const originalQueueMicrotask = globalThis.queueMicrotask;
+  afterEach(() => {
+    globalThis.queueMicrotask = originalQueueMicrotask;
+  });
+
+  test("a throwing remove function does not reject finished; the error is re-thrown asynchronously", async () => {
+    const { fake, options } = setup();
+    const element = createElement();
+    const failure = new Error("remove failed");
+    const queued: (() => void)[] = [];
+    const exited = exit(element, { opacity: 0 }, options({
+      remove: () => {
+        throw failure;
+      },
+    }));
+    globalThis.queueMicrotask = (callback) => {
+      queued.push(callback);
+    };
+    flushAll(fake);
+    // The removal runs once the exit's promises settle, so the stub stays until finished resolves.
+    expect(await exited.finished).toBe(true);
+    globalThis.queueMicrotask = originalQueueMicrotask;
+    expect(queued.length).toBe(1);
+    expect(() => queued[0]!()).toThrow(failure);
+  });
+});

@@ -1,19 +1,28 @@
 import { Presence, useLayout } from "@damped/react";
-import { useState, type MouseEvent } from "react";
+import { useCallback, useState, type MouseEvent } from "react";
+import { BillsView } from "./BillsView";
 import { Overview } from "./Overview";
 import { Placeholder, ViewPanel } from "./ViewPanel";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import type { Bill } from "./bills";
 import { INITIAL_OVERVIEW, shuffleOverview, type OverviewData } from "./data";
 import { SPRINGS, VIEW_ENTER, VIEW_EXIT } from "./motion";
 import { viewLabel, type ViewId } from "./views";
 
-function ViewContent({ view, overview }: { view: ViewId; overview: OverviewData }) {
+interface ViewContentProps {
+  view: ViewId;
+  overview: OverviewData;
+  paid: ReadonlySet<string>;
+  onPay(bill: Bill, amount: number): void;
+}
+
+function ViewContent({ view, overview, paid, onPay }: ViewContentProps) {
   switch (view) {
     case "overview":
       return <Overview data={overview} />;
     case "bills":
-      return <Placeholder title="Bills">Upcoming bills will appear here.</Placeholder>;
+      return <BillsView paid={paid} onPay={onPay} />;
     case "activity":
       return <Placeholder title="Activity">Transactions will appear here.</Placeholder>;
     case "settings":
@@ -25,6 +34,9 @@ export function App() {
   const [view, setView] = useState<ViewId>("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [overview, setOverview] = useState(INITIAL_OVERVIEW);
+  // Kept here, so a paid bill stays paid when the view is left and entered again.
+  const [paid, setPaid] = useState<ReadonlySet<string>>(() => new Set());
+  const payBill = useCallback((bill: Bill) => setPaid((current) => new Set(current).add(bill.id)), []);
   // The content area takes the space the sidebar gives up, so it animates its own box too.
   const main = useLayout<HTMLElement>([collapsed], { ...SPRINGS.panel, correct: "children" });
 
@@ -62,7 +74,7 @@ export function App() {
         <div className="stage">
           <Presence enter={VIEW_ENTER} exit={VIEW_EXIT} options={SPRINGS.view}>
             <ViewPanel key={view} view={view}>
-              <ViewContent view={view} overview={overview} />
+              <ViewContent view={view} overview={overview} paid={paid} onPay={payBill} />
             </ViewPanel>
           </Presence>
         </div>

@@ -461,3 +461,226 @@ p {
 .amount.negative {
   color: var(--negative);
 }
+
+/* Bills */
+
+[hidden] {
+  display: none !important;
+}
+
+.bills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.bill-card {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.bill-card:hover {
+  box-shadow: 0 6px 20px rgb(22 24 29 / 8%);
+}
+
+.bill-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px;
+}
+
+.bill-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.bill-name {
+  font-weight: 600;
+}
+
+.badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--pill);
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.bill-amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.bill-due {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.bill-due.overdue {
+  color: var(--negative);
+  font-weight: 600;
+}
+
+.bill-due.paid {
+  color: var(--positive);
+  font-weight: 600;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 3px 10px 3px 3px;
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 0.8125rem;
+}
+
+.chip-mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.paid-badge {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--positive);
+  color: #fff;
+}
+
+/* The dialog and its backdrop live in <body>; damped animates their opacity and box. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgb(22 24 29 / 38%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.backdrop[data-open="true"] {
+  pointer-events: auto;
+}
+
+.bill-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 21;
+  width: min(440px, calc(100vw - 32px));
+  height: fit-content;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 24px 60px rgb(22 24 29 / 22%);
+}
+
+.bill-dialog:focus {
+  outline: none;
+}
+
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px;
+}
+
+.dialog-body h2 {
+  font-size: 1.125rem;
+}
+
+.dialog-amount {
+  margin: 2px 0 0;
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dialog-payee {
+  font-weight: 600;
+}
+
+.dialog-route,
+.dialog-note {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.field label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.field input {
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: var(--negative);
+}
+
+.field-error {
+  color: var(--negative);
+  font-size: 0.8125rem;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

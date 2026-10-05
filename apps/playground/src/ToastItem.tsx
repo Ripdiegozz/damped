@@ -1,6 +1,5 @@
 import { useLayout } from "@damped/react";
-import { snapshot } from "damped";
-import { useCallback, useEffect, useLayoutEffect, useRef, type FocusEvent, type RefObject, type Ref } from "react";
+import { useCallback, useEffect, useRef, type FocusEvent, type Ref } from "react";
 import { SPRINGS } from "./motion";
 
 export interface ToastData {
@@ -15,34 +14,21 @@ interface ToastItemProps {
   toast: ToastData;
   /** How many toasts sit below this one in the stack. When it changes, this toast moved. */
   after: number;
+  /**
+   * Counts the toasts that finished leaving. It changes in the very render that removes one, while the DOM still shows
+   * the old layout, so useLayout takes its snapshot there and springs the toast into the space that was freed.
+   */
+  reflowKey: number;
   /** How long the toast stays before it dismisses itself. */
   duration: number;
-  /** Ids of the toasts that are not leaving. */
-  live: RefObject<ReadonlySet<number>>;
   onDismiss(id: number): void;
   /** Presence animates the element it receives through this ref (a prop in React 19). */
   ref?: Ref<HTMLDivElement>;
 }
 
-/**
- * The toasts that stay move into the space a leaving toast gives up. <Presence> keeps a leaving toast in the flow until
- * its exit settles and only then removes it, in a render of its own whose props do not change, so useLayout (which
- * watches its deps) cannot see that commit. This runs in the cleanup of the removed toast, the last moment the
- * others are still where they were, and plays the move once the removal has been committed.
- */
-function reflowOthers(removed: HTMLElement | null, live: ReadonlySet<number>): void {
-  const stack = removed?.parentElement;
-  if (stack == null) return;
-  // A toast that is itself leaving is mid-exit: moving it would cut the exit and it would never be removed.
-  const staying = [...stack.children].filter((child) => child !== removed && live.has(Number(child.getAttribute("data-toast-id"))));
-  if (staying.length === 0) return;
-  const before = snapshot(staying);
-  queueMicrotask(() => before.animate(SPRINGS.stack));
-}
-
-export function ToastItem({ toast, after, duration, live, onDismiss, ref }: ToastItemProps) {
-  // A toast added below pushes this one up: the deps change in the render that adds it, which is what useLayout needs.
-  const layoutRef = useLayout<HTMLDivElement>([after], SPRINGS.stack);
+export function ToastItem({ toast, after, reflowKey, duration, onDismiss, ref }: ToastItemProps) {
+  // Two things move a toast: one added below it pushes it up (`after`), and one that finished leaving frees space (`reflowKey`).
+  const layoutRef = useLayout<HTMLDivElement>([after, reflowKey], SPRINGS.stack);
   const node = useRef<HTMLDivElement | null>(null);
 
   const setNode = useCallback(
@@ -62,11 +48,6 @@ export function ToastItem({ toast, after, duration, live, onDismiss, ref }: Toas
     },
     [layoutRef, ref],
   );
-
-  useLayoutEffect(() => {
-    const element = node.current;
-    return () => reflowOthers(element, live.current ?? new Set());
-  }, [live]);
 
   // The dismissal timer pauses while the pointer is over the toast or focus is inside it, and resumes with what was left.
   const timer = useRef({ id: undefined as number | undefined, remaining: duration, startedAt: 0, hovered: false, focused: false });

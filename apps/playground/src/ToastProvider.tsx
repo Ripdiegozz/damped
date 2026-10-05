@@ -1,5 +1,5 @@
 import { Presence } from "@damped/react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ToastItem, type ToastData } from "./ToastItem";
 import { DEBUG } from "./debug";
@@ -24,10 +24,7 @@ export function useToast(): ToastApi {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastData[]>([]);
   const nextId = useRef(1);
-  const live = useRef<ReadonlySet<number>>(new Set());
-  useEffect(() => {
-    live.current = new Set(toasts.map((toast) => toast.id));
-  }, [toasts]);
+  const [gone, setGone] = useState(0);
 
   const show = useCallback((message: string) => {
     const id = nextId.current++;
@@ -43,9 +40,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* In document.body, bottom right (bottom center on narrow screens), above the dialogs. */}
       {createPortal(
         <div className="toast-region">
-          <Presence enter={TOAST_ENTER} exit={TOAST_EXIT} options={SPRINGS.toast}>
+          <Presence enter={TOAST_ENTER} exit={TOAST_EXIT} options={SPRINGS.toast} onExitComplete={() => setGone((count) => count + 1)}>
             {toasts.map((toast, index) => (
-              <ToastItem key={toast.id} toast={toast} after={toasts.length - 1 - index} duration={duration} live={live} onDismiss={dismiss} />
+              <ToastItem key={toast.id} toast={toast} after={toasts.length - 1 - index} reflowKey={gone} duration={duration} onDismiss={dismiss} />
             ))}
           </Presence>
         </div>,

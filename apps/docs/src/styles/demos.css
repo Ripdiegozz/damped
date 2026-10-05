@@ -1,0 +1,652 @@
+/* Live demo islands. Everything is built from the docs theme tokens (theme.css), so dark and light both work.
+   Demos opt out of Starlight's markdown styling with `not-content`. */
+
+.demo {
+  --demo-surface: var(--sl-color-gray-7);
+  --demo-raised: var(--sl-color-gray-6);
+  --demo-line: var(--sl-color-hairline-light);
+  --demo-text: var(--sl-color-text);
+  --demo-muted: var(--sl-color-gray-3);
+  --demo-accent: var(--sl-color-accent);
+  --demo-accent-strong: var(--sl-color-accent-high);
+  --demo-accent-soft: var(--sl-color-accent-low);
+  --demo-danger: #e5484d;
+  --demo-danger-text: #ff9592;
+
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  border: 1px solid var(--demo-line);
+  border-radius: calc(var(--damped-radius) + 0.125rem);
+  background: var(--demo-surface);
+  color: var(--demo-text);
+  font-family: var(--sl-font);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  box-shadow: 0 1px 0 var(--demo-line), 0 18px 40px -28px var(--damped-glow);
+}
+
+:root[data-theme="light"] .demo {
+  --demo-danger: #c62a2f;
+  --demo-danger-text: #a3171d;
+}
+
+.demo p,
+.demo dl,
+.demo dd,
+.demo ul {
+  margin: 0;
+  padding: 0;
+}
+
+.demo .demo-title {
+  margin-bottom: 0.9rem;
+  font-family: var(--damped-font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sl-color-white);
+}
+
+.demo .demo-hint,
+.demo .demo-status {
+  margin-top: 0.75rem;
+  color: var(--demo-muted);
+  font-size: 0.875rem;
+}
+
+.demo .demo-status {
+  min-height: 1.5em;
+}
+
+.demo .demo-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--demo-accent);
+  border-radius: 0.6rem;
+  background: var(--demo-accent-soft);
+  color: var(--demo-accent-strong);
+  font-size: 0.875rem;
+}
+
+/* Buttons */
+.demo-button {
+  appearance: none;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--demo-line);
+  border-radius: 0.55rem;
+  background: var(--demo-raised);
+  color: var(--demo-text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.demo-button:hover {
+  border-color: var(--demo-accent);
+}
+
+.demo-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.demo-button--primary,
+.demo-button[aria-pressed="true"] {
+  border-color: var(--demo-accent);
+  background: var(--demo-accent-soft);
+  color: var(--demo-accent-strong);
+}
+
+.demo-button--danger {
+  border-color: var(--demo-danger);
+  color: var(--demo-danger-text);
+}
+
+.demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.demo :is(button, [role="slider"], input):focus-visible {
+  outline: 2px solid var(--demo-accent-strong);
+  outline-offset: 2px;
+}
+
+/* Readouts */
+.demo-readouts {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.9rem;
+}
+
+.demo-readouts--wrap {
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+}
+
+.demo-readouts dt {
+  color: var(--demo-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.demo-readouts dd {
+  font-family: var(--sl-font-mono);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--sl-color-white);
+}
+
+.demo-readouts:not(.demo-readouts--wrap) dd {
+  min-width: 8ch;
+}
+
+/* Retarget spring */
+.retarget-track {
+  position: relative;
+  height: 3.25rem;
+  border: 1px solid var(--demo-line);
+  border-radius: 999px;
+  background: var(--demo-raised);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.retarget-track::before {
+  content: "";
+  position: absolute;
+  inset: 50% 1rem auto;
+  border-top: 1px dashed var(--demo-line);
+}
+
+.retarget-marker,
+.retarget-target {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  margin-top: -14px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.retarget-marker {
+  background: var(--demo-accent);
+  box-shadow: 0 0 0 4px var(--damped-glow), 0 4px 10px -2px rgb(0 0 0 / 0.35);
+}
+
+.retarget-target {
+  border: 2px dashed var(--demo-accent-strong);
+}
+
+.retarget-trace,
+.tuner-plot {
+  display: block;
+  width: 100%;
+  margin-top: 0.9rem;
+  border: 1px solid var(--demo-line);
+  border-radius: 0.6rem;
+  background: var(--demo-raised);
+}
+
+.retarget-trace {
+  height: 4rem;
+}
+
+.trace-zero,
+.plot-axis {
+  stroke: var(--demo-line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.trace-marks {
+  fill: none;
+  stroke: var(--demo-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.trace-line,
+.plot-curve {
+  fill: none;
+  stroke: var(--demo-accent-strong);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Tuner */
+.tuner-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.9rem 1.25rem;
+  align-items: end;
+}
+
+.demo-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.demo-field label {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 500;
+}
+
+.demo-field output {
+  font-family: var(--sl-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--demo-accent-strong);
+}
+
+.demo-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--demo-accent);
+}
+
+.tuner-plot .plot-target,
+.tuner-plot .plot-mark {
+  stroke: var(--demo-muted);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.plot-label {
+  fill: var(--demo-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 9px;
+}
+
+.plot-head {
+  fill: var(--demo-accent);
+  stroke: var(--demo-surface);
+  stroke-width: 2;
+}
+
+.tuner-lane,
+.compare-lane {
+  position: relative;
+  height: 2.75rem;
+  margin-top: 0.75rem;
+  padding: 0 10px;
+  border: 1px solid var(--demo-line);
+  border-radius: 999px;
+  background: var(--demo-raised);
+}
+
+.tuner-ball,
+.compare-ball {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  margin-top: -11px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+.tuner-ball {
+  background: var(--demo-accent);
+}
+
+/* Flip list */
+.flip-list {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.flip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--demo-line);
+  border-radius: 0.7rem;
+  background: var(--demo-raised);
+}
+
+.flip-avatar {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--demo-accent-soft);
+  color: var(--demo-accent-strong);
+  font-weight: 600;
+}
+
+.flip-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--sl-color-white);
+}
+
+.flip-amount {
+  font-family: var(--sl-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--demo-muted);
+}
+
+/* Presence */
+.toast-list {
+  position: relative;
+  display: grid;
+  gap: 0.5rem;
+  min-height: 14rem;
+  align-content: start;
+  list-style: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--demo-line);
+  border-left: 3px solid var(--demo-accent);
+  border-radius: 0.6rem;
+  background: var(--demo-raised);
+  box-shadow: 0 8px 18px -14px rgb(0 0 0 / 0.5);
+}
+
+/* damped marks a leaving toast inert: out of the flow, so the ones below glide up through layout(). */
+.toast[inert] {
+  position: absolute;
+  inset-inline: 0;
+  pointer-events: none;
+}
+
+.toast-text {
+  color: var(--sl-color-white);
+}
+
+.toast-dismiss {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--demo-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.toast-dismiss:hover {
+  background: var(--demo-line);
+  color: var(--sl-color-white);
+}
+
+.toast-stage {
+  position: relative;
+}
+
+.toast-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--demo-muted);
+  pointer-events: none;
+}
+
+/* Compositor comparison */
+.compare-lane {
+  height: 4.1rem;
+  border-radius: 0.8rem;
+}
+
+.compare-label {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  color: var(--demo-muted);
+  font-size: 0.75rem;
+}
+
+.compare-ball {
+  top: auto;
+  bottom: 0.55rem;
+  margin-top: 0;
+  margin-left: 0;
+}
+
+.compare-ball--js {
+  background: var(--demo-muted);
+}
+
+.compare-ball--compositor {
+  background: var(--demo-accent);
+  box-shadow: 0 0 0 4px var(--damped-glow);
+}
+
+/* Morph card */
+.morph-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 25rem;
+  overflow: hidden;
+  border-radius: calc(var(--damped-radius) - 0.125rem);
+  background: radial-gradient(40rem 14rem at 50% 0, var(--damped-glow), transparent 70%), var(--demo-raised);
+}
+
+.morph-card {
+  appearance: none;
+  position: relative;
+  z-index: 1;
+  width: min(18rem, calc(100% - 2rem));
+  padding: 0;
+  border: 1px solid var(--demo-line);
+  border-radius: 16px;
+  background: var(--demo-surface);
+  color: var(--demo-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 14px 30px -20px rgb(0 0 0 / 0.6);
+}
+
+.morph-card:hover {
+  border-color: var(--demo-accent);
+}
+
+.morph-card__body,
+.morph-dialog__body {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1.1rem 1.2rem;
+}
+
+.morph-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.morph-card__name {
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+
+.morph-card__badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--demo-accent-soft);
+  color: var(--demo-accent-strong);
+  font-size: 0.75rem;
+}
+
+.morph-card__amount,
+.morph-dialog__amount {
+  font-family: var(--damped-font-display);
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--sl-color-white);
+}
+
+.morph-card__meta,
+.morph-dialog__meta {
+  color: var(--demo-muted);
+  font-size: 0.875rem;
+}
+
+.morph-card__hint {
+  margin-top: 0.25rem;
+  color: var(--demo-accent-strong);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.morph-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgb(8 12 16 / 0.55);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.morph-backdrop[data-open="true"] {
+  pointer-events: auto;
+}
+
+.morph-dialog {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: min(24rem, calc(100% - 1.5rem));
+  height: fit-content;
+  margin: auto;
+  border: 1px solid var(--demo-line);
+  border-radius: 16px;
+  background: var(--demo-surface);
+  box-shadow: 0 30px 60px -24px rgb(0 0 0 / 0.7);
+}
+
+.morph-dialog[hidden] {
+  display: none;
+}
+
+.morph-dialog:focus-visible {
+  outline: 2px solid var(--demo-accent-strong);
+}
+
+.morph-dialog__body {
+  gap: 0.75rem;
+  padding: 1.25rem 1.35rem;
+}
+
+.morph-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.morph-dialog__title {
+  font-family: var(--damped-font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+
+.morph-dialog__close {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--demo-line);
+  border-radius: 50%;
+  background: var(--demo-raised);
+  color: var(--demo-text);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.morph-dialog__close:hover {
+  border-color: var(--demo-accent);
+}
+
+.morph-dialog__rows {
+  display: grid;
+  gap: 0.35rem;
+  padding-block: 0.6rem;
+  border-block: 1px solid var(--demo-line);
+}
+
+.morph-dialog__rows > div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.morph-dialog__rows dt {
+  color: var(--demo-muted);
+}
+
+.morph-dialog__rows dd {
+  font-variant-numeric: tabular-nums;
+  color: var(--sl-color-white);
+}
+
+.morph-dialog__note {
+  color: var(--demo-muted);
+  font-size: 0.8125rem;
+}
+
+.morph-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.morph-demo--compact {
+  padding: 0.75rem;
+}
+
+.morph-demo--compact .morph-stage {
+  min-height: 20rem;
+}
+
+.morph-demo--compact .morph-dialog__note {
+  display: none;
+}
+
+.morph-demo--compact .morph-card {
+  width: min(15rem, calc(100% - 2rem));
+}
+
+.morph-demo--compact .morph-dialog {
+  width: min(20rem, calc(100% - 1rem));
+}
+
+@media (max-width: 30rem) {
+  .demo {
+    padding: 0.9rem;
+  }
+}

@@ -13,7 +13,7 @@ export default defineConfig({
       title: "damped",
       description: "Interruptible, physically based spring animations for the web, React and React Native.",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/Ripdiegozz/damped" }],
-      customCss: ["./src/styles/theme.css"],
+      customCss: ["./src/styles/theme.css", "./src/styles/demos.css"],
       sidebar: [
         { label: "Start here", items: [{ slug: "getting-started" }] },
         { label: "Guides", items: [{ autogenerate: { directory: "guides" } }] },

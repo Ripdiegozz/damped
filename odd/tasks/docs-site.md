@@ -57,7 +57,7 @@ Verified on 2026-10-05 against the npm registry and the Starlight docs (context7
 |----|------|-------|--------|--------|
 | D1 | Scaffold `apps/docs` (Astro + Starlight + React), theme tokens, root scripts; the site builds | delegated (2+ non-trivial files) | done | `230d83a` |
 | D2 | Example typecheck harness: extract code blocks from the content and typecheck them | delegated | done | `df4d9c4` |
-| D3 | Live demo islands (six demos) with reduced-motion support | delegated | todo | |
+| D3 | Live demo islands (six demos) with reduced-motion support | delegated | done | `D3_HASH` |
 | D4 | Custom landing page: hero with live morph, package cards, "why" | delegated | todo | |
 | D5 | API reference for `@damped/core`, `@damped/react`, `@damped/native` | delegated | todo | |
 | D6 | Guides (eleven pages) | delegated | todo | |
@@ -94,6 +94,15 @@ Verified on 2026-10-05 against the npm registry and the Starlight docs (context7
   - Failure messages read `src/content/docs/<page>.mdx:<line>:<col> (code block at line <fence line>): TS<code> <message>`.
   - Native examples typecheck: `react-native`, `react-native-reanimated` and `react-native-worklets` ship their own types and are installed for `packages/native`; the harness maps them from there, so docs examples may import them. Authoring conventions: complete examples, `nocheck` in the info string to skip a block, no `fragment` marker.
 
+- 2026-10-05: D3 done, strict TDD. RED: `bun test apps/docs` failed with `Cannot find module '../src/components/demos/demo-state'` (and the four other pure modules); GREEN: 60 pass after the pure logic, 77 pass with the component and SSR tests (written after the components; checked by mutation: breaking the Escape key or a `data-demo` name turns them red).
+  - Six islands in `apps/docs/src/components/demos/`, on the public APIs only, embedded on `guides/demos.mdx` ("Demos") with `client:visible`: `RetargetSpring` (`useSpringValue`, velocity readout and trace through refs), `SpringTuner` (`springParams`, `createSpring`, analytic curve), `FlipReorder` (`layout()` with `flushSync`), `MorphCard` (`useMorph`, `useSpring`; props `variant="default"|"compact"`, `className`, `onOpenChange`, for the D4 hero), `PresenceDemo` (`<Presence>` plus `layout()` for the siblings), `CompositorVsJs` (`animate` with the `compositor` driver, "Block main thread" busy-loops 1 s).
+  - Pure logic with unit tests: `demo-state.ts` (data-state tracker), `spring-curve.ts`, `list-order.ts`, `morph-machine.ts`, `readout.ts` (velocity format and trace). Component tests render in happy-dom; a subprocess test renders all six with `renderToString` where `window`, `document` and `matchMedia` do not exist.
+  - Styles live in `src/styles/demos.css` (registered in `customCss`), built from the theme tokens; demos opt out of Starlight's markdown styles with `not-content`. `apps/docs/tsconfig.json` sets `jsx: react-jsx` (Astro's base uses `preserve`, which Bun cannot run).
+  - Test-hook contract (also the comment at the top of `demo-state.ts`): the demo root has `data-demo="retarget-spring|spring-tuner|flip-reorder|morph-card|presence|compositor-vs-js"`, `data-state="idle|animating|settled"` and `data-runs="<n>"` (animations started, only grows). Written to the DOM from animation callbacks, never through React. `morph-card` also has `data-phase="closed|opening|open|closing"`; `compositor-vs-js` writes `data-block-ms` after a block. A test waits for `data-runs` to grow, then for `data-state="settled"`.
+  - Reduced motion (`useReducedMotion` reads `matchMedia` only on the client; the server renders as if off): the SpringValue demos (retarget, tuner) jump and offer "Play anyway"; `layout()`, `useMorph` and `<Presence>` get damped's own behavior (spatial jumps, fades stay); the compositor demo jumps both balls, with "Play anyway" (`reducedMotion: "never"`) because the comparison is the point. Every demo shows a visible note while reduced motion is on.
+  - API gaps found: `<Presence>` has no completion callback on this branch, so the demo derives "settled" from a timer computed with `createSpring().settleTime()`; the siblings of a leaving toast glide only because damped sets `inert` on the leaving element (a documented behavior) and the stylesheet takes `[inert]` out of the flow. `animate()` exposes no velocity, so the velocity readout uses `createSpringValue`/`useSpringValue`, which do not follow `prefers-reduced-motion` by themselves.
+  - Visual check: built, served `apps/docs/dist` and screenshotted every demo in dark and light, idle and mid-flight, with and without reduced motion, into `/tmp/damped-docs-shots/wip/`; no console errors.
+
 ## Next step
 
-D3: live demo islands (six demos) with reduced-motion support.
+D4: custom landing page (hero with the live `MorphCard` in its `compact` variant, package cards, "why").

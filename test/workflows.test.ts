@@ -93,6 +93,41 @@ describe("pages workflow", () => {
   });
 });
 
+describe("ci workflow", () => {
+  const ci = (): string => readFileSync(join(workflows, "ci.yml"), "utf8");
+  /** The text of one job: from its key to the next job (or the end of the file). */
+  const job = (name: string): string => {
+    const match = new RegExp(`^  ${name}:\\n([\\s\\S]*?)(?=^  [\\w-]+:\\n|(?![\\s\\S]))`, "m").exec(ci());
+    if (match === null) throw new Error(`ci.yml has no job named ${name}`);
+    return match[1]!;
+  };
+
+  test("keeps the required check names: check and browser", () => {
+    job("check");
+    job("browser");
+  });
+
+  test("builds the packages and the docs before bun test, so the built-output tests run for real", () => {
+    const text = job("check");
+    for (const step of ["bun run build", "bun run docs:build", "bun test"]) expect(text, step).toContain(`run: ${step}`);
+    expect(text.indexOf("run: bun run build")).toBeLessThan(text.indexOf("run: bun run docs:build"));
+    expect(text.indexOf("run: bun run docs:build")).toBeLessThan(text.indexOf("run: bun test"));
+  });
+
+  test("still typechecks, builds the playground and checks the README examples", () => {
+    const text = job("check");
+    for (const step of ["bun run typecheck", "bun run playground:build", "bun run docs:check"]) expect(text, step).toContain(`run: ${step}`);
+  });
+
+  test("runs the browser suite, which builds the assembled site itself, after installing Chromium", () => {
+    const text = job("browser");
+    expect(text.indexOf("playwright install")).toBeGreaterThan(-1);
+    expect(text.indexOf("playwright install")).toBeLessThan(text.indexOf("run: bun run e2e"));
+    // The Playwright web server runs site:build, so docs and playground exist without a separate step.
+    expect(readFileSync(join(root, "playwright.config.ts"), "utf8")).toContain("bun run site:build");
+  });
+});
+
 describe("the site layout", () => {
   test("site:build is the root script behind the Pages artifact, and its output is not committed", async () => {
     const manifest = JSON.parse(await Bun.file(join(root, "package.json")).text()) as { scripts: Record<string, string> };

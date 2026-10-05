@@ -18,9 +18,12 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
+      # The docs are built before `bun test`: the tests that read the build output (landing page, examples) are
+      # required here, and fail instead of skipping when apps/docs/dist is missing (CI=true is set by Actions).
+      - run: bun run build
+      - run: bun run docs:build
       - run: bun test
       - run: bun run typecheck
-      - run: bun run build
       - run: bun run playground:build
       - run: bun run docs:check
 

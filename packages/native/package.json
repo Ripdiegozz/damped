@@ -1,0 +1,29 @@
+{
+  "name": "@damped/native",
+  "version": "0.0.0",
+  "description": "Velocity-preserving spring animations for Expo and React Native Reanimated.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "rm -rf dist && bun build ./src/index.ts --outdir dist --format esm --target browser --external react-native-reanimated --external react-native && tsc -p tsconfig.build.json"
+  },
+  "peerDependencies": {
+    "react-native-reanimated": ">=4.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@types/babel__core": "^7.20.5",
+    "damped": "workspace:*",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-reanimated": "4.5.1",
+    "react-native-worklets": "0.10.1"
+  }
+}

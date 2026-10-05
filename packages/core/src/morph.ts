@@ -84,6 +84,12 @@ export function morph(from: HTMLElement, to: HTMLElement, options: MorphOptions 
   const fades = fadeSprings(animateOptions as SpringOptions);
   const fromBox = measureLayout(from);
   const toBox = measureLayout(to);
+  const toStart = deltas(fromBox, toBox);
+  const fromTarget = deltas(toBox, fromBox);
+  // Checked before claiming or touching anything, so a failed morph never cuts the one already running.
+  for (const value of [...Object.values(toStart), ...Object.values(fromTarget)]) {
+    if (!Number.isFinite(value)) throw new RangeError("morph() measured a non-finite layout box");
+  }
 
   const state: MorphState = { superseded: false, stopped: false, touched: [] };
   const controls: AnimationControls[] = [];
@@ -119,8 +125,8 @@ export function morph(from: HTMLElement, to: HTMLElement, options: MorphOptions 
     }
   };
 
-  run(to, true, REST, deltas(fromBox, toBox));
-  run(from, false, deltas(toBox, fromBox), undefined);
+  run(to, true, REST, toStart);
+  run(from, false, fromTarget, undefined);
 
   return {
     finished: Promise.all(controls.map((entry) => entry.finished)).then(() => !state.superseded && !state.stopped),

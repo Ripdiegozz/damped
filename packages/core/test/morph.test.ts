@@ -600,3 +600,28 @@ describe("open, then fully close", () => {
     expect(fake.pending).toBe(0);
   });
 });
+
+describe("failure paths", () => {
+  test("a morph that throws on a non-finite box does not supersede the running one", async () => {
+    const { fake, card, modal, options } = scene();
+    const first = morph(card, modal, options());
+    fake.flush(0);
+    fake.flush(16);
+
+    const real = modal.getBoundingClientRect.bind(modal);
+    modal.getBoundingClientRect = () => ({ ...real(), width: Number.NaN, height: Number.NaN }) as DOMRect;
+    expect(() => morph(modal, card, options())).toThrow(RangeError);
+    modal.getBoundingClientRect = real;
+
+    flushAll(fake, 32);
+    expect(await first.finished).toBe(true);
+  });
+
+  test("stop() before the first frame still reports the morph as stopped", async () => {
+    const { fake, card, modal, options } = scene();
+    const controls = morph(card, modal, options());
+    controls.stop();
+    flushAll(fake);
+    expect(await controls.finished).toBe(false);
+  });
+});

@@ -1,4 +1,4 @@
-import { animate, peekSpringValue, type AnimatableProperty, type AnimationControls } from "./animate";
+import { animate, peekSpringValue, releaseToJs, type AnimatableProperty, type AnimationControls } from "./animate";
 import {
   AXES,
   REST,
@@ -82,6 +82,9 @@ export function morph(from: HTMLElement, to: HTMLElement, options: MorphOptions 
   const { reducedMotion } = animateOptions;
   const common = { scheduler, ...(reducedMotion === undefined ? {} : { reducedMotion }) };
   const fades = fadeSprings(animateOptions as SpringOptions);
+  // Compositor animations would hide the natural boxes and the running state from the code below.
+  releaseToJs(from);
+  releaseToJs(to);
   const fromBox = measureLayout(from);
   const toBox = measureLayout(to);
   const toStart = deltas(fromBox, toBox);
@@ -111,7 +114,7 @@ export function morph(from: HTMLElement, to: HTMLElement, options: MorphOptions 
     };
 
     installCorrections(element, scheduler, scoped, radius);
-    controls.push(animate(element, target, { ...animateOptions, scheduler, ...(jump ? { from: start } : {}) }));
+    controls.push(animate(element, target, { ...animateOptions, scheduler, driver: "js", ...(jump ? { from: start } : {}) }));
     for (const axis of AXES) track([element], axis);
 
     if (crossfade) {

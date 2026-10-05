@@ -2,6 +2,7 @@ import {
   animate,
   IDENTITY_TRANSFORM,
   peekSpringValue,
+  releaseToJs,
   setRenderHook,
   springValueFor,
   toList,
@@ -29,7 +30,7 @@ export interface Box {
   height: number;
 }
 
-export type LayoutOptions = DistributiveOmit<AnimateOptions, "from"> & {
+export type LayoutOptions = DistributiveOmit<AnimateOptions, "from" | "driver"> & {
   /** Children whose size must not distort while the parent scales; each gets scale(1/scaleX, 1/scaleY) with transform-origin 0 0. */
   correct?: readonly HTMLElement[] | "children";
   /** Border radius in px kept visually constant while the element scales (written as `${r/sx}px / ${r/sy}px`, and `${r}px` at rest). */
@@ -83,6 +84,8 @@ interface Recorded {
 }
 
 function record(element: Element): Recorded {
+  // A compositor animation is invisible to the measurements below: hand it to the JS values first.
+  releaseToJs(element);
   const velocity = { ...REST };
   for (const axis of AXES) velocity[axis] = peekSpringValue(element, axis)?.getVelocity() ?? 0;
   return { element, visual: boxOf(element), natural: measureLayout(element), velocity };
@@ -189,7 +192,8 @@ function animateRecorded(recorded: readonly Recorded[], options: LayoutOptions):
 
     installCorrections(element, scheduler, correct, radius);
 
-    controls.push(animate(element, REST, { ...animateOptions, scheduler }));
+    // Layout corrections are written per frame from JS, so it always uses the JS driver.
+    controls.push(animate(element, REST, { ...animateOptions, scheduler, driver: "js" }));
   }
   return combine(controls);
 }

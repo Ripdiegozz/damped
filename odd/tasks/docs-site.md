@@ -56,7 +56,7 @@ Verified on 2026-10-05 against the npm registry and the Starlight docs (context7
 | ID | Task | Route | Status | Commit |
 |----|------|-------|--------|--------|
 | D1 | Scaffold `apps/docs` (Astro + Starlight + React), theme tokens, root scripts; the site builds | delegated (2+ non-trivial files) | done | `230d83a` |
-| D2 | Example typecheck harness: extract code blocks from the content and typecheck them | delegated | done | this commit |
+| D2 | Example typecheck harness: extract code blocks from the content and typecheck them | delegated | done | `df4d9c4` |
 | D3 | Live demo islands (six demos) with reduced-motion support | delegated | todo | |
 | D4 | Custom landing page: hero with live morph, package cards, "why" | delegated | todo | |
 | D5 | API reference for `@damped/core`, `@damped/react`, `@damped/native` | delegated | todo | |

@@ -59,7 +59,7 @@ Verified on 2026-10-05 against the npm registry and the Starlight docs (context7
 | D2 | Example typecheck harness: extract code blocks from the content and typecheck them | delegated | done | `df4d9c4` |
 | D3 | Live demo islands (six demos) with reduced-motion support | delegated | done | `aa42e07` |
 | D4 | Custom landing page: hero with live morph, package cards, "why" | delegated | done | `f2834e1` |
-| D5 | API reference for `@damped/core`, `@damped/react`, `@damped/native` | delegated | done | see Progress |
+| D5 | API reference for `@damped/core`, `@damped/react`, `@damped/native` | delegated | done | `4f88942` |
 | D6 | Guides (eleven pages) | delegated | todo | |
 | D7 | Docs smoke e2e (console errors, demos settle, search, internal links) and CI wiring | delegated | todo | |
 | D8 | After `feat/playground` merges: merge `origin/main`, sync with the final READMEs (add `onExitComplete` to the `Presence` reference, re-check the bundle sizes), serve docs at `/` and Northbook at `/playground/` | delegated | blocked on `feat/playground` | |

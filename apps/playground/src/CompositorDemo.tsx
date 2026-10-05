@@ -1,4 +1,4 @@
-import { animate, compositor } from "damped";
+import { animate, compositor } from "@damped/core";
 import { useRef } from "react";
 import { useMotion } from "./motion-context";
 

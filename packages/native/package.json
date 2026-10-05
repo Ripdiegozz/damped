@@ -1,6 +1,7 @@
 {
   "name": "@damped/native",
   "version": "0.0.0",
+  "license": "MIT",
   "description": "Velocity-preserving spring animations for Expo and React Native Reanimated.",
   "type": "module",
   "sideEffects": false,
@@ -20,7 +21,7 @@
   "devDependencies": {
     "@babel/core": "^7.28.0",
     "@types/babel__core": "^7.20.5",
-    "damped": "workspace:*",
+    "@damped/core": "workspace:*",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-reanimated": "4.5.1",

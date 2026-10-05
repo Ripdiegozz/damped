@@ -1,4 +1,4 @@
-import { animate, type AnimateOptions, type AnimationControls, type AnimationTargets } from "damped";
+import { animate, type AnimateOptions, type AnimationControls, type AnimationTargets } from "@damped/core";
 import { useRef, type RefCallback } from "react";
 import { useIsomorphicLayoutEffect } from "./isomorphic";
 

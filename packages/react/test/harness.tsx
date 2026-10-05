@@ -1,6 +1,6 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { createScheduler, type Phase, type Scheduler } from "damped";
+import { createScheduler, type Phase, type Scheduler } from "@damped/core";
 import { createFakeSource } from "../../core/test/fake-frame-source";
 
 // Must be set before React renders anything, or every act() warns.

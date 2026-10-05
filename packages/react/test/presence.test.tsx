@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { Component, StrictMode, act, createRef, useState, type ReactNode, type Ref, type RefCallback } from "react";
-import { createSpring, type EnterOptions } from "damped";
+import { createSpring, type EnterOptions } from "@damped/core";
 import { peekSpringValue } from "../../core/src/animate";
 import { IDENTITY, SPRING, parseTransform } from "../../core/test/layout-world";
 import { Presence } from "../src";

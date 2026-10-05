@@ -1,6 +1,7 @@
 {
   "name": "@damped/react",
   "version": "0.0.0",
+  "license": "MIT",
   "description": "React hooks and components for damped spring animations, without per-frame re-renders.",
   "type": "module",
   "sideEffects": false,
@@ -15,14 +16,14 @@
     "build": "rm -rf dist && bun build.ts && tsc -p tsconfig.build.json"
   },
   "peerDependencies": {
-    "damped": ">=0.0.0",
+    "@damped/core": ">=0.0.0",
     "react": ">=19.0.0",
     "react-dom": ">=19.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
-    "damped": "workspace:*",
+    "@damped/core": "workspace:*",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   }

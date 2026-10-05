@@ -2,7 +2,7 @@
 
 React hooks for [damped](../core) springs. Values reach the DOM through damped, never through React state: nothing re-renders per animation frame, and state changes only on discrete events.
 
-Requires React 19 and `damped` as peers.
+Requires React 19 and `@damped/core` as peers.
 
 ```sh
 bun add @damped/react damped

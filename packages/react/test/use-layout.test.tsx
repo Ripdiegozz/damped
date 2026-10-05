@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { StrictMode, Suspense, act, startTransition, use, useLayoutEffect, useState, type RefCallback } from "react";
-import { createSpring, type LayoutOptions } from "damped";
+import { createSpring, type LayoutOptions } from "@damped/core";
 import { peekSpringValue } from "../../core/src/animate";
 import { A, B, C, IDENTITY, SPRING, centerX, centerY, createWorld, parseTransform } from "../../core/test/layout-world";
 import { useLayout } from "../src";

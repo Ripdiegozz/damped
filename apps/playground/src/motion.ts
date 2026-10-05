@@ -1,4 +1,4 @@
-import type { AnimationTargets } from "damped";
+import type { AnimationTargets } from "@damped/core";
 
 // Where things start and end. How they get there (the spring) comes from the motion settings below.
 export const VIEW_ENTER: AnimationTargets = { opacity: 0, y: 12 };

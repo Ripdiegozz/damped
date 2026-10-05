@@ -49,6 +49,8 @@ const CONFIG: Record<AnimatableProperty, PropertyConfig> = {
 // Below this radius a blur is invisible, so the filter is cleared instead of kept as a compositor layer.
 const MIN_BLUR = 0.01;
 
+export type RenderHook = (scaleX: number, scaleY: number) => void;
+
 interface ElementState {
   // The scheduler of the first animate() call on an element drives it from then on.
   scheduler: Scheduler;
@@ -57,12 +59,17 @@ interface ElementState {
   owners: Partial<Record<AnimatableProperty, object>>;
   dirty: Record<Group, boolean>;
   writeQueued: boolean;
+  // Runs inside the transform write with the effective scale, so extra per-element writes share the single write job.
+  renderHook: RenderHook | undefined;
 }
 
 /*
  * damped owns the inline `transform` of every element it animates (replacing any existing one),
  * `opacity` once opacity is animated, and `filter` once blur is animated.
  */
+/** Transform written for an element whose animated transform values are all at rest. */
+export const IDENTITY_TRANSFORM = "translate3d(0px, 0px, 0) rotate(0deg) scale(1, 1)";
+
 const states = new WeakMap<Element, ElementState>();
 
 function stateFor(element: Element, scheduler: Scheduler): ElementState {
@@ -74,6 +81,7 @@ function stateFor(element: Element, scheduler: Scheduler): ElementState {
       owners: {},
       dirty: { transform: false, opacity: false, filter: false },
       writeQueued: false,
+      renderHook: undefined,
     };
     states.set(element, state);
   }
@@ -89,7 +97,10 @@ function render(element: Element, state: ElementState): void {
   if (state.dirty.transform) {
     state.dirty.transform = false;
     const scale = read("scale");
-    style.transform = `translate3d(${read("x")}px, ${read("y")}px, 0) rotate(${read("rotate")}deg) scale(${scale * read("scaleX")}, ${scale * read("scaleY")})`;
+    const scaleX = scale * read("scaleX");
+    const scaleY = scale * read("scaleY");
+    style.transform = `translate3d(${read("x")}px, ${read("y")}px, 0) rotate(${read("rotate")}deg) scale(${scaleX}, ${scaleY})`;
+    state.renderHook?.(scaleX, scaleY);
   }
   if (state.dirty.opacity) {
     state.dirty.opacity = false;
@@ -147,7 +158,7 @@ function prefersReducedMotion(mode: "user" | "always" | "never"): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function toList(target: Element | readonly Element[]): readonly Element[] {
+export function toList(target: Element | readonly Element[]): readonly Element[] {
   return Array.isArray(target) ? (target as readonly Element[]) : [target as Element];
 }
 
@@ -199,4 +210,23 @@ export function animate(
       }
     },
   };
+}
+
+/*
+ * Internal accessors for layout.ts. They are deliberately not re-exported from index.ts.
+ */
+
+/** The element's value for `property`, created (and the element's scheduler fixed) on first use. */
+export function springValueFor(element: Element, scheduler: Scheduler, property: AnimatableProperty): SpringValue {
+  return valueFor(element, stateFor(element, scheduler), property);
+}
+
+/** The element's existing value for `property`, if animate() or layout ever created one. */
+export function peekSpringValue(element: Element, property: AnimatableProperty): SpringValue | undefined {
+  return states.get(element)?.values[property];
+}
+
+/** Installs (or with `undefined` removes) the hook that runs inside every transform write of `element`. */
+export function setRenderHook(element: Element, scheduler: Scheduler, hook: RenderHook | undefined): void {
+  stateFor(element, scheduler).renderHook = hook;
 }

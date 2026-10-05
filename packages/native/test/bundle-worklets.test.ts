@@ -18,8 +18,9 @@ describe("the built bundle keeps its worklets", () => {
   let transformed: string;
 
   beforeAll(async () => {
-    // Inside the package so the bundle resolves react-native-reanimated (mocked above) like a consumer would.
-    outdir = await mkdtemp(join(import.meta.dir, "..", "node_modules", ".bundle-test-"));
+    // At the package root, which always exists, so the bundle resolves react-native-reanimated (mocked above) through
+    // normal lookup whether dependencies live in the package's node_modules or are hoisted to the workspace root.
+    outdir = await mkdtemp(join(import.meta.dir, "..", ".bundle-test-"));
     await buildNative(outdir);
     bundle = await readFile(join(outdir, "index.js"), "utf8");
     transformed = workletizeCode(bundle, join(outdir, "index.js"));

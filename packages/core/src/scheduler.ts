@@ -29,6 +29,8 @@ interface Entry {
 }
 
 const PHASES: readonly Phase[] = ["read", "update", "write"];
+// Timer delay used when requestAnimationFrame is unavailable (~60 Hz).
+const FALLBACK_FRAME_MS = 16;
 
 export function createScheduler(source: FrameSource = defaultFrameSource()): Scheduler {
   const jobs: Record<Phase, Entry[]> = { read: [], update: [], write: [] };
@@ -148,7 +150,7 @@ function defaultFrameSource(): FrameSource {
         setTimeout(() => {
           timers.delete(id);
           callback(now());
-        }, 16),
+        }, FALLBACK_FRAME_MS),
       );
       return id;
     },

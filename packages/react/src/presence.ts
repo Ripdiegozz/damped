@@ -1,4 +1,4 @@
-import { enter, exit, type AnimationTargets, type EnterOptions } from "damped";
+import { enter, exit, type AnimationTargets, type EnterOptions } from "@damped/core";
 import {
   Children,
   Fragment,

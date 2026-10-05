@@ -5,7 +5,7 @@ export async function buildReact(outdir: string): Promise<void> {
     outdir,
     format: "esm",
     target: "browser",
-    external: ["react", "react-dom", "react/jsx-runtime", "damped"],
+    external: ["react", "react-dom", "react/jsx-runtime", "@damped/core"],
     minify: true,
   });
   if (!result.success) {

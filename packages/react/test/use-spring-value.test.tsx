@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { StrictMode } from "react";
-import type { SpringValue } from "damped";
+import type { SpringValue } from "@damped/core";
 import { useSpringValue } from "../src";
 import { cleanup, createTestScheduler, mount, runFrames } from "./harness";
 

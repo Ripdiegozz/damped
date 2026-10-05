@@ -11,7 +11,7 @@ Requirements: Expo SDK 57, `react-native-reanimated` 4.0 or newer and the New Ar
 
 ## `withDamped`
 
-A drop-in for `withSpring` that runs on the UI thread. It takes the same perceptual options as the `damped` core (`duration` in seconds, `bounce` from -1 to 1) or physical ones (`stiffness`, `damping`, `mass`).
+A drop-in for `withSpring` that runs on the UI thread. It takes the same perceptual options as the `@damped/core` core (`duration` in seconds, `bounce` from -1 to 1) or physical ones (`stiffness`, `damping`, `mass`).
 
 ```tsx
 import { withDamped } from "@damped/native";

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { StrictMode, act, useEffect, useState, type RefCallback } from "react";
-import { createSpring, type AnimateOptions, type AnimationTargets } from "damped";
+import { createSpring, type AnimateOptions, type AnimationTargets } from "@damped/core";
 import { peekSpringValue } from "../../core/src/animate";
 import { useSpring } from "../src";
 import { cleanup, createTestScheduler, mount, runFrames } from "./harness";

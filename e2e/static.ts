@@ -7,10 +7,22 @@ export interface Mount {
   dir: string;
 }
 
-/** Serves a file from the first mount whose prefix matches; a path ending in a slash serves its index.html. */
+/**
+ * Serves a file from the mounts whose prefix matches, in order, until one has it; a path ending in a slash serves
+ * its index.html. Mounts may share a prefix, so one directory can fall back to another.
+ */
 export async function serveStatic(mounts: readonly Mount[], pathname: string): Promise<Response> {
-  const mount = mounts.find(({ prefix }) => pathname.startsWith(prefix));
-  if (mount === undefined) return new Response("Not found", { status: 404 });
+  let status = 404;
+  for (const mount of mounts) {
+    if (!pathname.startsWith(mount.prefix)) continue;
+    const response = await serveFrom(mount, pathname);
+    if (response.status === 200) return response;
+    if (response.status === 400) status = 400;
+  }
+  return new Response(status === 400 ? "Bad request" : "Not found", { status });
+}
+
+async function serveFrom(mount: Mount, pathname: string): Promise<Response> {
   let relative: string;
   try {
     relative = decodeURIComponent(pathname.slice(mount.prefix.length));

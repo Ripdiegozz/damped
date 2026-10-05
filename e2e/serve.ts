@@ -1,13 +1,14 @@
 import { join, resolve } from "node:path";
 import { serveStatic, type Mount } from "./static";
 
-// Dev tooling for the Playwright suite: serves e2e/fixtures at /, the built library at /dist and the built
-// playground at /playground/ (listed first, because the "/" mount matches everything).
+// Dev tooling for the Playwright suite: serves the built library at /dist, the e2e fixtures at / and, behind them, the
+// assembled site (`bun run site:build`): the docs at / and the built playground at /playground/. A path that is not a
+// fixture falls through to the site, which is how the docs e2e sees exactly what Pages publishes.
 const root = resolve(import.meta.dir, "..");
 const mounts: Mount[] = [
-  { prefix: "/playground/", dir: join(root, "apps/playground/dist") },
   { prefix: "/dist/", dir: join(root, "packages/core/dist") },
   { prefix: "/", dir: join(root, "e2e/fixtures") },
+  { prefix: "/", dir: join(root, "site") },
 ];
 // Always provided by the webServer entry of playwright.config.ts, which owns the default.
 const port = Number(process.env.E2E_PORT);

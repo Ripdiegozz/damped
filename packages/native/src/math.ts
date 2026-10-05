@@ -28,37 +28,37 @@ const DEFAULT_REST_SPEED = 0.01;
 const CRITICAL_TOLERANCE = 1e-6;
 
 function assertFinite(name: string, value: number, valid: boolean, requirement: string): void {
-  'worklet';
+  "worklet";
   if (!Number.isFinite(value) || !valid) {
     throw new RangeError(`${name} must be ${requirement}, received ${value}`);
   }
 }
 
 export function dampedRestThresholds(options?: { restDelta?: number; restSpeed?: number }): RestThresholds {
-  'worklet';
+  "worklet";
   const restDelta = options?.restDelta ?? DEFAULT_REST_DELTA;
   const restSpeed = options?.restSpeed ?? DEFAULT_REST_SPEED;
-  assertFinite('restDelta', restDelta, restDelta > 0, 'a finite number greater than 0');
-  assertFinite('restSpeed', restSpeed, restSpeed > 0, 'a finite number greater than 0');
+  assertFinite("restDelta", restDelta, restDelta > 0, "a finite number greater than 0");
+  assertFinite("restSpeed", restSpeed, restSpeed > 0, "a finite number greater than 0");
   return { restDelta, restSpeed };
 }
 
 export function dampedParams(options?: DampedSpringOptions): DampedParams {
-  'worklet';
+  "worklet";
   dampedRestThresholds(options);
 
-  if (options !== undefined && 'stiffness' in options) {
+  if (options !== undefined && "stiffness" in options) {
     const { stiffness, damping, mass = 1 } = options;
-    assertFinite('stiffness', stiffness, stiffness > 0, 'a finite number greater than 0');
-    assertFinite('damping', damping, damping >= 0, 'a finite number greater than or equal to 0');
-    assertFinite('mass', mass, mass > 0, 'a finite number greater than 0');
+    assertFinite("stiffness", stiffness, stiffness > 0, "a finite number greater than 0");
+    assertFinite("damping", damping, damping >= 0, "a finite number greater than or equal to 0");
+    assertFinite("mass", mass, mass > 0, "a finite number greater than 0");
     return { stiffness, damping, mass };
   }
 
   const duration = options?.duration ?? DEFAULT_DURATION;
   const bounce = options?.bounce ?? DEFAULT_BOUNCE;
-  assertFinite('duration', duration, duration > 0, 'a finite number greater than 0');
-  assertFinite('bounce', bounce, bounce > -1 && bounce < 1, 'a finite number between -1 and 1 (exclusive)');
+  assertFinite("duration", duration, duration > 0, "a finite number greater than 0");
+  assertFinite("bounce", bounce, bounce > -1 && bounce < 1, "a finite number between -1 and 1 (exclusive)");
 
   const omega = (2 * Math.PI) / duration;
   const ratio = bounce >= 0 ? 1 - bounce : 1 / (1 + bounce);
@@ -68,7 +68,7 @@ export function dampedParams(options?: DampedSpringOptions): DampedParams {
 // Closed-form displacement from the target and velocity, `t` seconds after the spring
 // started at displacement `x0` with velocity `v0`.
 export function dampedState(x0: number, v0: number, params: DampedParams, t: number): DampedState {
-  'worklet';
+  "worklet";
   if (!(t > 0)) return { position: x0, velocity: v0 };
 
   const { stiffness, damping, mass } = params;
@@ -109,7 +109,7 @@ export function dampedState(x0: number, v0: number, params: DampedParams, t: num
 // Default values are applied in the body: the worklets plugin evaluates parameter defaults
 // before it binds captured module constants, so a default may not read them.
 export function isRest(displacement: number, velocity: number, restDelta?: number, restSpeed?: number): boolean {
-  'worklet';
+  "worklet";
   return (
     Math.abs(displacement) <= (restDelta ?? DEFAULT_REST_DELTA) &&
     Math.abs(velocity) <= (restSpeed ?? DEFAULT_REST_SPEED)

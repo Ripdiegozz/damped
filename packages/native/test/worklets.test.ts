@@ -78,3 +78,31 @@ describe("worklets babel plugin on math.ts", () => {
     expect(revive(module.dampedRestThresholds)()).toEqual({ restDelta: 0.001, restSpeed: 0.01 });
   });
 });
+
+describe("worklets babel plugin on index.ts", () => {
+  const code = workletize("../src/index.ts");
+  const closureOf = (name: string): string[] => {
+    const match = new RegExp(`${name}\\.__closure = \\{([^}]*)\\}`).exec(code);
+    return (match?.[1] ?? "").split(",").map((entry) => entry.trim()).filter((entry) => entry && !entry.startsWith("_worklet_")).sort();
+  };
+
+  test("workletizes withDamped and the animation factory it hands to defineAnimation", () => {
+    const names = workletNames(code);
+    expect(names).toContain("withDamped");
+    expect(names).toHaveLength(2);
+  });
+
+  test("withDamped only captures worklets and Reanimated imports", () => {
+    expect(closureOf("withDamped")).toEqual(
+      ["ReduceMotion", "dampedParams", "dampedRestThresholds", "dampedState", "defineAnimation", "isRest"].sort(),
+    );
+  });
+
+  test("the animation factory only captures numbers, worklets and the user callback", () => {
+    // The plugin names the anonymous factory after the file, e.g. `indexTs1`.
+    const factory = workletNames(code).find((name) => name !== "withDamped") as string;
+    expect(closureOf(factory)).toEqual(
+      ["callback", "dampedState", "isRest", "params", "reduceMotion", "restDelta", "restSpeed", "toValue", "velocity"].sort(),
+    );
+  });
+});

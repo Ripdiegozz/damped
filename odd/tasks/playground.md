@@ -55,9 +55,9 @@ The original proof of concept (and a first demo attempt) reused the app name, se
 | ID | Task | Route | Status |
 |----|------|-------|--------|
 | P1 | Cleanup: delete the local demo commit with copied content (`84357bb`) and its GIF. Salvage the generic `sizes.ts` and the GIF recorder into `/tmp/damped-salvage/`. Verify `origin` never contained the copied texts | inline | [x] |
-| P2 | Scaffold `apps/playground`: React 19 + workspace packages, `Bun.build` static output, served by the e2e server, base path `/` | delegated writer | [ ] |
-| P3 | App shell: collapsible sidebar (`useLayout`), active nav indicator moving between items, top bar, view switching with `<Presence>` | delegated writer | [ ] |
-| P4 | Overview: stat tiles with spring-animated numbers (`useSpringValue`), recent activity rows | delegated writer | [ ] |
+| P2 | Scaffold `apps/playground`: React 19 + workspace packages, `Bun.build` static output, served by the e2e server, base path `/` | delegated writer | [x] `22ca2a6` |
+| P3 | App shell: collapsible sidebar (`useLayout`), active nav indicator moving between items, top bar, view switching with `<Presence>` | delegated writer | [x] `cbc09e1` |
+| P4 | Overview: stat tiles with spring-animated numbers (`useSpringValue`), recent activity rows | delegated writer | [x] `15c63ad` |
 | P5 | Bills: grid of bill cards; card → dialog with `useMorph` (radius, content correction, blur crossfade); full keyboard support (focus trap, Esc, re-open while closing, focus return); "Pay" raises a toast | delegated writer | [ ] |
 | P6 | Activity: transaction rows with filter chips and sort (`useLayout` FLIP), add and delete rows (`<Presence>`) | delegated writer | [ ] |
 | P7 | Toasts: stacked toasts with `<Presence>` enter/exit and layout shift of the stack | delegated writer | [ ] |
@@ -78,6 +78,8 @@ The original proof of concept (and a first demo attempt) reused the app name, se
 
 - 2026-10-05: Plan created. P1 done: the copied demo commit and GIF were deleted locally. Searching the pushed history for the forbidden terms returns nothing, and `origin/main` has no copied text.
 
+- P2–P4: e2e RED (404 / 5 of 6 / 6 of 12 failing) → GREEN; 18 helper unit tests; playground e2e 48/48 with `--repeat-each 4`. Full suite: 529 unit, 24 e2e. The playground JS is 68 KB gzip (React included). The parent checked the screenshots (expanded and collapsed sidebar): original content, no forbidden terms. Exiting views share one grid cell. Rows are staggered through a mount timeout chain, because the core has no per-child delay.
+
 ## Next step
 
-P2–P5 on branch `feat/playground`.
+P5 bills (`useMorph`) + P7 toasts. Dialogs and toasts portal to `document.body`, because `.main` keeps an identity transform after settling.

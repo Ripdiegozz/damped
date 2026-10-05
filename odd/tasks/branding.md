@@ -31,7 +31,7 @@ Give damped its own identity: a mark built from the physics of the library, a re
 
 - In:
   - `brand/`: master mark, small-size mark, wordmark and lockups as outlined SVG (no font dependency), colour and type tokens, a short usage note.
-  - A generator (`bun run brand`) that writes every derived asset from `brand/`: favicon SVG (follows `prefers-color-scheme`), `favicon.ico`, `apple-touch-icon.png`, 192/512 icons, `site.webmanifest`, Open Graph image, docs logo files, README lockups. Generated files are committed; a test fails when they drift from the generator.
+  - A generator (`bun run brand`) that writes every derived asset from `brand/`: favicon SVG (a fixed near-black tile that reads in light and dark browser chrome), `favicon.ico`, `apple-touch-icon.png`, 192/512 icons, `site.webmanifest`, Open Graph image, docs logo files, README lockups. Generated files are committed; a test fails when they drift from the generator.
   - Fix the code-frame and aside radius bug through Expressive Code `styleOverrides`, never with CSS on `pre` or `.frame`.
   - New docs theme: tokens, Starlight header, sidebar, content typography, code blocks, asides, tables, badges, search, and the demo styles moved onto the new tokens.
   - New landing page with a live spring instrument hero and sections without the template patterns.

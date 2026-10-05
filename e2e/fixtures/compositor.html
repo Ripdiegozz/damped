@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>compositor</title>
+<style>
+  body { margin: 0; }
+  .box { position: absolute; left: 20px; width: 100px; height: 100px; background: #36c; }
+  #compositor { top: 20px; }
+  #js { top: 160px; background: #c63; }
+</style>
+<div class="box" id="compositor"></div>
+<div class="box" id="js"></div>
+<script src="/support.js"></script>
+<script type="module">
+  import * as damped from "/dist/index.js";
+  window.damped = damped;
+</script>

@@ -31,22 +31,58 @@ function filesUnder(directory: string, pattern: RegExp): string[] {
 describe("landing page source", () => {
   const page = read("src/content/docs/index.mdx");
   const config = read("astro.config.mjs");
+  const css = read("src/styles/landing.css");
 
   test("uses the splash template with a hero whose actions point at the guide, the playground and GitHub", () => {
     expect(page).toMatch(/^template: splash$/m);
     expect(page).toMatch(/text: Get started\s+link: \/getting-started\//);
-    expect(page).toMatch(/text: Try the playground\s+link: \/playground\//);
+    expect(page).toMatch(/text: Playground\s+link: \/playground\//);
     expect(page).toMatch(/link: https:\/\/github\.com\/Ripdiegozz\/damped\b/);
   });
 
-  test("overrides the hero so the live morph card is an island hydrated on load", () => {
+  test("overrides the hero so the live spring instrument is an island hydrated on load", () => {
     expect(config).toMatch(/Hero:\s*"\.\/src\/components\/landing\/Hero\.astro"/);
     const hero = read("src/components/landing/Hero.astro");
-    expect(hero).toMatch(/<MorphCard\b[^>]*\bclient:load\b[^>]*\bvariant="compact"|<MorphCard\b[^>]*\bvariant="compact"[^>]*\bclient:load\b/);
-    expect(hero).toContain("Esc");
+    expect(hero).toMatch(/<SpringInstrument\b[^>]*\bclient:load\b/);
+    expect(hero).not.toContain("MorphCard");
   });
 
-  test("has one card per package with its install command and a link to its reference page", () => {
+  test("has a plain title: no coloured word, no markup in the heading", () => {
+    expect(page).not.toMatch(/^\s*title:.*<[a-z]/m);
+    // The heading is the page title, set as is and self-closing: nothing in the component can colour a word of it.
+    expect(read("src/components/landing/Hero.astro")).toMatch(/<h1\b[^>]*set:html=\{title\}\s*\/>/);
+    expect(css).not.toMatch(/h1\s+(em|span|mark)/);
+  });
+
+  test("none of the template patterns are left: card grid, link cards, 2x2 why grid, number band, glow, shadows, big radii", () => {
+    expect(page).not.toMatch(/CardGrid|LinkCard/);
+    for (const name of ["why-grid", "why-point", "size-strip", "package-card", "package-grid"]) {
+      expect(page, name).not.toContain(name);
+      expect(css, name).not.toContain(name);
+    }
+    expect(css).not.toMatch(/gradient|box-shadow|--damped-glow/);
+    const radii = [...css.matchAll(/border-radius:\s*([^;]+);/g)].map((match) => match[1]!);
+    for (const radius of radii) {
+      for (const length of radius.matchAll(/(-?[\d.]+)(px|rem|em|%)?/g)) {
+        const px = length[2] === "rem" || length[2] === "em" ? Number(length[1]) * 16 : Number(length[1]);
+        // 50% is the instrument's own dots; no box is rounded past 6 px.
+        if (length[2] === "%") continue;
+        expect(px, `border-radius: ${radius}`).toBeLessThanOrEqual(6);
+      }
+    }
+  });
+
+  test("takes its colours and radius from the shared theme properties, with no private colour tokens or hex values", () => {
+    expect(css).not.toMatch(/--ld-(?!col\b)/);
+    expect(css).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(css).toMatch(/var\(--damped-radius\)/);
+  });
+
+  test("never forces focus from a script: a script focus() reads as :focus-visible after a mouse press and draws the ring", () => {
+    expect(read("src/components/landing/SpringInstrument.tsx")).not.toMatch(/\.focus\(/);
+  });
+
+  test("lists each package with its install command and a link to its reference page", () => {
     for (const name of PACKAGES) {
       const slug = name.replace("@damped/", "");
       expect(page).toContain(`name="${name}"`);
@@ -54,6 +90,34 @@ describe("landing page source", () => {
       expect(page).toContain(`npm install ${name}`);
       expect(page).toContain(`href="/reference/${slug}/"`);
     }
+    expect(page).toContain("<PackageRow");
+  });
+
+  test("numbers the reasons 01 to 04, each with a link to its guide", () => {
+    for (const number of ["01", "02", "03", "04"]) expect(page).toContain(`>${number}</span>`);
+    for (const slug of ["interruption-and-reversal", "springs-explained", "compositor", "reduced-motion"]) {
+      expect(page).toContain(`href="/guides/${slug}/"`);
+    }
+  });
+
+  test("prints the measured sizes in a spec sheet, and the README quotes the same numbers", () => {
+    const readme = readFileSync(resolve(docsRoot, "../../README.md"), "utf8");
+    expect(page).toContain('class="spec-sheet');
+    for (const figure of ["3.95 KB", "6.99 KB"]) {
+      expect(page, figure).toContain(figure);
+      expect(readme, figure).toContain(figure);
+    }
+    expect(page).toContain("0.74 KB");
+    expect(page).toMatch(/<td[^>]*>0<\/td>/);
+  });
+
+  test("indexes every guide in the docs, so a new guide cannot go missing from the landing page", () => {
+    const guides = readdirSync(join(docsRoot, "src/content/docs/guides"))
+      .filter((file) => file.endsWith(".mdx"))
+      .map((file) => file.replace(/\.mdx$/, ""));
+    expect(guides.length).toBeGreaterThanOrEqual(PLANNED_GUIDES.length);
+    for (const slug of guides) expect(page, slug).toContain(`href="/guides/${slug}/"`);
+    expect(page).toContain('href="/getting-started/"');
   });
 
   test("links every planned guide", () => {
@@ -93,26 +157,39 @@ if (mode === "fail") {
 describe.skipIf(mode !== "run")("landing page build output", () => {
   const html = existsSync(built) ? readFileSync(built, "utf8") : "";
 
-  test("renders the hero actions as links", () => {
-    expect(html).toMatch(/<a[^>]*href="\/getting-started\/"[^>]*>[\s\S]*?Get started/);
-    expect(html).toMatch(/<a[^>]*href="\/playground\/"[^>]*>[\s\S]*?Try the playground/);
-    expect(html).toMatch(/<a[^>]*href="https:\/\/github\.com\/Ripdiegozz\/damped"/);
+  test("renders two neutral buttons and a quiet GitHub link in the hero", () => {
+    const actions = html.match(/<div class="landing-hero__actions">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const buttons = [...actions.matchAll(/<a\b[^>]*class="[^"]*\blanding-button\b[^"]*"[^>]*>/g)].map((match) => match[0]);
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toContain('href="/getting-started/"');
+    expect(buttons[1]).toContain('href="/playground/"');
+    expect(actions).toMatch(/<a\b[^>]*class="[^"]*\blanding-quiet\b[^"]*"[^>]*href="https:\/\/github\.com\/Ripdiegozz\/damped"|<a\b[^>]*href="https:\/\/github\.com\/Ripdiegozz\/damped"[^>]*class="[^"]*\blanding-quiet\b/);
+    expect(actions).toMatch(/Get started/);
+    expect(actions).toMatch(/Playground/);
   });
 
-  test("renders the compact morph card inside an island that hydrates on load", () => {
-    expect(html).toMatch(/<astro-island[^>]*\bclient="load"[^>]*>[\s\S]*?data-demo="morph-card"/);
-    expect(html).toContain("morph-demo--compact");
-    expect(html).toMatch(/data-state="idle"/);
+  test("renders the spring instrument inside an island that hydrates on load, idle and server-rendered", () => {
+    expect(html).toMatch(/<astro-island[^>]*\bclient="load"[^>]*>[\s\S]*?data-demo="spring-instrument"/);
+    expect(html).toMatch(/data-demo="spring-instrument"[^>]*data-state="idle"|data-state="idle"[^>]*data-demo="spring-instrument"/);
+    expect(html).toMatch(/role="slider"/);
+    expect(html).not.toContain('data-demo="morph-card"');
+    expect(html).not.toMatch(/<[a-z]+\b[^>]*class="[^"]*sl-link-card/);
   });
 
-  test("shows the three package cards", () => {
+  test("the title is one plain text node", () => {
+    const heading = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1] ?? "";
+    expect(heading).not.toMatch(/</);
+    expect(heading).toContain("Springs that keep their momentum");
+  });
+
+  test("lists the three packages as rows", () => {
     for (const name of PACKAGES) expect(html).toContain(name);
     for (const slug of ["core", "react", "native"]) expect(html).toContain(`href="/reference/${slug}/"`);
   });
 
-  test("each package card holds its own install commands and a snippet that imports that package", () => {
-    const cards = html.split('<article class="package-card"').slice(1).map((card) => textOf(card.split("</article>")[0] ?? ""));
-    expect(cards).toHaveLength(PACKAGES.length);
+  test("each package row holds its own install commands and a snippet that imports that package", () => {
+    const rows = html.split('<article class="package-row"').slice(1).map((row) => textOf(row.split("</article>")[0] ?? ""));
+    expect(rows).toHaveLength(PACKAGES.length);
     const expected: Record<string, { install: string[]; snippet: string }> = {
       "@damped/core": { install: ["bun add @damped/core", "npm install @damped/core"], snippet: 'import { animate } from "@damped/core"' },
       "@damped/react": {
@@ -122,12 +199,20 @@ describe.skipIf(mode !== "run")("landing page build output", () => {
       "@damped/native": { install: ["bun add @damped/native", "npm install @damped/native"], snippet: 'import { withDamped } from "@damped/native"' },
     };
     for (const [index, name] of PACKAGES.entries()) {
-      const card = cards[index] ?? "";
-      expect(card, name).toContain(name);
-      for (const command of expected[name]!.install) expect(card, `${name}: ${command}`).toContain(command);
-      expect(card, `${name} snippet`).toContain(expected[name]!.snippet);
-      expect(card, `${name} reference link`).toContain("Reference");
+      const row = rows[index] ?? "";
+      expect(row, name).toContain(name);
+      for (const command of expected[name]!.install) expect(row, `${name}: ${command}`).toContain(command);
+      expect(row, `${name} snippet`).toContain(expected[name]!.snippet);
+      expect(row, `${name} reference link`).toContain("Reference");
     }
+  });
+
+  test("numbers the reasons and prints the spec sheet and the guide index", () => {
+    expect(html.match(/class="why-list__n"/g)).toHaveLength(4);
+    const sheet = textOf(html.match(/<table class="spec-sheet[\s\S]*?<\/table>/)?.[0] ?? "");
+    for (const figure of ["3.95 KB", "6.99 KB", "0.74 KB"]) expect(sheet, figure).toContain(figure);
+    const index = html.match(/<ul class="guide-index[\s\S]*?<\/ul>/)?.[0] ?? "";
+    expect([...index.matchAll(/<li\b/g)].length).toBeGreaterThanOrEqual(PLANNED_GUIDES.length + 1);
   });
 
   test("requests nothing from another origin", () => {

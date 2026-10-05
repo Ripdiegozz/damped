@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { StrictMode, act, type RefCallback } from "react";
-import { createSpring, morph, type MorphOptions } from "damped";
+import { createSpring, morph, type MorphOptions } from "@damped/core";
 import { peekSpringValue } from "../../core/src/animate";
 import { A, B, IDENTITY, SPRING, centerX, createWorld, parseTransform } from "../../core/test/layout-world";
 import { useMorph } from "../src";

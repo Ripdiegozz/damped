@@ -1,4 +1,4 @@
-import { snapshot, type LayoutOptions, type LayoutSnapshot } from "damped";
+import { snapshot, type LayoutOptions, type LayoutSnapshot } from "@damped/core";
 import { useRef, type RefCallback } from "react";
 import { useIsomorphicLayoutEffect } from "./isomorphic";
 

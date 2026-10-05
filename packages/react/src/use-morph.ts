@@ -1,4 +1,4 @@
-import { morph, type MorphControls, type MorphOptions } from "damped";
+import { morph, type MorphControls, type MorphOptions } from "@damped/core";
 import { useEffect, useMemo, useRef, useState, type RefCallback } from "react";
 import { useIsomorphicLayoutEffect } from "./isomorphic";
 

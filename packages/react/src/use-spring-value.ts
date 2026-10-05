@@ -1,4 +1,4 @@
-import { createSpringValue, type SpringValue, type SpringValueOptions } from "damped";
+import { createSpringValue, type SpringValue, type SpringValueOptions } from "@damped/core";
 import { useEffect, useRef } from "react";
 
 interface Owned {

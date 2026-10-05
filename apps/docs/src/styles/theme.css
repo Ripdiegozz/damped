@@ -1,97 +1,682 @@
-/* damped docs theme: a calm teal accent on cool neutrals, tuned for WCAG AA text contrast in both
-   themes. Fonts are self-hosted through @fontsource, so the site makes no third-party requests. */
-@import "@fontsource-variable/inter/wght.css";
-@import "@fontsource-variable/fraunces/wght.css";
-@import "@fontsource-variable/jetbrains-mono/wght.css";
+/* damped docs theme: quiet chrome, loud motion.
+ *
+ * The chrome is near-black (or warm white), hairline-ruled and set in Geist. Colour belongs to motion: the accent
+ * appears only on things that move or come to rest (the demo traces, markers and balls), on the active navigation
+ * indicator, on focus rings and on link underlines. Nothing here fills an area with it.
+ *
+ * Colours come from brand/tokens.css, the single source (imported below). This file maps them onto Starlight's
+ * `--sl-color-*` variables and names the shared theme properties other styles build on:
+ *
+ *   --damped-paper | --damped-surface | --damped-raised   page, raised panels, hover and header fills
+ *   --damped-ink | --damped-ink-muted                     text and muted text (both clear 4.5:1 on every surface)
+ *   --damped-hairline | --damped-hairline-strong          1px rules; the strong one is for hover and focus-adjacent edges
+ *   --damped-accent                                       the signal, for fills of things that move
+ *   --damped-accent-text                                  the signal where it must be legible: lines, text, indicators
+ *   --damped-caution | --damped-danger                    status hues, used for aside icons only
+ *   --damped-font-mono | --damped-radius | --damped-ease  type, the one radius (6px) and the easing
+ *
+ * Fonts are self-hosted through @fontsource, so the site makes no third-party requests. */
+@import "@fontsource-variable/geist/wght.css";
+@import "@fontsource-variable/geist-mono/wght.css";
+@import "../../../../brand/tokens.css";
 
 :root {
   --sl-font:
-    "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --sl-font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
-  --damped-font-display: "Fraunces Variable", ui-serif, Georgia, "Times New Roman", serif;
+    "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sl-font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --damped-font-mono: var(--sl-font-mono);
+  /* Kept for the landing page styles; it is one sans family now. */
+  --damped-font-display: var(--sl-font);
 
-  --sl-text-body: 1rem;
+  /* Type: 15px body, modest headings (no giant type on content pages). */
+  --sl-text-body: 0.9375rem;
+  --sl-text-body-sm: 0.8125rem;
+  --sl-text-code: 0.8125rem;
+  --sl-text-code-sm: 0.8125rem;
+  --sl-text-h1: 2rem;
+  --sl-text-h2: 1.375rem;
+  --sl-text-h3: 1.125rem;
+  --sl-text-h4: 1rem;
+  --sl-text-h5: 0.9375rem;
   --sl-line-height: 1.7;
-  --sl-content-width: 46rem;
+  --sl-line-height-headings: 1.2;
 
-  --damped-radius: 0.75rem;
+  /* Layout: a compact header and a slim sidebar. */
+  --sl-nav-height: 3.25rem;
+  --sl-nav-pad-y: 0.6rem;
+  --sl-sidebar-width: 15rem;
+  --sl-content-width: 44rem;
+
+  --damped-radius: 0.375rem;
   --damped-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The landing styles still read the old glow; it is gone, so it paints nothing. */
+  --damped-glow: transparent;
+
+  --damped-hairline-strong: color-mix(in srgb, var(--damped-ink) 22%, transparent);
+  --damped-caution: #e6c04a;
+  --damped-danger: #f2686d;
 }
 
-/* Dark theme (the default). Body text is gray-2, muted text gray-3; both stay above 4.5:1 on every surface. */
-:root,
-:root[data-theme="dark"] {
-  --sl-color-white: #ffffff;
-  --sl-color-gray-1: #eceff3;
-  --sl-color-gray-2: #c9d0d9;
-  --sl-color-gray-3: #aab4c0;
-  --sl-color-gray-4: #8691a0;
-  --sl-color-gray-5: #353d49;
-  --sl-color-gray-6: #232a33;
-  --sl-color-gray-7: #181d24;
-  --sl-color-black: #0f1318;
-
-  --sl-color-accent-low: #0c3b37;
-  --sl-color-accent: #14a89a;
-  --sl-color-accent-high: #7fe3d6;
-
-  --sl-color-hairline-light: #2c343f;
-  --sl-color-hairline: #232a33;
-  --damped-glow: rgba(20, 168, 154, 0.16);
-}
-
-/* Light theme. The ramp inverts: "white" is the strongest text colour and "black" the page background. */
 :root[data-theme="light"] {
-  --sl-color-white: #10161d;
-  --sl-color-gray-1: #1c2530;
-  --sl-color-gray-2: #2f3a47;
-  --sl-color-gray-3: #4a5563;
-  --sl-color-gray-4: #5d6877;
-  --sl-color-gray-5: #c3cad3;
-  --sl-color-gray-6: #eaeef2;
-  --sl-color-gray-7: #f4f6f8;
-  --sl-color-black: #ffffff;
-
-  --sl-color-accent-low: #d5f3ee;
-  --sl-color-accent: #0f766e;
-  --sl-color-accent-high: #0b4f49;
-
-  --sl-color-hairline-light: #d9dfe6;
-  --sl-color-hairline: #e6eaee;
-  --damped-glow: rgba(15, 118, 110, 0.1);
+  --damped-caution: #9a6b00;
+  --damped-danger: #c62a2f;
 }
 
-/* Display type: a soft serif for headings against a neutral sans for reading. */
-.hero h1,
-.sl-markdown-content h1,
-.sl-markdown-content h2,
-.sl-markdown-content h3,
-h1#_top {
-  font-family: var(--damped-font-display);
+/* Starlight's colour ramp for both themes: the damped tokens it points at switch with `data-theme`, so one block serves
+   dark (the default) and light. "white" is the strongest text colour and "black" the page background. */
+:root {
+  --sl-color-white: var(--damped-ink);
+  --sl-color-gray-1: var(--damped-ink);
+  --sl-color-gray-2: color-mix(in srgb, var(--damped-ink) 86%, var(--damped-paper));
+  --sl-color-gray-3: var(--damped-ink-muted);
+  --sl-color-gray-4: color-mix(in srgb, var(--damped-ink-muted) 70%, var(--damped-paper));
+  --sl-color-gray-5: var(--damped-hairline);
+  --sl-color-gray-6: var(--damped-raised);
+  --sl-color-gray-7: var(--damped-surface);
+  --sl-color-black: var(--damped-paper);
+
+  /* The accent variables stay neutral on purpose: anything Starlight paints with them must not become an orange block.
+     The signal is applied by hand, where the rules at the top of this file allow it. */
+  --sl-color-accent-low: var(--damped-raised);
+  --sl-color-accent: var(--damped-ink);
+  --sl-color-accent-high: var(--damped-ink);
+
+  --sl-color-text: var(--sl-color-gray-2);
+  --sl-color-text-accent: var(--damped-ink);
+  --sl-color-text-invert: var(--damped-paper);
+  --sl-color-bg: var(--damped-paper);
+  --sl-color-bg-nav: var(--damped-paper);
+  --sl-color-bg-sidebar: var(--damped-paper);
+  --sl-color-bg-inline-code: var(--damped-surface);
+  --sl-color-bg-accent: var(--damped-ink);
+  --sl-color-hairline-light: var(--damped-hairline);
+  --sl-color-hairline: var(--damped-hairline);
+  --sl-color-hairline-shade: var(--damped-hairline);
+  --sl-color-backdrop-overlay: color-mix(in srgb, var(--damped-paper) 72%, transparent);
+
+  --sl-shadow-sm: none;
+  --sl-shadow-md: none;
+  --sl-shadow-lg: none;
+}
+
+/* Typography ------------------------------------------------------------------------------------------------ */
+body {
+  font-feature-settings: "ss01", "cv11";
+  text-rendering: optimizeLegibility;
+}
+
+h1#_top,
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--sl-font);
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
+}
+
+h1#_top {
+  letter-spacing: -0.035em;
 }
 
 .sl-markdown-content h2 {
-  margin-top: 2.5rem;
+  letter-spacing: -0.027em;
 }
 
-.sl-markdown-content :not(pre) > code {
-  border-radius: 0.3rem;
+.sl-markdown-content :is(h4, h5, h6) {
+  letter-spacing: -0.01em;
 }
 
-/* A soft glow behind the hero and page headers. */
-.hero,
-.content-panel:first-child {
-  background: radial-gradient(60rem 18rem at 50% -4rem, var(--damped-glow), transparent 70%);
+.sl-markdown-content .sl-heading-wrapper.level-h2 {
+  margin-top: 2.75rem;
 }
 
-a:focus-visible,
-button:focus-visible,
-summary:focus-visible {
-  outline: 2px solid var(--sl-color-accent-high);
+.sl-markdown-content .sl-heading-wrapper.level-h3 {
+  margin-top: 2rem;
+}
+
+/* Heading anchors: there, but quiet. */
+.sl-markdown-content .sl-anchor-link {
+  color: var(--damped-ink-muted);
+}
+
+.sl-markdown-content .sl-anchor-link:hover {
+  color: var(--damped-ink);
+}
+
+/* Links: ink text with an accent underline that strengthens on hover. */
+.sl-markdown-content a:where(:not(.sl-anchor-link, .sl-link-button, .not-content *, .sl-link-card *)) {
+  color: var(--damped-ink);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--damped-accent-text) 55%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+}
+
+.sl-markdown-content a:where(:not(.sl-anchor-link, .sl-link-button, .not-content *, .sl-link-card *)):hover {
+  color: var(--damped-ink);
+  text-decoration-color: var(--damped-accent-text);
+  text-decoration-thickness: 2px;
+}
+
+.sl-markdown-content :where(strong) {
+  color: var(--damped-ink);
+  font-weight: 600;
+}
+
+/* Inline code: mono on a subtle surface with a hairline. */
+.sl-markdown-content :not(pre) > code:not(:where(.not-content *)) {
+  padding: 0.1em 0.38em;
+  border: 1px solid var(--damped-hairline);
+  border-radius: 4px;
+  background-color: var(--damped-surface);
+  color: var(--damped-ink);
+  font-size: 0.86em;
+}
+
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) :not(pre) > code:not(:where(.not-content *)) {
+  font-size: 0.86em;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+kbd {
+  font-family: var(--damped-font-mono);
+}
+
+.sl-markdown-content kbd {
+  padding: 0.05em 0.4em;
+  border: 1px solid var(--damped-hairline-strong);
+  border-radius: 4px;
+  background: var(--damped-surface);
+  color: var(--damped-ink);
+  font-size: 0.8em;
+}
+
+.sl-markdown-content blockquote:not(:where(.not-content *)) {
+  border-inline-start: 2px solid var(--damped-hairline-strong);
+  color: var(--damped-ink-muted);
+}
+
+.sl-markdown-content hr:not(:where(.not-content *)) {
+  border-bottom-color: var(--damped-hairline);
+}
+
+/* Tables: hairline rows, mono small-caps headers. */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  font-size: 0.875rem;
+}
+
+.sl-markdown-content :is(th, td):not(:where(.not-content *)) {
+  border-bottom: 1px solid var(--damped-hairline);
+  padding: 0.6rem 1rem;
+}
+
+.sl-markdown-content th:not(:where(.not-content *)) {
+  border-bottom-color: var(--damped-hairline-strong);
+  color: var(--damped-ink-muted);
+  font-family: var(--damped-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sl-markdown-content :is(th:first-child, td:first-child):not(:where(.not-content *)) {
+  padding-inline-start: 0;
+}
+
+.sl-markdown-content :is(th:last-child, td:last-child):not(:where(.not-content *)) {
+  padding-inline-end: 0;
+}
+
+/* Disclosure: a thin hairline rule, the summary marker follows the text. */
+.sl-markdown-content details:not(:where(.not-content *)) {
+  --sl-details-border-color: var(--damped-hairline-strong);
+  --sl-details-border-color--hover: var(--damped-ink-muted);
+}
+
+/* Asides: a uniform 1px hairline box on the same surface as every other panel. No start rule, no tinted fill and no
+   radius (test/code-frames.test.ts and test/theme.test.ts). The type is named quietly by a small mono label with a
+   6px status dot: ink-muted for note and tip, caution and danger hues for the other two, never the accent. */
+.starlight-aside {
+  position: relative;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--damped-hairline);
+  background-color: var(--damped-surface);
+  color: var(--sl-color-text);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.starlight-aside--note,
+.starlight-aside--tip,
+.starlight-aside--caution,
+.starlight-aside--danger {
+  --sl-color-asides-text-accent: var(--damped-ink);
+  --sl-color-asides-border: var(--damped-hairline);
+  --aside-dot: var(--damped-ink-muted);
+  background-color: var(--damped-surface);
+}
+
+.starlight-aside--caution {
+  --aside-dot: var(--damped-caution);
+}
+
+.starlight-aside--danger {
+  --aside-dot: var(--damped-danger);
+}
+
+.starlight-aside--note {
+  --aside-label: "Note";
+}
+
+.starlight-aside--tip {
+  --aside-label: "Tip";
+}
+
+.starlight-aside--caution {
+  --aside-label: "Caution";
+}
+
+.starlight-aside--danger {
+  --aside-label: "Danger";
+}
+
+.starlight-aside::before {
+  content: var(--aside-label);
+  display: block;
+  margin-bottom: 0.4rem;
+  padding-inline-start: 1rem;
+  color: var(--damped-ink-muted);
+  font-family: var(--damped-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  line-height: 1rem;
+  text-transform: uppercase;
+}
+
+.starlight-aside::after {
+  content: "";
+  position: absolute;
+  inset-block-start: calc(0.875rem + 5px);
+  inset-inline-start: 1rem;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--aside-dot);
+}
+
+.starlight-aside__title {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--damped-ink);
+}
+
+/* The type already has its label; a title that only repeats it is dropped. */
+.starlight-aside:is([aria-label="Note"], [aria-label="Tip"], [aria-label="Caution"], [aria-label="Danger"]) .starlight-aside__title {
+  display: none;
+}
+
+.starlight-aside__icon {
+  display: none;
+}
+
+.starlight-aside__content a {
+  color: var(--damped-ink);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--damped-accent-text) 55%, transparent);
+  text-underline-offset: 0.22em;
+}
+
+/* Badges: a hairline label in mono, never a filled colour chip. */
+:root {
+  --sl-badge-default-border: var(--damped-hairline-strong);
+  --sl-badge-default-bg: transparent;
+  --sl-badge-default-text: var(--damped-ink-muted);
+  --sl-badge-note-border: var(--damped-hairline-strong);
+  --sl-badge-note-bg: transparent;
+  --sl-badge-note-text: var(--damped-ink-muted);
+  --sl-badge-tip-border: var(--damped-hairline-strong);
+  --sl-badge-tip-bg: transparent;
+  --sl-badge-tip-text: var(--damped-ink-muted);
+  --sl-badge-success-border: var(--damped-hairline-strong);
+  --sl-badge-success-bg: transparent;
+  --sl-badge-success-text: var(--damped-ink-muted);
+  --sl-badge-caution-border: var(--damped-caution);
+  --sl-badge-caution-bg: transparent;
+  --sl-badge-caution-text: var(--damped-ink-muted);
+  --sl-badge-danger-border: var(--damped-danger);
+  --sl-badge-danger-bg: transparent;
+  --sl-badge-danger-text: var(--damped-ink-muted);
+}
+
+.sl-badge {
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-family: var(--damped-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+}
+
+/* Steps, cards and buttons --------------------------------------------------------------------------------- */
+.sl-steps > li::before {
+  border: 1px solid var(--damped-hairline-strong);
+  border-radius: 4px;
+  background-color: transparent;
+  box-shadow: none;
+  font-family: var(--damped-font-mono);
+  font-weight: 500;
+}
+
+.card {
+  --sl-card-border: var(--damped-hairline);
+  --sl-card-bg: var(--damped-raised);
+  border-radius: var(--damped-radius);
+  background-color: var(--damped-surface);
+}
+
+.card:nth-child(n) {
+  --sl-card-border: var(--damped-hairline);
+  --sl-card-bg: var(--damped-raised);
+}
+
+.sl-link-card {
+  border-color: var(--damped-hairline);
+  border-radius: var(--damped-radius);
+  box-shadow: none;
+  transition: background-color 160ms var(--damped-ease);
+}
+
+.sl-link-card:hover {
+  border-color: var(--damped-hairline-strong);
+  background: var(--damped-surface);
+}
+
+.sl-link-card .title {
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+}
+
+.sl-link-card .description {
+  font-size: 0.875rem;
+  color: var(--damped-ink-muted);
+}
+
+.sl-link-button {
+  padding: 0.5rem 0.95rem;
+  border-radius: var(--damped-radius);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+
+.sl-link-button.primary {
+  border-color: var(--damped-ink);
+  background: var(--damped-ink);
+  color: var(--damped-paper);
+}
+
+.sl-link-button.primary:hover {
+  background: color-mix(in srgb, var(--damped-ink) 86%, var(--damped-paper));
+  color: var(--damped-paper);
+}
+
+.sl-link-button.secondary {
+  border-color: var(--damped-hairline-strong);
+  color: var(--damped-ink);
+}
+
+.sl-link-button.secondary:hover {
+  background: var(--damped-raised);
+}
+
+.sl-link-button.minimal {
+  color: var(--damped-ink-muted);
+}
+
+.sl-link-button.minimal:hover {
+  color: var(--damped-ink);
+}
+
+/* Tabs: the selected tab carries the thin accent indicator. */
+.tab [role="tab"][aria-selected="true"] {
+  --sl-tab-color-border: var(--damped-accent-text);
+}
+
+[role="tablist"] {
+  border-bottom-width: 1px;
+}
+
+.tab > [role="tab"] {
+  font-size: 0.875rem;
+}
+
+/* Chrome: header ------------------------------------------------------------------------------------------------ */
+header.header {
+  border-bottom: 1px solid var(--damped-hairline);
+}
+
+.site-title img {
+  height: 1.25rem;
+}
+
+.header .social-icons::after {
+  border-inline-end-color: var(--damped-hairline);
+}
+
+.header .social-icons a {
+  color: var(--damped-ink-muted);
+}
+
+.header .social-icons a:hover {
+  color: var(--damped-ink);
+}
+
+/* Search: a quiet hairline field with a mono shortcut. */
+@media (min-width: 50rem) {
+  button[data-open-modal] {
+    height: 2rem;
+    max-width: 20rem;
+    border-color: var(--damped-hairline);
+    border-radius: var(--damped-radius);
+    background-color: var(--damped-surface);
+    color: var(--damped-ink-muted);
+    font-size: 0.8125rem;
+  }
+
+  button[data-open-modal]:hover {
+    border-color: var(--damped-hairline-strong);
+    color: var(--damped-ink);
+  }
+}
+
+button[data-open-modal] kbd {
+  font-family: var(--damped-font-mono);
+  font-size: 0.6875rem;
+}
+
+button[data-open-modal] > kbd {
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--damped-hairline-strong);
+  border-radius: 4px;
+  background-color: transparent;
+  color: var(--damped-ink-muted);
+}
+
+button[data-open-modal] > kbd > kbd {
+  padding: 0;
+}
+
+dialog {
+  border-color: var(--damped-hairline-strong);
+  border-radius: var(--damped-radius);
+  background-color: var(--damped-surface);
+  box-shadow: none;
+}
+
+#starlight__search {
+  --pagefind-ui-primary: var(--damped-ink);
+  --pagefind-ui-text: var(--damped-ink-muted);
+  --pagefind-ui-background: var(--damped-paper);
+  --pagefind-ui-border: var(--damped-hairline);
+  --pagefind-ui-tag: var(--damped-raised);
+  --pagefind-ui-font: var(--sl-font);
+}
+
+#starlight__search input:focus-visible {
+  --pagefind-ui-border: var(--damped-accent-text);
+}
+
+/* The mobile menu button: a hairline square, not a filled disc. */
+.sl-menu-button,
+.sl-menu-button:has(~ :popover-open) {
+  border: 1px solid var(--damped-hairline-strong);
+  border-radius: var(--damped-radius);
+  background-color: var(--damped-surface);
+  color: var(--damped-ink);
+  box-shadow: none;
+}
+
+/* Chrome: sidebar ------------------------------------------------------------------------------------------------ */
+.sidebar-pane {
+  border-inline-end-color: var(--damped-hairline);
+}
+
+.sidebar-content a {
+  position: relative;
+  border-radius: 0;
+  color: var(--damped-ink-muted);
+  font-size: 0.8125rem;
+}
+
+.sidebar-content a:hover,
+.sidebar-content a:focus-visible {
+  background-color: transparent;
+  color: var(--damped-ink);
+}
+
+/* The current page is ink, with a thin accent bar over the guide line. */
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus-visible {
+  background-color: transparent;
+  color: var(--damped-ink);
+  font-weight: 500;
+}
+
+.sidebar-content a[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  inset-block: 0.2em;
+  inset-inline-start: calc(-0.5rem - 1px);
+  width: 2px;
+  background-color: var(--damped-accent-text);
+}
+
+.sidebar-content .top-level > li > a[aria-current="page"]::before {
+  inset-inline-start: -0.25rem;
+}
+
+.sidebar-content ul ul li {
+  border-inline-start-color: var(--damped-hairline);
+}
+
+/* Group labels: small mono capitals, muted. */
+.sidebar-content summary .large {
+  color: var(--damped-ink);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.sidebar-content .top-level > li > details > summary .large {
+  color: var(--damped-ink-muted);
+  font-family: var(--damped-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar-content a.large {
+  color: var(--damped-ink-muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.sidebar-content .caret {
+  width: 1rem;
+  height: 1rem;
+  color: var(--damped-ink-muted);
+}
+
+/* Chrome: right table of contents, pagination -------------------------------------------------------------------- */
+.right-sidebar-panel h2 {
+  color: var(--damped-ink-muted);
+  font-family: var(--damped-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.right-sidebar-panel starlight-toc nav > ul {
+  border-inline-start: 1px solid var(--damped-hairline);
+}
+
+.right-sidebar-panel starlight-toc a {
+  position: relative;
+  border-radius: 0;
+  color: var(--damped-ink-muted);
+  font-size: 0.8125rem;
+}
+
+.right-sidebar-panel starlight-toc a:hover,
+.right-sidebar-panel starlight-toc a[aria-current="true"] {
+  color: var(--damped-ink);
+}
+
+.right-sidebar-panel starlight-toc a[aria-current="true"]::before {
+  content: "";
+  position: absolute;
+  inset-block: 0.2rem;
+  inset-inline-start: -1px;
+  width: 2px;
+  background-color: var(--damped-accent-text);
+}
+
+mobile-starlight-toc .toggle {
+  border-radius: var(--damped-radius);
+}
+
+.pagination-links a {
+  padding: 0.75rem 1rem;
+  border-color: var(--damped-hairline);
+  border-radius: var(--damped-radius);
+  box-shadow: none;
+  color: var(--damped-ink-muted);
+  font-family: var(--damped-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: border-color 160ms var(--damped-ease);
+}
+
+.pagination-links a:hover {
+  border-color: var(--damped-hairline-strong);
+}
+
+.pagination-links .link-title {
+  color: var(--damped-ink);
+  font-family: var(--sl-font);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+/* Focus ---------------------------------------------------------------------------------------------------------- */
+:where(a, button, summary, input, select, textarea, [tabindex], [role="slider"]):focus-visible {
+  outline: 2px solid var(--damped-accent-text);
   outline-offset: 2px;
-  border-radius: 0.25rem;
 }
 
 .spring-probe {
@@ -99,10 +684,12 @@ summary:focus-visible {
   padding: 0.75rem 1rem;
   max-width: 32rem;
   text-align: center;
-  border: 1px solid var(--sl-color-hairline-light);
+  border: 1px solid var(--damped-hairline);
   border-radius: var(--damped-radius);
-  background: var(--sl-color-accent-low);
-  color: var(--sl-color-text-accent);
+  background: var(--damped-surface);
+  color: var(--damped-ink);
+  font-family: var(--damped-font-mono);
+  font-size: 0.875rem;
 }
 
 @media (prefers-reduced-motion: no-preference) {

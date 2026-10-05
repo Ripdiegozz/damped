@@ -12,18 +12,24 @@
   --damped-accent-text-light: #c73800;
 
   --damped-dark-paper: #0a0a0b;
+  /* Raised surfaces are one small step lighter than the page: cards, code panels, the search field. */
+  --damped-dark-surface: #111113;
+  --damped-dark-raised: #19191c;
   --damped-dark-ink: #ededed;
   --damped-dark-ink-muted: #a1a1aa;
   --damped-dark-hairline: #26262a;
 
   --damped-light-paper: #fafaf9;
   --damped-light-surface: #ffffff;
+  --damped-light-raised: #f1f1ef;
   --damped-light-ink: #0a0a0b;
   --damped-light-ink-muted: #52525b;
   --damped-light-hairline: #e4e4e0;
 
   /* Dark first: the site is dark unless the light theme is selected. */
   --damped-paper: var(--damped-dark-paper);
+  --damped-surface: var(--damped-dark-surface);
+  --damped-raised: var(--damped-dark-raised);
   --damped-ink: var(--damped-dark-ink);
   --damped-ink-muted: var(--damped-dark-ink-muted);
   --damped-hairline: var(--damped-dark-hairline);
@@ -32,6 +38,8 @@
 
 :root[data-theme="light"] {
   --damped-paper: var(--damped-light-paper);
+  --damped-surface: var(--damped-light-surface);
+  --damped-raised: var(--damped-light-raised);
   --damped-ink: var(--damped-light-ink);
   --damped-ink-muted: var(--damped-light-ink-muted);
   --damped-hairline: var(--damped-light-hairline);

@@ -58,11 +58,11 @@ Give damped its own identity: a mark built from the physics of the library, a re
 | --- | --- | --- | --- | --- |
 | B1 | Brand system: `brand/` sources (mark, small mark, outlined wordmark, lockups, tokens) and the `bun run brand` generator with a drift test | delegated (writer: 2+ non-trivial files) | done | `332a80a` `f1096e3` |
 | B2 | Fix code frames and asides: Expressive Code `styleOverrides`, drop the radius rule, built-output test | inline (one mechanical, understood change) | done | `3d62d81` |
-| B3 | Docs theme: Geist/Geist Mono, dark-first tokens, accent rules, Starlight chrome, code, asides, tables; demos on the new tokens; logo and favicons wired | delegated (writer) | todo | |
-| B4 | Landing redesign: live spring instrument hero, new sections, updated landing tests | delegated (writer) | todo | |
-| B5 | Physics: interactive "Springs explained" (mass on a spring, damping ratio, phase portrait, interruption) with unit, SSR and e2e coverage | delegated (writer) | todo | |
-| B6 | Playground favicon and head metadata; build copies the assets; e2e asserts they load under `/playground/` | delegated (writer, with B7) | todo | |
-| B7 | README lockup, package manifest metadata, GitHub repository description, homepage and topics | delegated (writer, with B6) + inline `gh repo edit` | todo | |
+| B3 | Docs theme: Geist/Geist Mono, dark-first tokens, accent rules, Starlight chrome, code, asides, tables; demos on the new tokens; logo and favicons wired | delegated (writer) | done | `28478c4` `5f44c87` `e4978b3` `117231e` |
+| B4 | Landing redesign: live spring instrument hero, new sections, updated landing tests | delegated (writer, worktree `feat/branding-landing`) | in progress | |
+| B5 | Physics: interactive "Springs explained" (mass on a spring, damping ratio, phase portrait, interruption) with unit, SSR and e2e coverage | delegated (writer, worktree `feat/branding-physics`) | in progress | |
+| B6 | Playground favicon and head metadata; build copies the assets; e2e asserts they load under `/playground/` | delegated (writer with B7, worktree `feat/branding-meta`) | done (on `feat/branding-meta`, to merge) | `f03cb9a` |
+| B7 | README lockup, package manifest metadata, GitHub repository description, homepage and topics | delegated (writer with B6) + inline `gh repo edit` | done (on `feat/branding-meta`, to merge; GitHub edited) | `9d97f6d` |
 | B8 | Deliver: forbidden-strings grep, all gates, PRs, merge, verify the live site, screenshots | inline | todo | |
 
 ## Acceptance criteria
@@ -101,6 +101,21 @@ Give damped its own identity: a mark built from the physics of the library, a re
 
 - 2026-10-05: Review assessment for `01d2b48..cc9ac75`: medium, `slice_budget_reached`, so the review was due. START asked for consent (44 files, 1316 lines). The user chose "Skip this time", and the exact decline invocation returned `declined` / `declined_this_candidate` for target `sha256:38f2593a…`. Verification for that range is therefore the writer's self-verification plus the parent spot check (medium tier, non-mini writer). B3 delegated to one writer.
 
+- 2026-10-05: The user asked for maximum parallelism ("metele nitro, tirá paralelos"). Four writers now run at once. B3 is in the main checkout on `feat/branding`. B4, B5 and B6+B7 each have their own worktree under `../damped-worktrees/` on `feat/branding-landing`, `feat/branding-physics` and `feat/branding-meta`, all from `ecd4f04`, with `bun install --frozen-lockfile` done.
+  - File ownership: B3 owns the theme, chrome, code blocks, demos and head; it was told to stay out of the landing. B4 owns the landing files. B5 owns `springs-explained.mdx`, `components/physics/` and `styles/physics.css`, plus one `customCss` line. B6+B7 own the playground head and build, the README and the package manifests.
+  - Ports: `reuseExistingServer` is on locally, so each writer has its own `E2E_PORT` (B3 4173, B4 4174, B5 4175, B6+B7 4176) and its own static-server range.
+  - Integration: merge the three branches into `feat/branding` after B3, re-verify visually on the merged theme, and dedupe the overlap between the B4 hero instrument and the B5 phase-portrait figure.
+
+- 2026-10-05: B6+B7 done in their worktree, strict TDD. RED: `bun test apps/playground/test/head.test.ts test/package-metadata.test.ts` gave 1 pass / 9 fail, and the new playground e2e received `[]` icon requests. GREEN: 5 + 5 pass. Writer gates: `CI=true bun test` 883 pass, `bun run typecheck` 0, `bun run docs:check` 26 examples, `bun run site:check` 26 pages, `E2E_PORT=4176 bun run e2e` 98 passed, and the `/playground/` icons serve 200.
+  - The playground `theme-color` is `#f1f2f4`, Northbook's own light `--bg`, and a unit test ties it to `styles.css`. The README lockup sits in the `<h1>` through `<picture>`. The three manifests have `keywords`, `homepage`, `bugs` and `repository.directory`.
+  - Parent, inline: `gh repo edit` set the description ("Interruptible, physically based spring animations for the web, React and React Native."), the homepage `https://damped.dagadev.net` and 9 topics. The repository is PUBLIC.
+- 2026-10-05: B3 done, strict TDD. RED: `theme.test.ts` 1 pass / 14 fail. After the user's aside correction (no start border, no tint) and the focus-ring fix, RED again with 18 pass / 3 fail. GREEN: writer gates `CI=true bun test` 894 pass, `bun run typecheck` 0, `bun run site:check` 26 pages, `E2E_PORT=4173 bun run e2e` 106 passed. One full-run flake on `playground-lab.e2e.ts:166` (the compositor dot during a main-thread block) passed 14/14 alone and on the next full run. Parent spot check: `bun test apps/docs/test/theme.test.ts apps/docs/test/code-frames.test.ts` 26 pass.
+  - Geist and Geist Mono replace Inter, Fraunces and JetBrains Mono. `apps/docs/brand.mjs` reads `brand/tokens.css` for the config and defines the `damped-dark` and `damped-light` code themes. `theme.css` imports the tokens and maps `--sl-color-*`, with the accent variables neutral on purpose. Shared properties are documented at the top of `theme.css`.
+  - The accent appears only on the 2px sidebar/TOC indicator, the selected tab underline, focus rings (`:focus-visible` only), link underlines, demo moving parts and syntax strings.
+  - Asides are a 1px hairline box on the surface fill, with no radius, a mono uppercase label and a 6px status dot that is never the accent. A test enforces this.
+  - Contrast, dark/light: body 12.5/13.4, muted 7.7/7.4, link 16.9/19.0, worst code token 5.9/5.5, indicator 6.9/5.0.
+  - Open for B4: `landing.css` still has the glow, a card shadow and 10px radii. It is excluded from the scans (`NOT_SCANNED` in `theme.test.ts`); B4 must clean it and drop the exclusion. Also, with `replacesTitle`, the lockup alt and the sr-only title both say "damped".
+
 ## Next step
 
-B3: docs theme (writer running).
+Native review for the `feat/branding` range; wait for B4 and B5; integrate `feat/branding-meta`, `feat/branding-landing` and `feat/branding-physics`; then B8.

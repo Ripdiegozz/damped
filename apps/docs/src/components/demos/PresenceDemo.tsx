@@ -20,8 +20,9 @@ const MAX_TOASTS = 4;
 const SPRING = { duration: 0.4, bounce: 0.1 } as const;
 const ENTER = { opacity: 0, y: 16, scale: 0.96 } as const;
 const EXIT = { opacity: 0, x: 40 } as const;
-// <Presence> reports no completion, so the demo derives when the longest move (40 px at damped's length thresholds) is over.
-const SETTLE_MS = createSpring(0, 40, 0, { ...SPRING, restDelta: 0.01, restSpeed: 0.1 }).settleTime() * 1000 + 80;
+// <Presence> reports when a child has left (onExitComplete) but not when one has entered, so an entrance ends on a
+// time derived from the spring: the longest move (40 px at damped's length thresholds) is over by then.
+const ENTER_SETTLE_MS = createSpring(0, 40, 0, { ...SPRING, restDelta: 0.01, restSpeed: 0.1 }).settleTime() * 1000 + 80;
 
 /**
  * Toasts that enter and exit through `<Presence>`. A removed toast stays mounted until its exit settles; while it
@@ -37,6 +38,8 @@ export function PresenceDemo() {
   const motion = useMotionPreference();
   const next = useRef(2);
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  // One entry per removal in flight: it settles the demo once the toast has left and its siblings have glided up.
+  const leaving = useRef(new Map<string, () => void>());
   const [toasts, setToasts] = useState<Toast[]>([
     { id: 0, text: MESSAGES[0] },
     { id: 1, text: MESSAGES[1] },
@@ -49,30 +52,40 @@ export function PresenceDemo() {
     };
   }, []);
 
-  // Presence has no completion callback, so a timer derived from the spring ends the run.
-  const watch = (): void => {
+  const add = (): void => {
+    const id = next.current++;
+    const toast = { id, text: MESSAGES[id % MESSAGES.length]! };
     tracker.begin();
     const timer = setTimeout(() => {
       timers.current.delete(timer);
       tracker.settle();
-    }, SETTLE_MS);
+    }, ENTER_SETTLE_MS);
     timers.current.add(timer);
-  };
-
-  const add = (): void => {
-    const id = next.current++;
-    const toast = { id, text: MESSAGES[id % MESSAGES.length]! };
-    watch();
     setToasts((current) => [...current, toast].slice(-MAX_TOASTS));
   };
 
   const remove = (id: number): void => {
+    const key = String(id);
+    // A second press on a toast that is already leaving does nothing (it is inert, but a keyboard can still reach it).
+    if (leaving.current.has(key)) return;
     const rows = Array.from(list.current?.children ?? []);
-    watch();
+    // One run per removal; it ends when both halves are done: Presence reported the exit and layout() finished.
+    tracker.begin();
+    let remaining = 2;
+    const part = (): void => {
+      remaining -= 1;
+      if (remaining === 0) {
+        leaving.current.delete(key);
+        tracker.settle();
+      }
+    };
+    leaving.current.set(key, part);
     // Committed before layout() measures: <Presence> marks the leaving toast inert within this commit.
     const controls = layout(rows, () => flushSync(() => setToasts((current) => current.filter((toast) => toast.id !== id))), SPRING);
-    void tracker.track(controls.finished.then(() => true));
+    void controls.finished.then(part, part);
   };
+
+  const exited = (key: string | number | bigint): void => leaving.current.get(String(key))?.();
 
   return (
     <div ref={root} className="not-content demo" data-demo="presence" data-state="idle" data-runs="0" role="group" aria-label="Toasts that enter and exit with Presence">
@@ -87,7 +100,7 @@ export function PresenceDemo() {
       </div>
       <div className="toast-stage">
       <ul ref={list} className="toast-list" aria-label="Notifications">
-        <Presence enter={ENTER} exit={EXIT} options={SPRING}>
+        <Presence enter={ENTER} exit={EXIT} options={SPRING} onExitComplete={exited}>
           {toasts.map((toast) => (
             <li key={toast.id} className="toast">
               <span className="toast-text">{toast.text}</span>

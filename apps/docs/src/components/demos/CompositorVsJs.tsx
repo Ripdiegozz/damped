@@ -46,6 +46,16 @@ export function CompositorVsJs() {
   const atEnd = useRef(false);
   const latest = useRef(motion);
   latest.current = motion;
+  // The pending "Block main thread" (a frame, then the lead-in). Cancelled on unmount and when pressed again.
+  const pendingBlock = useRef<{ frame: number; timer: ReturnType<typeof setTimeout> | undefined } | undefined>(undefined);
+
+  const cancelBlock = (): void => {
+    const pending = pendingBlock.current;
+    pendingBlock.current = undefined;
+    if (pending === undefined) return;
+    cancelAnimationFrame(pending.frame);
+    clearTimeout(pending.timer);
+  };
 
   const stop = (): void => {
     const current = loop.current;
@@ -54,7 +64,13 @@ export function CompositorVsJs() {
     for (const controls of current?.controls ?? []) controls.stop();
   };
 
-  useEffect(() => stop, []);
+  useEffect(
+    () => () => {
+      cancelBlock();
+      stop();
+    },
+    [],
+  );
 
   const leg = (): AnimationControls[] => {
     const lane = jsLane.current;
@@ -110,8 +126,12 @@ export function CompositorVsJs() {
     const text = status.current;
     if (text) text.textContent = "Blocking the main thread for one second. Watch the two balls.";
     // After a frame and the lead-in, so the balls are visibly moving and the message was painted.
-    requestAnimationFrame(() =>
-      setTimeout(() => {
+    cancelBlock();
+    const pending: { frame: number; timer: ReturnType<typeof setTimeout> | undefined } = { frame: 0, timer: undefined };
+    pendingBlock.current = pending;
+    pending.frame = requestAnimationFrame(() => {
+      pending.timer = setTimeout(() => {
+        pendingBlock.current = undefined;
         const took = blockMainThread(BLOCK_MS);
         root.current?.setAttribute("data-block-ms", String(Math.round(took)));
         if (text) {
@@ -120,8 +140,8 @@ export function CompositorVsJs() {
             : "The compositor ball kept moving; the JS ball froze and then caught up.";
           text.textContent = `The main thread was blocked for ${Math.round(took)} ms. ${result}`;
         }
-      }, LEAD_IN_MS),
-    );
+      }, LEAD_IN_MS);
+    });
   };
 
   return (

@@ -19,6 +19,11 @@ export default defineConfig({
         alt: "",
       },
       favicon: "/favicon.svg",
+      expressiveCode: {
+        // Expressive Code rounds only the outer corners of the whole frame (header and code together). Rounding
+        // `pre` or `.frame` from a stylesheet instead detaches the header and doubles the borders.
+        styleOverrides: { borderRadius: "0.375rem" },
+      },
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/Ripdiegozz/damped" }],
       customCss: ["./src/styles/theme.css", "./src/styles/demos.css", "./src/styles/landing.css", "./src/styles/reference.css"],
       components: {

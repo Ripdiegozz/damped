@@ -86,12 +86,6 @@ h1#_top {
   background: radial-gradient(60rem 18rem at 50% -4rem, var(--damped-glow), transparent 70%);
 }
 
-.sl-markdown-content .starlight-aside,
-.sl-markdown-content pre,
-.expressive-code .frame {
-  border-radius: var(--damped-radius);
-}
-
 a:focus-visible,
 button:focus-visible,
 summary:focus-visible {

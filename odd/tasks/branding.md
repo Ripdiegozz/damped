@@ -59,7 +59,7 @@ Give damped its own identity: a mark built from the physics of the library, a re
 | B1 | Brand system: `brand/` sources (mark, small mark, outlined wordmark, lockups, tokens) and the `bun run brand` generator with a drift test | delegated (writer: 2+ non-trivial files) | done | `332a80a` `f1096e3` |
 | B2 | Fix code frames and asides: Expressive Code `styleOverrides`, drop the radius rule, built-output test | inline (one mechanical, understood change) | done | `3d62d81` |
 | B3 | Docs theme: Geist/Geist Mono, dark-first tokens, accent rules, Starlight chrome, code, asides, tables; demos on the new tokens; logo and favicons wired | delegated (writer) | done | `28478c4` `5f44c87` `e4978b3` `117231e` |
-| B4 | Landing redesign: live spring instrument hero, new sections, updated landing tests | delegated (writer, worktree `feat/branding-landing`) | in progress | |
+| B4 | Landing redesign: live spring instrument hero, new sections, updated landing tests | delegated (writer, worktree `feat/branding-landing`) | in progress (built; integration fixes running) | `9f252c0` `32413f0` |
 | B5 | Physics: interactive "Springs explained" (mass on a spring, damping ratio, phase portrait, interruption) with unit, SSR and e2e coverage | delegated (writer, worktree `feat/branding-physics`) | in progress | |
 | B6 | Playground favicon and head metadata; build copies the assets; e2e asserts they load under `/playground/` | delegated (writer with B7, worktree `feat/branding-meta`) | done (on `feat/branding-meta`, to merge) | `f03cb9a` |
 | B7 | README lockup, package manifest metadata, GitHub repository description, homepage and topics | delegated (writer with B6) + inline `gh repo edit` | done (on `feat/branding-meta`, to merge; GitHub edited) | `9d97f6d` |
@@ -118,6 +118,13 @@ Give damped its own identity: a mark built from the physics of the library, a re
 
 - 2026-10-05: Merged `feat/branding-meta` into `feat/branding` (`5111236`): `CI=true bun test` 904 pass, `bun run typecheck` 0. Review assessment for `01d2b48..5111236`: medium, `slice_budget_reached`. START asked for consent (61 files, 2978 lines); the user chose "Skip this time", and the exact decline returned `declined_this_candidate` (target `sha256:8282bae4…`).
 - 2026-10-05: Delivery. One honest slicing pass along the existing work units gives stacked PRs: #24 `feat/brand-system` (`ecd4f04`, B1+B2, about 1,100 authored lines plus generated assets) → `main`; #25 `feat/docs-theme` (`e2a1f7f`, B3, about 1,540 lines) → #24; #26 `feat/branding-meta` (B6+B7, 185 lines) → #24. #24 and #25 exceed the budget with no cohesive split, so `size:exception` is recommended and awaits the maintainer; the label is not applied yet. `feat/branding` stays the local integration branch. The PRs are watched in T3.
+
+- 2026-10-05: CI on #26 failed because `check` built the playground after `bun test`, and the new playground head tests fail under `CI=true` without `dist`. Fixed in `b385778`: RED was the new `workflows.test.ts` order assertion; the failure was reproduced locally with `rm -rf apps/playground/dist && CI=true bun test apps/playground` (3 fail) and went GREEN after the build.
+- 2026-10-05: CodeRabbit on #24. The favicon scope line is fixed in `741ae69`. The missing manifest link is answered: #25 adds it, and `theme.test.ts` asserts it.
+- 2026-10-05: B4 done in its worktree (`9f252c0`, `32413f0`), strict TDD. Writer gates: `CI=true bun test` 919 pass, `E2E_PORT=4174 bun run e2e` 100 passed, no overflow at 390px. Merged into `feat/branding` (`7a66837`); the integrated branch gives `CI=true bun test` 951 pass after a full build.
+  - The review assessment for `01d2b48..` with B4 came out HIGH because of the `ci.yml` shell steps. START asked for consent (77 files, 5367 lines); the user skipped it (`declined_this_candidate`, `sha256:262807f8…`). Under the off path, a high tier needs an independent verifier, which is running.
+  - The visual check on the integrated theme looks good. Found: a thick orange focus ring after a mouse drag on the instrument track (the same script-`focus()` bug B3 fixed), plus `landing.css` leftovers (glow, shadow, radii above 6px) that `theme.test.ts` excludes. B4 has been resumed to merge `feat/docs-theme`, fix both, and drop the `NOT_SCANNED` exclusion.
+- 2026-10-05: The T3 server restarted and cancelled B5 mid-task. The models were committed (`4152e72`) and the figures uncommitted. B5 has been resumed from its worktree state, with instructions to merge `feat/docs-theme` and adopt the shared properties.
 
 ## Next step
 

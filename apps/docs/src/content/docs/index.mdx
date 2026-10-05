@@ -3,32 +3,30 @@ title: Springs that keep their momentum
 description: Interruptible, physically based spring animations for the web, React and React Native.
 template: splash
 hero:
-  title: Motion that keeps its <em>momentum</em>
-  tagline: Spring animations you can interrupt at any moment, because every retarget and reversal carries the velocity the element already had.
+  tagline: Retarget or reverse an animation at any moment and the new spring starts from where the element is, moving at the speed it already had.
   actions:
     - text: Get started
       link: /getting-started/
-      icon: right-arrow
-    - text: Try the playground
+      variant: primary
+    - text: Playground
       link: /playground/
       variant: secondary
     - text: GitHub
       link: https://github.com/Ripdiegozz/damped
-      icon: github
       variant: minimal
 ---
 
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
-import PackageCard from "../../components/landing/PackageCard.astro";
+import PackageRow from "../../components/landing/PackageRow.astro";
 
-<section class="landing-section" aria-labelledby="packages">
+<section class="landing-section not-content" aria-labelledby="packages">
 
-<h2 id="packages">Three packages, one spring</h2>
+<div class="landing-section__head">
+<h2 id="packages">Packages</h2>
+<p>The same analytic spring runs in the browser, in React and in React Native. Pick the layer you work at.</p>
+</div>
 
-The same analytic spring runs in the browser, in React and in React Native. Pick the layer you work at.
-
-<div class="package-grid">
-<PackageCard name="@damped/core" platform="Web" purpose="Animate elements, reorder with FLIP, morph one element into another and run springs on the compositor." href="/reference/core/">
+<div class="package-list">
+<PackageRow name="@damped/core" platform="Web" purpose="Animate elements, reorder with FLIP, morph one element into another and run springs on the compositor." href="/reference/core/">
 
 ```sh frame="none"
 bun add @damped/core
@@ -42,8 +40,8 @@ const card = document.getElementById("card")!;
 animate(card, { x: 240 }, { bounce: 0.15 });
 ```
 
-</PackageCard>
-<PackageCard name="@damped/react" platform="React 19" purpose="Hooks and a Presence component. Values reach the DOM without re-rendering on every frame." href="/reference/react/">
+</PackageRow>
+<PackageRow name="@damped/react" platform="React 19" purpose="Hooks and a Presence component. Values reach the DOM without re-rendering on every frame." href="/reference/react/">
 
 ```sh frame="none"
 bun add @damped/react @damped/core
@@ -59,8 +57,8 @@ export function Card({ open }: { open: boolean }) {
 }
 ```
 
-</PackageCard>
-<PackageCard name="@damped/native" platform="React Native" purpose="withDamped, a withSpring replacement for Reanimated that keeps velocity on reversal." href="/reference/native/">
+</PackageRow>
+<PackageRow name="@damped/native" platform="React Native" purpose="withDamped, a withSpring replacement for Reanimated that keeps velocity on reversal." href="/reference/native/">
 
 ```sh frame="none"
 bun add @damped/native
@@ -79,68 +77,94 @@ export function useToggle() {
 }
 ```
 
-</PackageCard>
+</PackageRow>
 </div>
 
 </section>
 
-<section class="landing-section" aria-labelledby="why">
+<section class="landing-section not-content" aria-labelledby="why">
 
+<div class="landing-section__head">
 <h2 id="why">Why damped</h2>
+</div>
 
-<div class="why-grid">
-<div class="why-point">
+<ol class="why-list">
+<li>
+<span class="why-list__n">01</span>
 <h3>Interruptions keep their momentum</h3>
+<div class="why-list__body">
 <p>Retarget a running animation, or reverse it halfway, and the new spring starts from where the element is, moving at the speed it had. Nothing snaps back to a standstill.</p>
 <a href="/guides/interruption-and-reversal/">Interruption and reversal <span aria-hidden="true">&rarr;</span></a>
 </div>
-<div class="why-point">
+</li>
+<li>
+<span class="why-list__n">02</span>
 <h3>Exact state at any time</h3>
+<div class="why-list__body">
 <p>A spring is a closed-form function of time, not a per-frame integration. The same position and velocity come out at 60 Hz, at 144 Hz and on an irregular frame cadence, to within 1e-12.</p>
 <a href="/guides/springs-explained/">Springs, explained <span aria-hidden="true">&rarr;</span></a>
 </div>
-<div class="why-point">
+</li>
+<li>
+<span class="why-list__n">03</span>
 <h3>Smooth while the main thread is busy</h3>
+<div class="why-list__body">
 <p>The optional compositor driver hands the browser a sampled keyframe animation. In Chromium, a 250 ms busy loop left the compositor box moving while the same spring on the main thread stood still.</p>
 <a href="/guides/compositor/">The compositor driver <span aria-hidden="true">&rarr;</span></a>
 </div>
-<div class="why-point">
+</li>
+<li>
+<span class="why-list__n">04</span>
 <h3>Reduced motion is respected</h3>
+<div class="why-list__body">
 <p>Animations follow <code>prefers-reduced-motion</code> by default: movement jumps to its destination while fades and crossfades stay, so the interface still reads as changing.</p>
 <a href="/guides/reduced-motion/">Reduced motion and accessibility <span aria-hidden="true">&rarr;</span></a>
 </div>
-</div>
-
-<dl class="size-strip">
-<div>
-<dt>3.95 KB</dt>
-<dd>gzipped, for an app that only calls <code>animate</code></dd>
-</div>
-<div>
-<dt>6.99 KB</dt>
-<dd>gzipped, for the whole of <code>@damped/core</code></dd>
-</div>
-<div>
-<dt>0</dt>
-<dd>React renders per animation frame</dd>
-</div>
-</dl>
-
-<p class="size-note">Sizes are minified and gzipped, each entry point bundled the way an application would bundle it. The compositor driver adds about 0.74 KB and is left out unless you import it.</p>
+</li>
+</ol>
 
 </section>
 
-<section class="landing-section" aria-labelledby="explore">
+<section class="landing-section not-content" aria-labelledby="sizes">
 
-<h2 id="explore">Keep exploring</h2>
+<div class="landing-section__head">
+<h2 id="sizes">Spec sheet</h2>
+<p>Minified and gzipped, each entry point bundled the way an application would bundle it.</p>
+</div>
 
-<CardGrid>
-  <LinkCard title="Layout and morph" description="FLIP reorders, and a card that turns into its dialog." href="/guides/layout-and-morph/" />
-  <LinkCard title="Presence" description="Enter and exit animations for elements that mount and unmount." href="/guides/presence/" />
-  <LinkCard title="damped with React" description="Hooks, Presence and why nothing re-renders per frame." href="/guides/react/" />
-  <LinkCard title="React Native and Expo" description="withDamped on the UI thread, and how it differs from withSpring." href="/guides/react-native/" />
-  <LinkCard title="Testing animations" description="Drive springs with a fake frame source and assert exact states." href="/guides/testing/" />
-  <LinkCard title="FAQ" description="Including when Motion or Reanimated is the better tool." href="/guides/faq/" />
-</CardGrid>
+<table class="spec-sheet">
+<thead>
+<tr><th scope="col">Measure</th><th scope="col">Value</th><th scope="col">Note</th></tr>
+</thead>
+<tbody>
+<tr><th scope="row">animate</th><td>3.95 KB</td><td>gzipped, for an app that only calls <code>animate</code></td></tr>
+<tr><th scope="row">@damped/core</th><td>6.99 KB</td><td>gzipped, for the whole package</td></tr>
+<tr><th scope="row">compositor driver</th><td>~0.74 KB</td><td>gzipped, added only when you import it</td></tr>
+<tr><th scope="row">React renders</th><td>0</td><td>per animation frame; values reach the DOM through refs</td></tr>
+</tbody>
+</table>
+
+</section>
+
+<section class="landing-section not-content" aria-labelledby="guides">
+
+<div class="landing-section__head">
+<h2 id="guides">Guides</h2>
+</div>
+
+<ul class="guide-index">
+<li><a href="/getting-started/"><span class="guide-index__title">Getting started</span><span class="guide-index__note">Install damped, pick a package and animate your first element.</span></a></li>
+<li><a href="/guides/springs-explained/"><span class="guide-index__title">Springs explained</span><span class="guide-index__note">What duration and bounce mean, and how they map to stiffness and damping.</span></a></li>
+<li><a href="/guides/interruption-and-reversal/"><span class="guide-index__title">Interruption and reversal</span><span class="guide-index__note">Retarget a moving element without a jump.</span></a></li>
+<li><a href="/guides/layout-and-morph/"><span class="guide-index__title">Layout and morph</span><span class="guide-index__note">FLIP reorders, and a card that turns into its dialog.</span></a></li>
+<li><a href="/guides/presence/"><span class="guide-index__title">Presence</span><span class="guide-index__note">Enter and exit animations for elements that mount and unmount.</span></a></li>
+<li><a href="/guides/compositor/"><span class="guide-index__title">The compositor driver</span><span class="guide-index__note">Springs that keep moving while the main thread is busy.</span></a></li>
+<li><a href="/guides/reduced-motion/"><span class="guide-index__title">Reduced motion and accessibility</span><span class="guide-index__note">How every API follows <code>prefers-reduced-motion</code>.</span></a></li>
+<li><a href="/guides/react/"><span class="guide-index__title">damped with React</span><span class="guide-index__note">Hooks, Presence and why nothing re-renders per frame.</span></a></li>
+<li><a href="/guides/react-native/"><span class="guide-index__title">React Native and Expo</span><span class="guide-index__note">withDamped on the UI thread, and how it differs from withSpring.</span></a></li>
+<li><a href="/guides/testing/"><span class="guide-index__title">Testing animations</span><span class="guide-index__note">Drive springs with a fake frame source and assert exact states.</span></a></li>
+<li><a href="/guides/demos/"><span class="guide-index__title">Demos</span><span class="guide-index__note">Six live demos running on the real packages.</span></a></li>
+<li><a href="/guides/faq/"><span class="guide-index__title">FAQ</span><span class="guide-index__note">Including when Motion or Reanimated is the better tool.</span></a></li>
+</ul>
 
 </section>

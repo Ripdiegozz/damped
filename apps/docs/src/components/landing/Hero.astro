@@ -1,8 +1,8 @@
 ---
-// Replaces Starlight's Hero on pages with `hero` frontmatter (only the landing page has one). Same data, same
-// LinkButton, same `_top` page-title anchor; the difference is the live morph card next to the copy.
-import { LinkButton } from "@astrojs/starlight/components";
-import { MorphCard } from "../demos";
+// Replaces Starlight's Hero on pages with `hero` frontmatter (only the landing page has one). Same data and the same
+// `_top` page-title anchor; the difference is the live spring instrument under the copy, and plain links instead of
+// Starlight's LinkButton: two neutral buttons (`primary`, `secondary`) and a quiet text link for anything `minimal`.
+import { SpringInstrument } from "./SpringInstrument";
 
 const { data } = Astro.locals.starlightRoute.entry;
 const { title = data.title, tagline, actions = [] } = data.hero ?? {};
@@ -15,18 +15,22 @@ const { title = data.title, tagline, actions = [] } = data.hero ?? {};
     {
       actions.length > 0 && (
         <div class="landing-hero__actions">
-          {actions.map(({ attrs: { class: className, ...attrs } = {}, icon, link: href, text, variant }) => (
-            <LinkButton {href} {variant} icon={icon?.name} class:list={[className]} {...attrs}>
-              {text}
-              {icon?.html && <Fragment set:html={icon.html} />}
-            </LinkButton>
-          ))}
+          {actions.map(({ link: href, text, variant }) =>
+            variant === "minimal" ? (
+              <a class="landing-quiet" {href}>
+                {text}
+              </a>
+            ) : (
+              <a class:list={["landing-button", { "landing-button--solid": variant === "primary" }]} {href}>
+                {text}
+              </a>
+            ),
+          )}
         </div>
       )
     }
   </div>
-  <div class="landing-hero__visual">
-    <MorphCard client:load variant="compact" />
-    <p class="landing-hero__hint">Click the card, then press <kbd>Esc</kbd> mid-flight to reverse it.</p>
+  <div class="landing-hero__instrument">
+    <SpringInstrument client:load />
   </div>
 </div>

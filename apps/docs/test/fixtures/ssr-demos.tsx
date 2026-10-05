@@ -1,6 +1,7 @@
 // Runs in its own `bun run` process, so happy-dom's test preload never loads: a real server, with no window or
 // document. Fails (non-zero exit) on any DOM global, React warning or thrown error.
 import { renderToString } from "react-dom/server";
+import { DampingRatio, Interruption, MassOnSpring, PhasePortrait } from "../../src/components/physics";
 import { CompositorVsJs, FlipReorder, MorphCard, PresenceDemo, RetargetSpring, SpringTuner } from "../../src/components/demos";
 
 const globals = globalThis as Record<string, unknown>;
@@ -20,6 +21,10 @@ const demos = {
   "morph-card": <MorphCard />,
   presence: <PresenceDemo />,
   "compositor-vs-js": <CompositorVsJs />,
+  "physics-mass": <MassOnSpring />,
+  "physics-damping": <DampingRatio />,
+  "physics-phase": <PhasePortrait />,
+  "physics-interruption": <Interruption />,
 };
 
 for (const [name, element] of Object.entries(demos)) {

@@ -14,7 +14,7 @@ export function watchProblems(page: Page): string[] {
   return problems;
 }
 
-export type DemoName = "retarget-spring" | "spring-tuner" | "flip-reorder" | "morph-card" | "presence" | "compositor-vs-js";
+export type DemoName = "retarget-spring" | "spring-tuner" | "flip-reorder" | "morph-card" | "presence" | "compositor-vs-js" | "spring-instrument";
 
 /**
  * The demo root, scrolled into view and hydrated. The islands hydrate when visible, and Astro removes `ssr` from the

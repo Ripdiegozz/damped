@@ -13,10 +13,8 @@ const docsRoot = resolve(import.meta.dir, "..");
 const read = (path: string): string => readFileSync(join(docsRoot, path), "utf8");
 const brandTokens = parseTokens(readFileSync(join(docsRoot, "../../brand/tokens.css"), "utf8"));
 
-// The landing page is rebuilt by its own task, which restyles landing.css. Until then it only has to keep rendering.
-const NOT_SCANNED = new Set(["landing.css"]);
 const stylesheets = readdirSync(join(docsRoot, "src/styles"))
-  .filter((name) => name.endsWith(".css") && !NOT_SCANNED.has(name))
+  .filter((name) => name.endsWith(".css"))
   .map((name) => ({ name, source: read(join("src/styles", name)), rules: rulesOf(read(join("src/styles", name))) }));
 const declarations = stylesheets.flatMap(({ name, rules }) =>
   rules.flatMap((rule) => declarationsOf(rule.body).map((declaration) => ({ file: name, selector: rule.selector, ...declaration }))),

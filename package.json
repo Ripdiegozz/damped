@@ -9,7 +9,8 @@
     "e2e": "playwright test",
     "build": "bun run --filter './packages/*' build",
     "playground:build": "bun run --filter @damped/playground build",
-    "playground:serve": "bun apps/playground/serve.ts"
+    "playground:serve": "bun apps/playground/serve.ts",
+    "docs:check": "bun scripts/check-readme-examples.ts"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",

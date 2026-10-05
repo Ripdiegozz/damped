@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@damped/core": ["./packages/core/src/index.ts"],
+      "@damped/react": ["./packages/react/src/index.ts"],
+      "@damped/native": ["./packages/native/src/index.ts"],
+      "react-native-reanimated": ["./packages/native/node_modules/react-native-reanimated"]
+    }
+  },
+  "include": ["packages/*/.readme-check/*.ts", "packages/*/.readme-check/*.tsx", "apps/*/.readme-check/*.ts", "apps/*/.readme-check/*.tsx"]
+}

@@ -11,6 +11,9 @@ export type AnimateOptions = SpringOptions & {
   /** Applied immediately, as a jump, before animating. */
   from?: AnimationTargets;
 };
+// Omit applied per union member, so both spring option forms (perceptual and physical) survive.
+export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
 export interface AnimationControls {
   /** Resolves when every property set by this call has settled or been superseded. Never rejects. */
   readonly finished: Promise<void>;
@@ -139,7 +142,7 @@ function valueFor(element: Element, state: ElementState, property: AnimatablePro
   return value;
 }
 
-function entries(targets: AnimationTargets | undefined, label: string): [AnimatableProperty, number][] {
+export function entries(targets: AnimationTargets | undefined, label: string): [AnimatableProperty, number][] {
   const result: [AnimatableProperty, number][] = [];
   if (targets === undefined) return result;
   for (const [name, target] of Object.entries(targets)) {
@@ -212,8 +215,13 @@ export function animate(
   };
 }
 
+/** The value `property` has when it is not animated: what enter() animates to by default. */
+export function identityValue(property: AnimatableProperty): number {
+  return CONFIG[property].initial;
+}
+
 /*
- * Internal accessors for layout.ts. They are deliberately not re-exported from index.ts.
+ * Internal accessors for layout.ts and presence.ts. They are deliberately not re-exported from index.ts.
  */
 
 /** The element's value for `property`, created (and the element's scheduler fixed) on first use. */

@@ -7,6 +7,7 @@ import {
   toList,
   type AnimateOptions,
   type AnimationControls,
+  type DistributiveOmit,
 } from "./animate";
 import { frame, type Scheduler } from "./scheduler";
 import { springParams, type SpringOptions } from "./spring";
@@ -27,9 +28,6 @@ export interface Box {
   width: number;
   height: number;
 }
-
-// Omit applied per union member, so both spring option forms (perceptual and physical) survive.
-type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 export type LayoutOptions = DistributiveOmit<AnimateOptions, "from"> & {
   /** Children whose size must not distort while the parent scales; each gets scale(1/scaleX, 1/scaleY) with transform-origin 0 0. */

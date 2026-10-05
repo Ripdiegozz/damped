@@ -59,7 +59,7 @@ Give damped its own identity: a mark built from the physics of the library, a re
 | B1 | Brand system: `brand/` sources (mark, small mark, outlined wordmark, lockups, tokens) and the `bun run brand` generator with a drift test | delegated (writer: 2+ non-trivial files) | done | `332a80a` `f1096e3` |
 | B2 | Fix code frames and asides: Expressive Code `styleOverrides`, drop the radius rule, built-output test | inline (one mechanical, understood change) | done | `3d62d81` |
 | B3 | Docs theme: Geist/Geist Mono, dark-first tokens, accent rules, Starlight chrome, code, asides, tables; demos on the new tokens; logo and favicons wired | delegated (writer) | done | `28478c4` `5f44c87` `e4978b3` `117231e` |
-| B4 | Landing redesign: live spring instrument hero, new sections, updated landing tests | delegated (writer, worktree `feat/branding-landing`) | in progress (built; integration fixes running) | `9f252c0` `32413f0` |
+| B4 | Landing redesign: live spring instrument hero, new sections, updated landing tests | delegated (writer, worktree `feat/branding-landing`) | done (PR #28) | `9f252c0` `32413f0` `c89f993` `4b7d837` |
 | B5 | Physics: interactive "Springs explained" (mass on a spring, damping ratio, phase portrait, interruption) with unit, SSR and e2e coverage | delegated (writer, worktree `feat/branding-physics`) | done (PR #27) | `4152e72` `30facd9` `7113d94` |
 | B6 | Playground favicon and head metadata; build copies the assets; e2e asserts they load under `/playground/` | delegated (writer with B7, worktree `feat/branding-meta`) | done (on `feat/branding-meta`, to merge) | `f03cb9a` |
 | B7 | README lockup, package manifest metadata, GitHub repository description, homepage and topics | delegated (writer with B6) + inline `gh repo edit` | done (on `feat/branding-meta`, to merge; GitHub edited) | `9d97f6d` |
@@ -133,6 +133,9 @@ Give damped its own identity: a mark built from the physics of the library, a re
   - Follow-ups: the readout table overflows by a few pixels at 390 px, and the phase helpers duplicate parts of the B4 instrument.
   - Delivery: PR #27, `feat/branding-physics` stacked on #25, about 3,100 lines. One slicing pass found no cohesive split (the guide embeds all four figures, and the fixtures, tests and e2e are shared), so `size:exception` is recommended.
 
+- 2026-10-05: The review for the physics range (`e2a1f7f..`, medium, 24 files, 3122 lines) was skipped by the user (`declined_this_candidate`, `sha256:bedb03db…`).
+- 2026-10-05: B4 follow-ups done. `feat/docs-theme` merged (`c89f993`, no conflicts). `4b7d837` removes the script `focus()` and makes rings `:focus-visible` only, moves `landing.css` onto the shared properties (no hex values, no `--ld-*` colours, no glow, no shadow, no radius above 6px), renames the mass to `.instrument__mass-dot` to satisfy the accent scan, and removes `NOT_SCANNED`. RED: `theme.test.ts` failed on the 8 repeated hex values in `landing.css`. GREEN: `CI=true bun test` 942 pass, `bun run typecheck` 0, `bun run site:check` 26 pages, `E2E_PORT=4174 bun run e2e` 110 passed (the first run failed on the new test's exact 1.5px width assertion; Chromium snaps it to 1px). PR #28, stacked on #25, about 2,675 lines, `size:exception` recommended. Both branches merged into `feat/branding`.
+
 ## Next step
 
-Maintainer decision on `size:exception` for #24 and #25; CI on #24-#26; wait for B4 and B5; integrate `feat/branding-meta`, `feat/branding-landing` and `feat/branding-physics`; then B8.
+Maintainer decision on `size:exception` for #24, #25, #27 and #28; CI on #24-#26; wait for B4 and B5; integrate `feat/branding-meta`, `feat/branding-landing` and `feat/branding-physics`; then B8.

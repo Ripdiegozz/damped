@@ -17,7 +17,7 @@ declare global {
     damped: typeof import("../packages/core/src/index");
     e2e: {
       frames(): number;
-      record<T>(probe: () => T): { samples: Sample<T>[]; stop(): void };
+      record<T>(probe: () => T, onSample?: (samples: Sample<T>[]) => void): { samples: Sample<T>[]; stop(): void };
       rect(element: Element): Rect;
       nextFrame(): Promise<void>;
       sleep(ms: number): Promise<void>;

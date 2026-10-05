@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { open } from "./helpers";
+import { MIN_FRAMES, TOLERANCE_PX, open } from "./helpers";
 
-const TOLERANCE = 1;
+// The mutation must move the element by at least this much, or the checks below would prove nothing.
+const MIN_TRAVEL_PX = 20;
+// Edge positions are sub-pixel floats; this absorbs rounding noise without admitting a visible overshoot.
+const MONOTONIC_SLACK_PX = 0.5;
 
 for (const scenario of ["reorder", "resize"] as const) {
   test(`layout() starts on the previous box and settles on the new one (${scenario})`, async ({ page }) => {
@@ -26,14 +29,13 @@ for (const scenario of ["reorder", "resize"] as const) {
     }, scenario);
 
     const { before, natural, after, samples } = result;
-    // The mutation must actually move the element, or the checks below would prove nothing.
-    expect(Math.abs(natural.x - before.x) + Math.abs(natural.y - before.y)).toBeGreaterThan(20);
-    expect(samples.length).toBeGreaterThan(5);
+    expect(Math.abs(natural.x - before.x) + Math.abs(natural.y - before.y)).toBeGreaterThan(MIN_TRAVEL_PX);
+    expect(samples.length).toBeGreaterThan(MIN_FRAMES);
 
     const first = samples[0]!;
     for (const key of ["x", "y", "width", "height"] as const) {
-      expect(Math.abs(first[key] - before[key]), `first frame ${key}`).toBeLessThanOrEqual(TOLERANCE);
-      expect(Math.abs(after[key] - natural[key]), `final ${key}`).toBeLessThanOrEqual(TOLERANCE);
+      expect(Math.abs(first[key] - before[key]), `first frame ${key}`).toBeLessThanOrEqual(TOLERANCE_PX);
+      expect(Math.abs(after[key] - natural[key]), `final ${key}`).toBeLessThanOrEqual(TOLERANCE_PX);
     }
 
     // Bounce 0 and no inherited velocity: every edge approaches its target without overshooting or reversing.
@@ -42,7 +44,7 @@ for (const scenario of ["reorder", "resize"] as const) {
     for (const edge of ["left", "top", "right", "bottom"] as const) {
       const distances = samples.map((sample) => Math.abs(edges(sample)[edge] - target[edge]));
       for (let i = 1; i < distances.length; i++) {
-        expect(distances[i]!, `${edge} distance at frame ${i}`).toBeLessThanOrEqual(distances[i - 1]! + 0.5);
+        expect(distances[i]!, `${edge} distance at frame ${i}`).toBeLessThanOrEqual(distances[i - 1]! + MONOTONIC_SLACK_PX);
       }
     }
   });
@@ -68,16 +70,16 @@ test("layout() with correct: children keeps the child at its natural size while 
 
   const { childBefore, samples } = result;
   expect(childBefore.width).toBe(60);
-  expect(samples.length).toBeGreaterThan(5);
+  expect(samples.length).toBeGreaterThan(MIN_FRAMES);
   // The parent really did start at half size, so the child would be visibly squeezed without correction.
   expect(samples[0]!.parent.width).toBeCloseTo(100, 0);
   expect(samples.some((sample) => sample.parent.width < 150)).toBe(true);
   expect(result.parentAfter.width).toBeCloseTo(200, 0);
 
   for (const [index, sample] of samples.entries()) {
-    expect(Math.abs(sample.child.width - childBefore.width), `child width at frame ${index}`).toBeLessThanOrEqual(TOLERANCE);
+    expect(Math.abs(sample.child.width - childBefore.width), `child width at frame ${index}`).toBeLessThanOrEqual(TOLERANCE_PX);
     expect(Math.abs(sample.child.height - childBefore.height), `child height at frame ${index}`).toBeLessThanOrEqual(
-      TOLERANCE,
+      TOLERANCE_PX,
     );
   }
 });

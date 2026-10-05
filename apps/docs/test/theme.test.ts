@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { contrast, parseTokens } from "../../../brand/tokens";
 import { builtOutputMode } from "./built-output";
-import { declarationsOf, rulesOf } from "./css";
+import { declarationsOf, rulesOf, targets } from "./css";
 
 // "Quiet chrome, loud motion": the chrome is neutral and set in Geist, and the accent colour belongs to things that
 // move or come to rest, the active navigation indicator, focus rings and link underlines. These tests pin that down
@@ -95,6 +95,51 @@ describe("no template tells", () => {
           }),
       );
     expect(offenders.map(({ file, selector, value }) => `${file}: ${selector} { ${value} }`)).toEqual([]);
+  });
+});
+
+describe("asides are hairline boxes", () => {
+  // Every rule that targets an aside element itself (not its title or content): `.starlight-aside` and its variants.
+  const aside = declarations.filter(({ selector }) => targets(selector, /^\.starlight-aside(--[a-z]+)?$/));
+
+  test("they are styled at all", () => {
+    expect(aside.length).toBeGreaterThan(0);
+  });
+
+  test("no start border of any width or colour, and the only border is a 1px hairline on all four sides", () => {
+    const start = aside.filter(({ property }) => /^border-(inline-start|inline-end|left|right|top|bottom|block)/.test(property));
+    expect(start.map(({ selector, property }) => `${selector} { ${property} }`)).toEqual([]);
+    const borders = aside.filter(({ property }) => property === "border");
+    expect(borders.length).toBeGreaterThan(0);
+    for (const { value } of borders) expect(value).toBe("1px solid var(--damped-hairline)");
+  });
+
+  test("no fill but the surface or nothing, and no radius", () => {
+    const fills = aside.filter(({ property }) => /^background/.test(property));
+    expect(fills.length).toBeGreaterThan(0);
+    for (const { value, selector } of fills) expect(["var(--damped-surface)", "transparent"], selector).toContain(value);
+    expect(aside.filter(({ property }) => /radius/.test(property))).toEqual([]);
+  });
+
+  test("the status dot is never the accent", () => {
+    const dots = declarations.filter(({ property }) => property === "--aside-dot");
+    expect(dots.length).toBeGreaterThanOrEqual(3);
+    for (const { value } of dots) expect(value).not.toMatch(/accent/);
+  });
+});
+
+describe("focus rings are for the keyboard", () => {
+  test("no stylesheet restyles plain :focus with an outline, ring or accent", () => {
+    const offenders = declarations
+      .filter(({ selector }) => /:focus(?!-visible|-within)/.test(selector))
+      .filter(({ property, value }) => /outline|box-shadow|border/.test(property) || /accent/.test(value));
+    expect(offenders.map(({ file, selector }) => `${file}: ${selector}`)).toEqual([]);
+  });
+
+  test("every outline is set on a :focus-visible selector", () => {
+    const outlines = declarations.filter(({ property }) => property === "outline");
+    expect(outlines.length).toBeGreaterThan(0);
+    expect(outlines.filter(({ selector }) => !/:focus-visible/.test(selector)).map(({ file, selector }) => `${file}: ${selector}`)).toEqual([]);
   });
 });
 

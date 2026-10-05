@@ -61,3 +61,29 @@ for (const path of ["/", "/getting-started/", "/guides/testing/", "/reference/re
     expect(widths.page).toBeLessThanOrEqual(widths.window);
   });
 }
+
+test("a pointer click on the retarget track leaves no focus ring, a Tab onto it draws a thin one", async ({ page }) => {
+  await page.goto("/guides/demos/");
+  const track = page.locator(".retarget-track");
+  await track.scrollIntoViewIfNeeded();
+  await expect(page.locator('astro-island:not([ssr]):has([data-demo="retarget-spring"])')).toBeAttached();
+  await track.click();
+  await expect(track).toBeFocused();
+  expect(await track.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("none");
+
+  await page.reload();
+  await expect(page.locator('astro-island:not([ssr]):has([data-demo="retarget-spring"])')).toBeAttached();
+  await track.evaluate((element) => {
+    const focusables = [...document.querySelectorAll<HTMLElement>("a[href], button, [tabindex='0']")];
+    focusables[focusables.indexOf(element as HTMLElement) - 1]!.focus();
+  });
+  await page.keyboard.press("Tab");
+  await expect(track).toBeFocused();
+  const outline = await track.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { style: style.outlineStyle, width: parseFloat(style.outlineWidth), offset: style.outlineOffset };
+  });
+  expect(outline.style).toBe("solid");
+  expect(outline.width).toBeLessThanOrEqual(2);
+  expect(outline.offset).toBe("2px");
+});

@@ -233,12 +233,13 @@ kbd {
   --sl-details-border-color--hover: var(--damped-ink-muted);
 }
 
-/* Asides: a hairline box with a thin start rule and a tinted icon. No fill beyond one surface step, and no radius, so
-   the straight start rule never curves (test/code-frames.test.ts). */
+/* Asides: a uniform 1px hairline box on the same surface as every other panel. No start rule, no tinted fill and no
+   radius (test/code-frames.test.ts and test/theme.test.ts). The type is named quietly by a small mono label with a
+   6px status dot: ink-muted for note and tip, caution and danger hues for the other two, never the accent. */
 .starlight-aside {
+  position: relative;
   padding: 0.875rem 1rem;
   border: 1px solid var(--damped-hairline);
-  border-inline-start: 2px solid var(--aside-rule);
   background-color: var(--damped-surface);
   color: var(--sl-color-text);
   font-size: 0.9rem;
@@ -250,35 +251,74 @@ kbd {
 .starlight-aside--caution,
 .starlight-aside--danger {
   --sl-color-asides-text-accent: var(--damped-ink);
-  --sl-color-asides-border: var(--aside-rule);
+  --sl-color-asides-border: var(--damped-hairline);
+  --aside-dot: var(--damped-ink-muted);
   background-color: var(--damped-surface);
 }
 
-.starlight-aside--note,
-.starlight-aside--tip {
-  --aside-rule: var(--damped-hairline-strong);
-  --aside-tint: var(--damped-ink-muted);
-}
-
 .starlight-aside--caution {
-  --aside-rule: var(--damped-caution);
-  --aside-tint: var(--damped-caution);
+  --aside-dot: var(--damped-caution);
 }
 
 .starlight-aside--danger {
-  --aside-rule: var(--damped-danger);
-  --aside-tint: var(--damped-danger);
+  --aside-dot: var(--damped-danger);
+}
+
+.starlight-aside--note {
+  --aside-label: "Note";
+}
+
+.starlight-aside--tip {
+  --aside-label: "Tip";
+}
+
+.starlight-aside--caution {
+  --aside-label: "Caution";
+}
+
+.starlight-aside--danger {
+  --aside-label: "Danger";
+}
+
+.starlight-aside::before {
+  content: var(--aside-label);
+  display: block;
+  margin-bottom: 0.4rem;
+  padding-inline-start: 1rem;
+  color: var(--damped-ink-muted);
+  font-family: var(--damped-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  line-height: 1rem;
+  text-transform: uppercase;
+}
+
+.starlight-aside::after {
+  content: "";
+  position: absolute;
+  inset-block-start: calc(0.875rem + 5px);
+  inset-inline-start: 1rem;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--aside-dot);
 }
 
 .starlight-aside__title {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 400;
   letter-spacing: 0;
   color: var(--damped-ink);
 }
 
+/* The type already has its label; a title that only repeats it is dropped. */
+.starlight-aside:is([aria-label="Note"], [aria-label="Tip"], [aria-label="Caution"], [aria-label="Danger"]) .starlight-aside__title {
+  display: none;
+}
+
 .starlight-aside__icon {
-  color: var(--aside-tint);
+  display: none;
 }
 
 .starlight-aside__content a {
@@ -483,7 +523,7 @@ dialog {
   --pagefind-ui-font: var(--sl-font);
 }
 
-#starlight__search input:focus {
+#starlight__search input:focus-visible {
   --pagefind-ui-border: var(--damped-accent-text);
 }
 
@@ -518,7 +558,7 @@ dialog {
 /* The current page is ink, with a thin accent bar over the guide line. */
 .sidebar-content a[aria-current="page"],
 .sidebar-content a[aria-current="page"]:hover,
-.sidebar-content a[aria-current="page"]:focus {
+.sidebar-content a[aria-current="page"]:focus-visible {
   background-color: transparent;
   color: var(--damped-ink);
   font-weight: 500;

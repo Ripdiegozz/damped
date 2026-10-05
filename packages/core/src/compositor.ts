@@ -25,15 +25,16 @@ import { seedSpringValue } from "./value";
  * to the next animation (of either driver).
  *
  * Between samples the browser draws a straight line through a curve, which deviates from the spring by at most
- * acceleration * step^2 / 8 (about 1.6 px for a 300 px move over 0.5 s). The state handed over on interruption is the
+ * acceleration * step^2 / 8 (about 0.4 px for a 300 px move over 0.5 s). The state handed over on interruption is the
  * exact analytic one, so a handover can move the element by up to that amount.
  */
 
-// 60 Hz in milliseconds.
-const STEP = 1000 / 60;
-// Animations longer than this are sampled in at most MAX_INTERVALS equal intervals, which bounds the keyframe count.
+// 120 Hz in milliseconds. The chord error shrinks with the square of the step, so this is a quarter of what 60 Hz gives.
+const STEP = 1000 / 120;
+// Animations longer than this are sampled in MAX_INTERVALS equal (and therefore longer) intervals, so a keyframe list
+// never exceeds MAX_INTERVALS + 1 = 361 entries. 3 s at 120 Hz is exactly 360 intervals, so the step is continuous there.
 const LONG_ANIMATION = 3000;
-const MAX_INTERVALS = 180;
+const MAX_INTERVALS = 360;
 
 export function canUseCompositor(element: Element): boolean {
   return typeof (element as Partial<Element>).animate === "function";

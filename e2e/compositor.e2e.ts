@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import { MIN_FRAMES, open } from "./helpers";
 
 // The compositor driver samples the spring into linear keyframes at 60 Hz, so between samples the browser draws a chord
-// through the curve instead of the curve itself. 2 px bounds that error for the springs used here.
-const SAMPLING_TOLERANCE_PX = 2;
+// through the curve instead of the curve itself. The bound below is the measured worst case plus a small margin.
+const SAMPLING_TOLERANCE_PX = 0.5;
 // How long the main thread is blocked, and how long into the animation that starts.
 const BLOCK_MS = 250;
 const LEAD_IN_MS = 50;

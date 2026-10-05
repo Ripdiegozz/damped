@@ -1,6 +1,7 @@
 {
   "name": "damped",
   "version": "0.0.0",
+  "license": "MIT",
   "description": "Interruptible, physically based spring animations for the web.",
   "type": "module",
   "sideEffects": false,

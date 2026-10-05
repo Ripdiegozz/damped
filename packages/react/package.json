@@ -1,6 +1,7 @@
 {
   "name": "@damped/react",
   "version": "0.0.0",
+  "license": "MIT",
   "description": "React hooks and components for damped spring animations, without per-frame re-renders.",
   "type": "module",
   "sideEffects": false,

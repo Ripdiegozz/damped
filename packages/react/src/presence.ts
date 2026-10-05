@@ -51,6 +51,9 @@ const KEY_ERROR =
   "<Presence> children need a unique `key`, so it can tell which one left. Give every child a key, e.g. <div key={id} />.";
 const TYPE_ERROR = "<Presence> children must be elements (host elements or components that take `ref`), received text.";
 
+// toArray prefixes explicit keys (".$a", ".1:$a"); the error should name the key the app wrote.
+const readable = (key: string): string => key.replace(/^\.(?:[^$:]*:)*\$/, "");
+
 function collect(children: ReactNode): { order: string[]; elements: Map<string, ChildElement> } {
   // toArray rewrites missing keys into index keys, which would hide the mistake; the original elements show it.
   Children.forEach(children, (child) => {
@@ -62,6 +65,7 @@ function collect(children: ReactNode): { order: string[]; elements: Map<string, 
   const elements = new Map<string, ChildElement>();
   for (const child of Children.toArray(children)) {
     if (!isValidElement(child) || child.key === null) continue;
+    if (elements.has(child.key)) throw new TypeError(`${KEY_ERROR} The key "${readable(child.key)}" is used twice.`);
     order.push(child.key);
     elements.set(child.key, child as ChildElement);
   }

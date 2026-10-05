@@ -397,6 +397,13 @@ describe("Presence keys", () => {
     expect(error?.message).toMatch(/<Presence> children need a unique `key`/);
   });
 
+  test("two children with the same key throw an error naming the key", () => {
+    const error = render([<div key="a" />, <div key="b" />, <div key="a" />]);
+
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error?.message).toMatch(/<Presence> children need a unique `key`.*"a"/);
+  });
+
   test("text children throw because they cannot be animated", () => {
     const error = render("hello");
 

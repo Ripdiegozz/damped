@@ -88,7 +88,7 @@ export default defineConfig({
         },
       },
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/Ripdiegozz/damped" }],
-      customCss: ["./src/styles/theme.css", "./src/styles/demos.css", "./src/styles/landing.css", "./src/styles/reference.css"],
+      customCss: ["./src/styles/theme.css", "./src/styles/demos.css", "./src/styles/landing.css", "./src/styles/reference.css", "./src/styles/physics.css"],
       components: {
         // The landing hero holds a live island, which the `hero` frontmatter cannot express.
         Hero: "./src/components/landing/Hero.astro",

@@ -6,10 +6,44 @@ sidebar:
 ---
 
 import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
-import { RetargetSpring } from "../../../components/demos/RetargetSpring";
-import { SpringTuner } from "../../../components/demos/SpringTuner";
+import { DampingRatio } from "../../../components/physics/DampingRatio";
+import { Interruption } from "../../../components/physics/Interruption";
+import { MassOnSpring } from "../../../components/physics/MassOnSpring";
+import { PhasePortrait } from "../../../components/physics/PhasePortrait";
 
-A spring animation moves a value toward a target the way a mass on a spring would: fast at first, slowing down as it arrives, optionally overshooting. Unlike an easing curve, a spring has a state, a position **and a velocity**, and that state is what makes it interruptible.
+A spring animation moves a value toward a target the way a mass on a spring would: fast at first, slowing down as it arrives, optionally overshooting. Unlike an easing curve, a spring has a state, a position **and a velocity**, and that state is what makes it interruptible. Four figures below let you touch each part of that.
+
+## A mass on a spring
+
+Fix one end of a spring to a wall and hang a mass on the other end. At rest the spring pulls with no force. Pull the mass away and the spring pulls back, harder the further you go. Let go and the mass accelerates toward rest, passes it with some speed, and the spring now pulls the other way.
+
+Drag the mass below and let go. Your hand's velocity at the release becomes the starting velocity of a damped spring, so a flick travels further than a gentle release. Catch the mass while it swings and it stops where it is; let go again and it continues from that state.
+
+<MassOnSpring client:visible />
+
+It does not swing forever because of friction, which pushes against the velocity. The two forces together give the whole motion:
+
+```
+mass × acceleration = −stiffness × position − damping × velocity
+```
+
+Position is measured from rest. `stiffness` sets how hard the spring pulls, `damping` how much friction there is, and `mass` how reluctant the object is to change speed. Every spring in damped solves this one equation.
+
+## Damping
+
+The same spring can behave in three ways, and the **damping ratio** `zeta` decides which. It compares the friction with the amount that would stop the mass most quickly without a single swing:
+
+```
+zeta = damping / (2 · sqrt(stiffness · mass))
+```
+
+- Below 1, **underdamped**: the mass overshoots the target and swings back, each swing smaller than the last.
+- At 1, **critically damped**: it returns as fast as it can without overshooting.
+- Above 1, **overdamped**: friction dominates and it creeps in slowly, with no overshoot.
+
+Move the slider to change `zeta`. The three thin curves are reference values; the bright one is yours, and the ball replays it when you let go. `bounce`, the option you will use most, describes the same thing: `bounce = 1 - zeta` while it is positive. Under the plot are the numbers behind the slider: `duration` is fixed at 0.6 s, so each `zeta` is a `bounce`, and `springParams` turns that pair into a `stiffness` and a `damping` for a mass of 1.
+
+<DampingRatio client:visible />
 
 ## Two ways to describe a spring
 
@@ -93,9 +127,17 @@ The overshoot depends only on the damping ratio, so it is the same for any `dura
   Prefer a small positive `bounce` (0.1 to 0.2) for most interface motion. It settles about as fast as `bounce: 0`, and the tiny overshoot reads as physical rather than mechanical. Use a negative `bounce` only when overshoot would be wrong, such as a value that must not exceed its target.
 </Aside>
 
-Try it. The sliders redraw the analytic curve and Replay plays a real spring with the same options.
+## The phase portrait
 
-<SpringTuner client:visible />
+Plot position against time and you get the curves above. Plot position against **velocity** instead and time disappears into the path: the state of the spring, `{ position, velocity }`, becomes one point on a plane, and the motion is that point moving.
+
+For an underdamped spring the point does not go straight home. The mass swings out, slows, stops for an instant at the far end (velocity zero, so the point crosses the position axis), swings back through rest at full speed (position zero, so it crosses the velocity axis) and each lap is smaller than the last. The path is a spiral that winds into the rest point. This is the shape of the damped mark: one winding of this curve and the dot it comes to rest on.
+
+Drag the dot to any point on the plane and let go. The spring starts from exactly that state and draws its path. Try a point with some velocity and no displacement, then raise `zeta` past 1 and watch the spiral unwind into a plain curve.
+
+<PhasePortrait client:visible />
+
+Since the state is a point, everything the spring needs to continue is those two numbers. A new target moves the rest point and nothing else: the position and the velocity stay what they were, and the path now winds toward the new rest. That is why an interruption can carry on from exactly where the motion was.
 
 ## Analytic: the exact state at any time
 
@@ -155,11 +197,13 @@ const second = createSpring(position, 0, velocity, options);
 console.log(second.at(0.02).position.toFixed(1)); // 80.9: it keeps going forward for a moment, then turns
 ```
 
-`animate`, `createSpringValue`, `layout`, `morph` and the React hooks do this for you on every retarget. Drag the marker below while it is moving and watch the velocity trace: it never snaps to zero.
+`animate`, `createSpringValue`, `layout`, `morph` and the React hooks do this for you on every retarget.
 
-<RetargetSpring client:visible />
+An easing curve such as `ease-out` has no velocity to carry. Interrupt it and the new animation starts from rest, so the motion stalls and restarts. The figure below runs both from the same state. The lanes are identical springs; the only difference is what happens at a retarget. The damped lane calls `set()` on the value again. The restart lane does what an easing curve does: it jumps to the position the value had, which drops its velocity, and starts a new spring from rest. Press the button, then press it again while the balls are moving. Each press moves the target one stop further right, and the third sends it back to the start. Compare the velocities and the traces.
 
-An easing curve such as `ease-out` has no velocity to carry. Interrupt it and the new animation starts from rest, so the motion stalls and restarts. [Interruption and reversal](/guides/interruption-and-reversal/) goes through what that looks like and how damped handles reversals of layout, morph and presence.
+<Interruption client:visible />
+
+The velocity plot shows it most clearly. At each retarget the restart line drops to zero and climbs again, which is the stall you see as a flat spot in its position trace, while the damped line goes on without a jump. [Interruption and reversal](/guides/interruption-and-reversal/) goes through what that looks like and how damped handles reversals of layout, morph and presence.
 
 ## Next
 

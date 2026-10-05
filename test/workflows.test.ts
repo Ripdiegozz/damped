@@ -64,7 +64,10 @@ describe("pages workflow", () => {
       expect(text, step).toContain(`run: ${step}`);
     }
     expect(text.indexOf("run: bun install")).toBeLessThan(text.indexOf("run: bun run site:build"));
-    expect(text.indexOf("run: bun run site:build")).toBeLessThan(text.indexOf("upload-pages-artifact"));
+    // A broken link or missing asset in the assembled site stops the deploy instead of reaching production.
+    expect(text).toContain("run: bun run site:check");
+    expect(text.indexOf("run: bun run site:build")).toBeLessThan(text.indexOf("run: bun run site:check"));
+    expect(text.indexOf("run: bun run site:check")).toBeLessThan(text.indexOf("upload-pages-artifact"));
     expect(text).toMatch(/upload-pages-artifact@[0-9a-f]{40}[^\n]*\n\s+with:\s*\n\s+path: site\s*\n/);
     // The playground alone is no longer the artifact.
     expect(text).not.toMatch(/path: apps\/playground\/dist/);

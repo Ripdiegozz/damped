@@ -15,7 +15,8 @@
     "demo:gif": "bun scripts/record-demo.ts",
     "docs:build": "bun run --filter @damped/docs build",
     "docs:dev": "bun run --filter @damped/docs dev",
-    "site:build": "bun apps/docs/scripts/assemble-site.ts"
+    "site:build": "bun apps/docs/scripts/assemble-site.ts",
+    "site:check": "bun apps/docs/scripts/check-site.ts"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",

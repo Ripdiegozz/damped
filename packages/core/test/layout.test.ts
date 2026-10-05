@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { layout, measureLayout, snapshot, type Box, type LayoutOptions } from "../src/layout";
+import { animate } from "../src/animate";
 import { createScheduler, type Scheduler } from "../src/scheduler";
 import { createSpring } from "../src/spring";
 import { createFakeSource } from "./fake-frame-source";
@@ -630,6 +631,31 @@ describe("scale correction", () => {
       const applied = parseTransform(parent.style.transform);
       expect(children[0]!.style.transform).toBe(`scale(${1 / applied.scaleX}, ${1 / applied.scaleY})`);
     }
+  });
+
+  test("after stop() the frozen parent keeps its child correction and radius on later transform writes", () => {
+    const world = createWorld();
+    const { fake, options } = setup();
+    const { parent, children } = parentWithChildren(1);
+    world.place(parent, { a: A, b: B });
+    const controls = layout(
+      parent,
+      () => {
+        world.state = "b";
+      },
+      options({ correct: "children", radius: 12 }),
+    );
+    for (let frame = 0; frame < 4; frame++) fake.flush(frame * 16);
+    controls.stop();
+
+    // Any later transform write on the frozen element must not treat it as finished.
+    animate(parent, { rotate: 1 }, options());
+    fake.flush(64);
+    const applied = parseTransform(parent.style.transform);
+    expect(applied.scaleX).not.toBe(1);
+    expect(children[0]!.style.transform).toBe(`scale(${1 / applied.scaleX}, ${1 / applied.scaleY})`);
+    expect(children[0]!.style.transformOrigin).toBe("0 0");
+    expect(parent.style.borderRadius).not.toBe("12px");
   });
 
   test("at rest the child transform is cleared and the origins are restored", () => {

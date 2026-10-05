@@ -192,7 +192,8 @@ function animateRecorded(recorded: readonly Recorded[], options: LayoutOptions):
     for (const child of resolveChildren(element, correct)) state.children.add(child);
     if (radius !== undefined) state.radius = radius;
     setRenderHook(element, scheduler, (scaleX, scaleY) => {
-      if (values.every((value) => !value.animating)) {
+      // Finished means settled at the identity; a stop() freezes mid-flight and must keep its corrections.
+      if (values.every((value, index) => !value.animating && value.get() === REST[AXES[index]!])) {
         finishRun(element, scheduler, state);
         return;
       }

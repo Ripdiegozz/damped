@@ -6,6 +6,17 @@ import { curvePath, describeSpring, plotScale, sampleCurve, type PlotBox } from 
 const PLOT: PlotBox = { width: 360, height: 168, padding: 22 };
 const SAMPLES = 120;
 const BALL_PX = 24;
+const LANE_PADDING_PX = 10;
+
+/**
+ * Pixel offset of the tuner ball for a spring value inside a lane of `laneWidth` px.
+ * Clamps the live spring value to [0, 1] so overshoot/undershoot never leaves the lane,
+ * and subtracts both lane paddings (the ball rests at `left: 10px` inside `padding: 0 10px`).
+ */
+export function laneOffset(value: number, laneWidth: number, ballPx: number = BALL_PX, lanePaddingPx: number = LANE_PADDING_PX): number {
+  const clamped = Math.min(Math.max(value, 0), 1);
+  return clamped * Math.max(0, laneWidth - ballPx - 2 * lanePaddingPx);
+}
 
 const fixed = (value: number, digits: number): string => value.toFixed(digits);
 
@@ -40,7 +51,7 @@ export function SpringTuner() {
   useEffect(() => {
     const unsubscribe = progress.onChange((value) => {
       const track = lane.current;
-      if (track && ball.current) ball.current.style.transform = `translate3d(${value * Math.max(0, track.clientWidth - BALL_PX)}px,0,0)`;
+      if (track && ball.current) ball.current.style.transform = `translate3d(${laneOffset(value, track.clientWidth)}px,0,0)`;
       const dot = head.current;
       if (!dot) return;
       const elapsed = (performance.now() - started.current) / 1000;

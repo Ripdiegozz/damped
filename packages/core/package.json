@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "license": "MIT",
   "description": "Interruptible, physically based spring animations for the web.",
+  "keywords": ["spring", "animation", "physics", "interruptible", "velocity", "flip", "layout"],
+  "homepage": "https://damped.dagadev.net/reference/core/",
+  "bugs": { "url": "https://github.com/Ripdiegozz/damped/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/Ripdiegozz/damped.git", "directory": "packages/core" },
   "type": "module",
   "sideEffects": false,
   "exports": {

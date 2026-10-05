@@ -1,4 +1,4 @@
-import { copyFile, mkdir, rm } from "node:fs/promises";
+import { cp, copyFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 // Dev tooling for the playground: writes a complete static site to dist/, ready to be served at /.
@@ -25,4 +25,6 @@ if (!result.success) {
 
 await copyFile(join(root, "index.html"), join(dist, "index.html"));
 await copyFile(join(root, "src/styles.css"), join(dist, "styles.css"));
+// public/ holds the generated tab icons (`bun run brand`); copying the directory means a new asset needs no change here.
+await cp(join(root, "public"), dist, { recursive: true });
 console.log(`playground built into ${dist}`);

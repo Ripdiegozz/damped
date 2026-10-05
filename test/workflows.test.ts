@@ -58,13 +58,23 @@ describe("pages workflow", () => {
     expect(text).toMatch(/concurrency:\s*\n\s+group: pages\s*\n\s+cancel-in-progress: false/);
   });
 
-  test("builds the packages and the playground, then uploads the playground's dist", () => {
+  test("assembles the whole site with one script, then uploads that directory", () => {
     const text = pages();
-    for (const step of ["bun install --frozen-lockfile", "bun run build", "bun run playground:build"]) {
+    for (const step of ["bun install --frozen-lockfile", "bun run site:build"]) {
       expect(text, step).toContain(`run: ${step}`);
     }
-    expect(text.indexOf("bun run build")).toBeLessThan(text.indexOf("bun run playground:build"));
-    expect(text).toMatch(/upload-pages-artifact@[0-9a-f]{40}[^\n]*\n\s+with:\s*\n\s+path: apps\/playground\/dist/);
+    expect(text.indexOf("run: bun install")).toBeLessThan(text.indexOf("run: bun run site:build"));
+    expect(text.indexOf("run: bun run site:build")).toBeLessThan(text.indexOf("upload-pages-artifact"));
+    expect(text).toMatch(/upload-pages-artifact@[0-9a-f]{40}[^\n]*\n\s+with:\s*\n\s+path: site\s*\n/);
+    // The playground alone is no longer the artifact.
+    expect(text).not.toMatch(/path: apps\/playground\/dist/);
+  });
+
+  test("says where the docs and Northbook are published", () => {
+    const comment = pages().split("\non:")[0]!;
+    expect(comment).toContain("docs");
+    expect(comment).toMatch(/at the root|at \//);
+    expect(comment).toContain("/playground/");
   });
 
   test("deploys through the github-pages environment after the build", () => {
@@ -83,8 +93,16 @@ describe("pages workflow", () => {
   });
 });
 
-describe("the site served at the domain root", () => {
-  test("index.html refers to its assets relatively, so no path prefix is assumed", async () => {
+describe("the site layout", () => {
+  test("site:build is the root script behind the Pages artifact, and its output is not committed", async () => {
+    const manifest = JSON.parse(await Bun.file(join(root, "package.json")).text()) as { scripts: Record<string, string> };
+    expect(manifest.scripts["site:build"]).toBe("bun apps/docs/scripts/assemble-site.ts");
+    expect(await Bun.file(join(root, ".gitignore")).text()).toMatch(/^site\/$/m);
+  });
+});
+
+describe("the playground, which is served under /playground/", () => {
+  test("index.html refers to its assets relatively, so it works under any path prefix", async () => {
     const html = await Bun.file(join(root, "apps/playground/index.html")).text();
     const references = [...html.matchAll(/\b(?:src|href)="([^"]+)"/g)].map((match) => match[1]!);
     expect(references.length).toBeGreaterThan(0);

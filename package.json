@@ -2,12 +2,17 @@
   "name": "damped-monorepo",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc -p tsconfig.json",
     "e2e": "playwright test",
-    "build": "bun run --filter '*' build"
+    "build": "bun run --filter './packages/*' build",
+    "playground:build": "bun run --filter @damped/playground build",
+    "playground:serve": "bun apps/playground/serve.ts",
+    "docs:check": "bun scripts/check-readme-examples.ts",
+    "sizes": "bun scripts/sizes.ts",
+    "demo:gif": "bun scripts/record-demo.ts"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",

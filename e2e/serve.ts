@@ -1,8 +1,11 @@
-import { join, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
+import { serveStatic, type Mount } from "./static";
 
-// Dev tooling for the Playwright suite: serves e2e/fixtures at / and the built library at /dist.
+// Dev tooling for the Playwright suite: serves e2e/fixtures at /, the built library at /dist and the built
+// playground at /playground/ (listed first, because the "/" mount matches everything).
 const root = resolve(import.meta.dir, "..");
-const mounts = [
+const mounts: Mount[] = [
+  { prefix: "/playground/", dir: join(root, "apps/playground/dist") },
   { prefix: "/dist/", dir: join(root, "packages/core/dist") },
   { prefix: "/", dir: join(root, "e2e/fixtures") },
 ];
@@ -15,25 +18,11 @@ if (!Number.isInteger(port) || port <= 0) {
 Bun.serve({
   hostname: "127.0.0.1",
   port,
-  async fetch(request) {
+  fetch(request) {
     const { pathname } = new URL(request.url);
     if (pathname === "/healthz") return new Response("ok");
-
-    const mount = mounts.find(({ prefix }) => pathname.startsWith(prefix));
-    if (mount === undefined) return new Response("Not found", { status: 404 });
-    let relative: string;
-    try {
-      relative = decodeURIComponent(pathname.slice(mount.prefix.length));
-    } catch {
-      return new Response("Bad request", { status: 400 });
-    }
-    const path = resolve(mount.dir, relative);
-    // Never serve anything outside the mounted directory.
-    if (!path.startsWith(mount.dir + sep)) return new Response("Not found", { status: 404 });
-
-    const file = Bun.file(path);
-    if (!(await file.exists())) return new Response("Not found", { status: 404 });
-    return new Response(file, { headers: { "cache-control": "no-store" } });
+    if (pathname === "/playground") return Response.redirect(new URL("/playground/", request.url), 301);
+    return serveStatic(mounts, pathname);
   },
 });
 

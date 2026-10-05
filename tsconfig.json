@@ -14,7 +14,10 @@
     "jsx": "react-jsx",
     "skipLibCheck": true,
     "noEmit": true,
-    "paths": { "@damped/core": ["./packages/core/src/index.ts"] }
+    "paths": {
+      "@damped/core": ["./packages/core/src/index.ts"],
+      "@damped/react": ["./packages/react/src/index.ts"]
+    }
   },
-  "include": ["packages/*/src", "packages/*/test", "test", "e2e", "playwright.config.ts"]
+  "include": ["packages/*/src", "packages/*/test", "apps/*/src", "apps/*/test", "apps/*/*.ts", "test", "e2e", "scripts", "playwright.config.ts"]
 }

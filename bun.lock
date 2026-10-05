@@ -11,6 +11,20 @@
         "typescript": "^7.0.2",
       },
     },
+    "apps/playground": {
+      "name": "@damped/playground",
+      "version": "0.0.0",
+      "dependencies": {
+        "@damped/core": "workspace:*",
+        "@damped/react": "workspace:*",
+        "react": "19.2.3",
+        "react-dom": "19.2.3",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.0",
+        "@types/react-dom": "^19.2.0",
+      },
+    },
     "packages/core": {
       "name": "@damped/core",
       "version": "0.0.0",
@@ -178,6 +192,8 @@
     "@damped/core": ["@damped/core@workspace:packages/core"],
 
     "@damped/native": ["@damped/native@workspace:packages/native"],
+
+    "@damped/playground": ["@damped/playground@workspace:apps/playground"],
 
     "@damped/react": ["@damped/react@workspace:packages/react"],
 

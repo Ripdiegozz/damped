@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>morph</title>
+<style>
+  body { margin: 0; }
+  .shared { position: absolute; background: #36c; overflow: hidden; }
+  #card { left: 40px; top: 60px; width: 120px; height: 80px; }
+  #modal { left: 300px; top: 120px; width: 400px; height: 300px; opacity: 0; background: #c63; }
+  .content { width: 60px; height: 20px; margin: 10px; background: #fff; }
+</style>
+<div class="shared" id="card"><div class="content"></div></div>
+<div class="shared" id="modal"><div class="content"></div></div>
+<script src="/support.js"></script>
+<script type="module">
+  import * as damped from "/dist/index.js";
+  window.damped = damped;
+</script>

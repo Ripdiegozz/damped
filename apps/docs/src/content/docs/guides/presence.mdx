@@ -1,0 +1,304 @@
+---
+title: Presence
+description: Animate elements in when they appear and out before they are removed, interrupt a leaving element by bringing it back, and let its siblings glide into the freed space.
+sidebar:
+  order: 4
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+import { PresenceDemo } from "../../../components/demos/PresenceDemo";
+
+Adding an element is easy to animate: it exists, so you animate it. Removing one is the hard half. By the time your code knows the element should go, the framework has already taken it out of the DOM, and there is nothing left to fade. Presence keeps an element in the DOM until its exit animation settles, and only then removes it.
+
+damped has this in two layers: `enter()` and `exit()` in `@damped/core`, and `<Presence>` in `@damped/react`, which calls them for you.
+
+<PresenceDemo client:visible />
+
+Add a few toasts, remove one, then add another while the first is still leaving. The siblings of a leaving toast glide up instead of jumping, and every move can be interrupted.
+
+## enter() and exit() in core
+
+```ts
+import { enter, exit } from "@damped/core";
+
+const toast = document.querySelector<HTMLElement>(".toast");
+
+if (toast) {
+  // From invisible and 12 px low, to the identity values.
+  await enter(toast, { opacity: 0, y: 12 }, {}, { duration: 0.3, bounce: 0 }).finished;
+
+  // To invisible, then removed from the DOM.
+  const leaving = exit(toast, { opacity: 0, y: -12 }, { duration: 0.3, bounce: 0 });
+  const completed = await leaving.finished; // false if enter() or another exit() interrupted it
+  console.log(completed);
+}
+```
+
+### enter(target, from, to?, options?)
+
+Jumps to `from`, then springs each property in `from` to its **identity** value: `x`, `y`, `rotate` and `blur` to `0`; `scale`, `scaleX`, `scaleY` and `opacity` to `1`. Pass `to` to aim somewhere else. Properties that only `to` mentions animate from their current value, and properties neither object mentions are never written.
+
+An element that is **already moving** on one of those properties, for example one that is exiting, is only retargeted. It does not jump back to `from`; it keeps its position and velocity.
+
+### exit(target, to, options?)
+
+Animates to `to`. When it settles without being interrupted, the `remove` option decides what happens:
+
+| `remove` | After the exit settles |
+| --- | --- |
+| `true` (default) | The element is removed from the DOM. |
+| `false` | The element stays, and the attributes damped added are restored. |
+| a function | The function is called with the element instead. If it throws, the exit still counts as completed and the error is rethrown from a microtask, so `finished` never rejects. |
+
+`finished` resolves `true` when the exit completed and `false` when something interrupted it: a later `enter()`, a later `exit()` on the same element (only the second one removes it), `stop()`, or a direct `animate()` that takes over one of its properties. With several elements, each is removed when its own animation settles and `finished` is `true` only if all of them completed.
+
+```ts
+import { exit } from "@damped/core";
+
+const banner = document.querySelector<HTMLElement>(".banner");
+
+if (banner) {
+  // Keep the element and handle it yourself once it has faded.
+  void exit(banner, { opacity: 0 }, { remove: (element) => element.setAttribute("hidden", "") });
+}
+```
+
+Both functions always use the JS driver, take the same spring options as `animate`, and validate everything before touching an element.
+
+## Interrupting an exit
+
+An exit is a spring toward its target, so it can be redirected like any other. Calling `enter()` on an element that is leaving:
+
+- cancels the removal,
+- restores the attributes the exit set,
+- resolves the exit's `finished` with `false`,
+- and retargets from where the element is with the velocity it has. It does not restart from rest, so the element does not hitch.
+
+```ts
+import { enter, exit } from "@damped/core";
+
+const toast = document.querySelector<HTMLElement>(".toast");
+
+if (toast) {
+  const leaving = exit(toast, { opacity: 0, y: -12 });
+
+  // Undo, a moment later: the toast turns around in place.
+  setTimeout(() => void enter(toast, { opacity: 0, y: -12 }), 120);
+
+  console.log(await leaving.finished); // false
+}
+```
+
+## Why a leaving element is inert
+
+While an element exits, damped sets `inert` and `aria-hidden="true"` on it. The element is still in the DOM, so without them it would behave like a live part of the page for up to a second:
+
+- a keyboard user could Tab into a control that is about to disappear,
+- a click could land on it,
+- a screen reader would announce something that is already gone.
+
+`aria-hidden` removes it from the accessibility tree but not from the focus order; `inert` removes it from focus, clicks and the accessibility tree together. damped sets both. When the exit is interrupted, stopped, or finishes with `remove: false` or a function, the values the element had before are put back, whatever they were.
+
+`inert` also gives you a hook for layout: `.item[inert]` selects exactly the elements that are leaving, which the [next section](#siblings-that-glide) uses.
+
+## Reduced motion
+
+Spatial entries and exits jump and the opacity still animates, so a toast fades without moving. An exit that has only spatial targets completes at once and removes the element immediately. See [Reduced motion](/guides/reduced-motion/).
+
+## Presence in React
+
+`<Presence>` wraps a list of keyed children. A child that is added enters; a child that is removed stays mounted, animates out and is then dropped.
+
+```tsx
+import type { Ref } from "react";
+import { Presence } from "@damped/react";
+
+interface ToastData {
+  id: string;
+  text: string;
+}
+
+// A component child must pass the `ref` prop on to an element (React 19 passes it as a prop).
+function Toast({ toast, ref }: { toast: ToastData; ref?: Ref<HTMLDivElement> }) {
+  return (
+    <div ref={ref} role="status">
+      {toast.text}
+    </div>
+  );
+}
+
+export function Toasts({ toasts }: { toasts: ToastData[] }) {
+  return (
+    <Presence enter={{ opacity: 0, y: 16 }} exit={{ opacity: 0, x: 24 }} options={{ duration: 0.3, bounce: 0 }}>
+      {toasts.map((toast) => (
+        <Toast key={toast.id} toast={toast} />
+      ))}
+    </Presence>
+  );
+}
+```
+
+| Prop | Default | Meaning |
+| --- | --- | --- |
+| `enter` | none | Where an added child starts. It animates to its identity values. Without it, added children appear at once. |
+| `exit` | none | Where a removed child goes before it is dropped. Without it, removed children disappear at once. |
+| `options` | core defaults | Spring options, `scheduler` and `reducedMotion`, used for both directions. |
+| `initial` | `false` | Also animate the children present on the first mount. |
+| `onExitComplete` | none | Called once with the key of every child that left. |
+| `children` | none | Keyed elements. |
+
+### Keys are required
+
+Every child needs a `key`, in development and in production. A missing key throws a `TypeError`, because with index keys the exit would play on the wrong child. Two children with the same key throw as well and the message names the key. Text children throw too: Presence animates elements. `null`, `undefined` and booleans are ignored, so `{visible && <div key="a" />}` works.
+
+A child is a host element or a component that passes the `ref` prop on to an element. Your own `ref` on the child still receives the element. A removed child whose element cannot be reached, for example a component that ignores `ref`, is dropped at once instead of hanging.
+
+### Position, first mount and re-adding
+
+- Exiting children keep their position among the remaining ones and stay in the layout flow until they are gone.
+- Children present when `<Presence>` first mounts do not animate in, unless you set `initial`.
+- If the same key comes back during its exit, the exit is interrupted and the child stays, with the velocity it had. A key can leave, return and leave again.
+- Under StrictMode a child enters once.
+
+```tsx
+import { useState } from "react";
+import { Presence } from "@damped/react";
+
+export function Banner() {
+  const [visible, setVisible] = useState(true);
+
+  return (
+    <>
+      <button type="button" onClick={() => setVisible((value) => !value)}>
+        {visible ? "Dismiss" : "Undo"}
+      </button>
+      <Presence enter={{ opacity: 0, y: -12 }} exit={{ opacity: 0, y: -12 }} options={{ duration: 0.4, bounce: 0.1 }}>
+        {visible && <p key="banner">Payment sent to Jane Doe</p>}
+      </Presence>
+    </>
+  );
+}
+```
+
+Press the button twice quickly: the banner reverses mid-exit instead of restarting.
+
+### Renders
+
+`<Presence>` renders when its set of children changes, plus once when a leaving child is dropped after its exit. It never renders per animation frame. The animation itself runs through `enter()` and `exit()`, outside React.
+
+## Siblings that glide
+
+When an element leaves, the elements after it have to move up. If nothing animates that, they jump the moment the leaving element is removed. There are two ways to make them glide, and they differ in timing.
+
+### Move at once: take the leaving element out of the flow
+
+The leaving element is `inert`, so a CSS rule can pull it out of the layout flow right away. The siblings then move at the start of the exit while the leaving element fades where it was.
+
+```css
+/* damped marks a leaving element inert: out of the flow, so the ones after it can glide up. */
+.toast[inert] {
+  position: absolute;
+  inset-inline: 0;
+  pointer-events: none;
+}
+```
+
+Run `layout()` on the rows around the state change, with `flushSync` so React commits, and Presence marks the element `inert`, before the new boxes are measured:
+
+```tsx
+import { layout } from "@damped/core";
+import { Presence } from "@damped/react";
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
+
+const SPRING = { duration: 0.4, bounce: 0.1 } as const;
+
+export function Toasts() {
+  const list = useRef<HTMLUListElement>(null);
+  const [toasts, setToasts] = useState(["Bill paid: City Power", "Receipt saved for Corner Grocery", "FiberNet is due Friday"]);
+
+  const remove = (text: string) => {
+    const rows = Array.from(list.current?.children ?? []);
+    layout(rows, () => flushSync(() => setToasts((current) => current.filter((toast) => toast !== text))), SPRING);
+  };
+
+  return (
+    <ul ref={list}>
+      <Presence enter={{ opacity: 0, y: 16 }} exit={{ opacity: 0, x: 40 }} options={SPRING}>
+        {toasts.map((text) => (
+          <li key={text}>
+            {text}
+            <button type="button" onClick={() => remove(text)}>
+              Dismiss
+            </button>
+          </li>
+        ))}
+      </Presence>
+    </ul>
+  );
+}
+```
+
+This is how the demo at the top of the page works.
+
+### Move afterwards: onExitComplete
+
+If you would rather keep the gap until the element is gone and then close it, use `onExitComplete`. It is called once with the key of every child that left. After an exit animation it runs in the same batch as the render that removes the child, so the child is still in the DOM when it runs, and state you set from it re-renders together with the removal. A layout snapshot taken in that render still sees the old layout. A counter bumped in `onExitComplete` can therefore drive `useLayout` on the siblings, which spring into the space the child leaves:
+
+```tsx
+import { useState, type Ref } from "react";
+import { Presence, useLayout } from "@damped/react";
+
+interface Item {
+  id: string;
+  label: string;
+}
+
+function Row({ item, reflowKey, ref }: { item: Item; reflowKey: number; ref?: Ref<HTMLLIElement> }) {
+  const layoutRef = useLayout<HTMLLIElement>([reflowKey], { duration: 0.4 });
+  return (
+    <li
+      ref={(node) => {
+        layoutRef(node);
+        if (typeof ref === "function") return ref(node);
+        if (ref) ref.current = node;
+      }}
+    >
+      {item.label}
+    </li>
+  );
+}
+
+export function List({ items }: { items: Item[] }) {
+  const [gone, setGone] = useState(0);
+  return (
+    <ul>
+      <Presence exit={{ opacity: 0, x: 24 }} onExitComplete={() => setGone((count) => count + 1)}>
+        {items.map((item) => (
+          <Row key={item.id} item={item} reflowKey={gone} />
+        ))}
+      </Presence>
+    </ul>
+  );
+}
+```
+
+When `onExitComplete` is called:
+
+| How the child left | When it is called |
+| --- | --- |
+| It animated out | In the same batch as the render that removes it. |
+| It left without an animation (no `exit` targets, or an element that could not take the ref) | Right after the commit that removed it. |
+| Its exit was interrupted because the key came back | Not called. It is called when the key finally leaves. |
+| `<Presence>` unmounted | Not called. |
+
+Why the order matters: child effects run before their parent's. If the siblings measured in their own layout effect at the moment the exit starts, Presence would not yet have marked the leaving element `inert`, and the boxes would not have changed. That is why the first approach wraps the commit in `layout()`, and the second waits until the element is dropped.
+
+## Next
+
+<CardGrid>
+  <LinkCard title="Layout and morph" description="FLIP, scale correction and the card-to-dialog morph that the siblings above rely on." href="/guides/layout-and-morph/" />
+  <LinkCard title="React" description="The hooks, the render model and the patterns around lists." href="/guides/react/" />
+  <LinkCard title="Reduced motion and accessibility" description="What an exit does when the user prefers less motion." href="/guides/reduced-motion/" />
+  <LinkCard title="React reference" description="The full props and edge cases of Presence." href="/reference/react/" />
+</CardGrid>

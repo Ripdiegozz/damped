@@ -59,11 +59,11 @@ The original proof of concept (and a first demo attempt) reused the app name, se
 | P3 | App shell: collapsible sidebar (`useLayout`), active nav indicator moving between items, top bar, view switching with `<Presence>` | delegated writer | [x] `cbc09e1` |
 | P4 | Overview: stat tiles with spring-animated numbers (`useSpringValue`), recent activity rows | delegated writer | [x] `15c63ad` |
 | P5 | Bills: grid of bill cards; card → dialog with `useMorph` (radius, content correction, blur crossfade); full keyboard support (focus trap, Esc, re-open while closing, focus return); "Pay" raises a toast | delegated writer | [x] `ebb7bf9` |
-| P6 | Activity: transaction rows with filter chips and sort (`useLayout` FLIP), add and delete rows (`<Presence>`) | delegated writer | [ ] |
+| P6 | Activity: transaction rows with filter chips and sort (`useLayout` FLIP), add and delete rows (`<Presence>`) | delegated writer | [x] `51111ce` |
 | P7 | Toasts: stacked toasts with `<Presence>` enter/exit and layout shift of the stack | delegated writer | [x] `f1f2c2f` |
-| P7a | Library: `<Presence onExitComplete>` so the remaining children can reflow with `useLayout` when one leaves (found while building toasts); the toast stack then switches to it. Bills grid moves to a roving tabindex (a single tab stop, arrows move) | delegated writer | [ ] |
-| P8 | Spring lab panel: duration and bounce for the whole app, a compositor-driver showcase, and a reduced-motion simulation toggle | delegated writer | [ ] |
-| P9 | Playwright smoke tests: morph open/close/reverse, keyboard flow, toast, row add/delete, view switch | delegated writer | [ ] |
+| P7a | Library: `<Presence onExitComplete>` so the remaining children can reflow with `useLayout` when one leaves (found while building toasts); the toast stack then switches to it. Bills grid moves to a roving tabindex (a single tab stop, arrows move) | delegated writer | [x] `d13b3a2`, `97f5882`, `00ef68a`, `afe1eab` |
+| P8 | Spring lab panel: duration and bounce for the whole app, a compositor-driver showcase, and a reduced-motion simulation toggle | delegated writer | [x] `b3499fe`, `a8c6570` |
+| P9 | Playwright smoke tests: morph open/close/reverse, keyboard flow, toast, row add/delete, view switch | delegated writer | [x] covered by the per-feature e2e suites (71 tests) |
 | P10 | Deploy: GitHub Pages workflow (build → upload artifact → deploy), `CNAME` for `damped.dagadev.net`, documented DNS step | delegated writer | [ ] |
 | P11 | README with a GIF recorded from the playground, sizes script, links to the live playground | delegated writer | [ ] |
 
@@ -82,7 +82,9 @@ The original proof of concept (and a first demo attempt) reused the app name, se
 - P2–P4: e2e RED (404 / 5 of 6 / 6 of 12 failing) → GREEN; 18 helper unit tests; playground e2e 48/48 with `--repeat-each 4`. Full suite: 529 unit, 24 e2e. The playground JS is 68 KB gzip (React included). The parent checked the screenshots (expanded and collapsed sidebar): original content, no forbidden terms. Exiting views share one grid cell. Rows are staggered through a mount timeout chain, because the core has no per-child delay.
 
 - P5/P7: RED (missing helpers; 11/11 bills and 11/11 toast e2e failing) → GREEN; 550 unit, 138/138 e2e with `--repeat-each 3`; JS 72.9 KB gzip. One `useMorph` per card, dialogs portaled to `document.body`; focus moves to the card as soon as a close starts, so Enter can reverse it. The parent checked screenshots 4–7 (grid, mid-morph, open dialog, toasts). Finding: the toast removal reflow needed `snapshot()` in a cleanup, because `<Presence>` gives no signal when a child finishes exiting.
+- P7a/P6/P8: `d13b3a2` onExitComplete, `97f5882` toast reflow, `00ef68a` roving tabindex, `51111ce` activity, `b3499fe` spring lab, `afe1eab` onExitComplete fires uniformly, `a8c6570` anchored lab with `aria-valuetext`. 589→600 unit tests, 142 e2e ×2. Screenshots 8–11 checked.
+- 2026-10-05: the user made the repo public, verified `dagadev.net`, and set the `damped` CNAME to DNS only. Pages is enabled (workflow source, cname set). MIT license merged (#19). The core was renamed to `@damped/core` (#20) and merged into this branch, which now has 600 unit and 71 e2e tests passing.
 
 ## Next step
 
-P7a, then P6 activity and P8 spring lab.
+P10 deploy workflow and P11 README + GIF + sizes, then the playground PRs.

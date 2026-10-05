@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { builtOutputMode } from "./built-output";
+import { rulesOf, targets } from "./css";
 
 // Expressive Code draws a code block as one frame: the header (terminal dots or a file-name tab) and the `pre`
 // share a border, and only the outer corners are rounded. Rounding `pre` or `.frame` from our own CSS detaches
@@ -9,28 +10,6 @@ import { builtOutputMode } from "./built-output";
 
 const docsRoot = resolve(import.meta.dir, "..");
 const read = (path: string): string => readFileSync(join(docsRoot, path), "utf8");
-
-interface CssRule {
-  selector: string;
-  body: string;
-}
-
-/** The innermost rules of a stylesheet. Rules inside at-rules come out with their own selector. */
-function rulesOf(css: string): CssRule[] {
-  const source = css.replace(/\/\*[\s\S]*?\*\//g, "");
-  return [...source.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, body]) => ({
-    selector: selector!.trim(),
-    body: body!,
-  }));
-}
-
-/** True when one selector of the list targets the element itself, not something inside or beside it. */
-function targets(selectorList: string, subject: RegExp): boolean {
-  return selectorList
-    .split(",")
-    .map((selector) => selector.replace(/:not\([^)]*\)/g, "").trim())
-    .some((selector) => subject.test(selector.split(/\s+|>|\+|~/).filter(Boolean).at(-1) ?? ""));
-}
 
 const stylesheets = readdirSync(join(docsRoot, "src/styles"))
   .filter((name) => name.endsWith(".css"))

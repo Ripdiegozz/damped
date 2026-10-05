@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
+import { Aside, CardGrid, LinkCard, TabItem, Tabs } from "@astrojs/starlight/components";
 
 damped is a family of three packages that share one spring. This page gets you from an empty project to an element that you can interrupt mid-flight.
 
@@ -21,25 +21,55 @@ damped is a family of three packages that share one spring. This page gets you f
 
 ## Install
 
+<Tabs syncKey="package-manager">
+  <TabItem label="bun">
+
 ```sh frame="none"
-# bun
 bun add @damped/core
-# npm
+```
+
+  </TabItem>
+  <TabItem label="npm">
+
+```sh frame="none"
 npm install @damped/core
-# pnpm
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```sh frame="none"
 pnpm add @damped/core
 ```
 
+  </TabItem>
+</Tabs>
+
 For React, install the React package next to the core:
 
+<Tabs syncKey="package-manager">
+  <TabItem label="bun">
+
 ```sh frame="none"
-# bun
 bun add @damped/react @damped/core
-# npm
+```
+
+  </TabItem>
+  <TabItem label="npm">
+
+```sh frame="none"
 npm install @damped/react @damped/core
-# pnpm
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```sh frame="none"
 pnpm add @damped/react @damped/core
 ```
+
+  </TabItem>
+</Tabs>
 
 <Aside type="caution" title="Not published to npm yet">
   The packages are not on the npm registry yet, so the commands above will not resolve today. Until they are published, use them from the [repository's](https://github.com/Ripdiegozz/damped) workspace.

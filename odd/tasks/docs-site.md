@@ -60,9 +60,9 @@ Verified on 2026-10-05 against the npm registry and the Starlight docs (context7
 | D3 | Live demo islands (six demos) with reduced-motion support | delegated | done | `aa42e07` |
 | D4 | Custom landing page: hero with live morph, package cards, "why" | delegated | done | `f2834e1` |
 | D5 | API reference for `@damped/core`, `@damped/react`, `@damped/native` | delegated | done | `4f88942` |
-| D6 | Guides (eleven pages) | delegated | todo | |
-| D7 | Docs smoke e2e (console errors, demos settle, search, internal links) and CI wiring | delegated | todo | |
-| D8 | After `feat/playground` merges: merge `origin/main`, sync with the final READMEs (add `onExitComplete` to the `Presence` reference, re-check the bundle sizes), serve docs at `/` and Northbook at `/playground/` | delegated | blocked on `feat/playground` | |
+| D6 | Guides (eleven pages) | delegated, two parallel writers in worktrees | done | `6e5d9db` `607bb0e` `4a589d3` `53ae47d` (A), `9e71cc4` `8d49bd4` `b917b1d` (B) |
+| D7 | Docs smoke e2e (console errors, demos settle, search, internal links) and CI wiring | delegated, parallel worktree | done | `fbb3cdc` `781012d` `bad072c` `2d30b07` |
+| D8 | After `feat/playground` merges: merge `origin/main`, sync with the final READMEs (add `onExitComplete` to the `Presence` reference, re-check the bundle sizes), serve docs at `/` and Northbook at `/playground/` | inline + delegated | done | `c621809` `028c5a1` `648dd0b` `7246005` `94151d0` `1adb373` `f2110ec` |
 | D9 | Deliver: one PR (`size:exception`), CI green, merge, verify the live site, screenshots and sizes | inline | todo | |
 
 ## Acceptance criteria
@@ -122,6 +122,13 @@ Verified on 2026-10-05 against the npm registry and the Starlight docs (context7
   - Install snippets say the packages are not published to npm yet (as every README does). D8 should revisit that wording after the merge.
   - Visual check: built, served `apps/docs/dist` and screenshotted `springs`, `animate`, `react`, `native` and the core overview in dark and light at 1280 and 390 px into `/tmp/damped-docs-shots/wip/reference-*.png`; no console errors, no horizontal page overflow, every demo island on the reference pages renders. All reference links and anchors resolve in the built output (guide links point at the D6 slugs).
 
+- 2026-10-05: `feat/playground` merged to `main` (#21, `dc5cc6a`). On the user's request for parallel work, `feat/docs-int` (`c621809`) merged `main` onto `feat/docs`, and three writers worked in their own worktrees from it: guides A, guides B, infra. `feat/docs` then merged `feat/docs-int`, the three branches and the hotfix #22 (`4d192fe`), with only `bunfig.toml` conflicting (identical hoist line, kept the commented version).
+  - D6: eleven guides. Guides A: `getting-started`, `springs-explained`, `interruption-and-reversal`, `compositor`, `testing`. Guides B: `layout-and-morph`, `presence`, `reduced-motion`, `react`, `react-native`, `faq`, with `apps/docs/test/guides-b.test.ts` (RED 0 pass / 28 fail, GREEN 115 pass). Testing examples declare `test`/`expect` because the harness has `types: []`.
+  - D7: `e2e/docs-{landing,demos,search,playground,links}.e2e.ts`; link and anchor checker `apps/docs/scripts/check-links.ts` (no exemptions; `rel="canonical"` is not followed) with fixture tests; built-output tests fail under `CI=true` when `dist` is missing; CI `check` builds the docs before `bun test`. Review follow-ups fixed: lazy native mappings, tsc timeout and missing-binary message, fence indentation, demo timers cancelled on unmount, Presence demo settles on `onExitComplete`.
+  - D8: `bun run site:build` (`apps/docs/scripts/assemble-site.ts`) assembles `site/` with the docs at `/` and Northbook at `/playground/`; `pages.yml` uploads `site` after `bun run site:check` passes. The Northbook e2e proves every request stays under `/playground/`, so its relative asset URLs work under the sub-path. `onExitComplete` is in the React reference; `layout()` now documents that its inverse is written before the next paint (#22). Sizes re-measured with `bun run sizes` after #22: full core 18,198 B / 7,158 B gzip (6.99 KB), `layout` 5,186 B gzip; README, landing, FAQ and reference updated.
+  - Gates on the integrated branch: `bun install --frozen-lockfile` 0, `bun run build` 0, `bun run docs:build` 0, `CI=true bun test` 822 pass / 0 fail, `bun run typecheck` 0, `bun run docs:check` 0, `bun run e2e` 97 passed, `bun run site:check` 26 pages, forbidden-terms check exit 1.
+  - Native review (consent from the standing "automatic with everything" instruction): D1+D2, D3, D4, D5, guides A, guides B and infra (high risk, four lenses) approved and acknowledged; advisory follow-ups handled above, and the infra WARNING (deploy without a link gate) fixed by `site:check`.
+
 ## Next step
 
-D6: the eleven guides (`getting-started` expansion plus the slugs the reference and the landing link to: `springs-explained` (stub exists), `interruption-and-reversal`, `compositor`, `reduced-motion`, `layout-and-morph`, `presence`, `react`, `react-native`, `testing`, `faq`, `demos` (exists)). The reference already links to those exact slugs.
+D9: open one PR to `main` (`size:exception`, review path), merge after `check` and `browser`, verify `https://damped.dagadev.net/` and `/playground/`, screenshots in `/tmp/damped-docs-shots/`, docs build sizes.

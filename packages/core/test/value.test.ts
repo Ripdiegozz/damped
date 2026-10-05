@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createScheduler, type Phase, type Scheduler } from "../src/scheduler";
 import { createSpring, type SpringOptions } from "../src/spring";
-import { createSpringValue, type SpringValueOptions } from "../src/value";
+import { createSpringValue, seedSpringValue, type SpringValueOptions } from "../src/value";
 import { createFakeSource } from "./fake-frame-source";
 
 const SPRING: SpringOptions = { duration: 0.5, bounce: 0.15 };
@@ -586,5 +586,68 @@ describe("rebase", () => {
     const idle = setup().value;
     expect(() => idle.rebase(Number.NaN)).toThrow(RangeError);
     expect(() => idle.rebase(1, Number.NaN)).toThrow(RangeError);
+  });
+});
+
+describe("seedSpringValue", () => {
+  test("sets an idle value to a position and velocity without animating, and notifies", () => {
+    const { fake, scheduler, value } = setup();
+    const seen: [number, number][] = [];
+    value.onChange((position, speed) => seen.push([position, speed]));
+    seedSpringValue(value, 40, 300);
+    expect(value.get()).toBe(40);
+    expect(value.getVelocity()).toBe(300);
+    expect(value.animating).toBe(false);
+    expect(scheduler.active).toBe(false);
+    expect(fake.requests).toBe(0);
+    expect(seen).toEqual([[40, 300]]);
+  });
+
+  test("the next set() inherits the seeded velocity, which a jump would have discarded", () => {
+    const seeded = setup();
+    seedSpringValue(seeded.value, 40, 300);
+    void seeded.value.set(100, SPRING);
+    seeded.fake.flush(0);
+    seeded.fake.flush(16);
+    const expected = createSpring(40, 100, 300, SPRING).at(0.016);
+    expect(seeded.value.get()).toBe(expected.position);
+    expect(seeded.value.getVelocity()).toBe(expected.velocity);
+
+    const jumped = setup();
+    jumped.value.jump(40);
+    void jumped.value.set(100, SPRING);
+    jumped.fake.flush(0);
+    jumped.fake.flush(16);
+    expect(jumped.value.get()).not.toBe(expected.position);
+  });
+
+  test("an animation in flight is cancelled: its promise resolves false and no more frames run", async () => {
+    const { fake, value } = setup();
+    const settled = value.set(100, SPRING);
+    fake.flush(0);
+    fake.flush(16);
+    seedSpringValue(value, 12, -50);
+    expect(await settled).toBe(false);
+    expect(value.animating).toBe(false);
+    expect(fake.pending).toBe(0);
+    expect(value.get()).toBe(12);
+    expect(value.getVelocity()).toBe(-50);
+  });
+
+  test("velocity defaults to zero and a non-finite position or velocity throws RangeError", () => {
+    const { value } = setup();
+    seedSpringValue(value, 5, 70);
+    seedSpringValue(value, 6);
+    expect(value.getVelocity()).toBe(0);
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => seedSpringValue(value, bad, 1)).toThrow(RangeError);
+      expect(() => seedSpringValue(value, 1, bad)).toThrow(RangeError);
+    }
+    expect(value.get()).toBe(6);
+  });
+
+  test("a value that was not created by createSpringValue is rejected", () => {
+    const foreign = { get: () => 0 } as unknown as ReturnType<typeof createSpringValue>;
+    expect(() => seedSpringValue(foreign, 1, 1)).toThrow(TypeError);
   });
 });

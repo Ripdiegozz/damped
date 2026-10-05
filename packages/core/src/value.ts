@@ -34,6 +34,20 @@ function assertFinite(name: string, value: number): void {
   if (!Number.isFinite(value)) throw new RangeError(`${name} must be a finite number, received ${value}`);
 }
 
+const seeders = new WeakMap<SpringValue, (position: number, velocity: number) => void>();
+
+/**
+ * Internal (not exported from the package index): replaces the state of a value with a position and velocity without
+ * animating. Any animation in flight is cancelled (its promise resolves false); listeners are notified. Unlike
+ * jump() the velocity is kept, so the next set() inherits it. This is how a driver that moved the value elsewhere
+ * (the compositor) hands the exact state back.
+ */
+export function seedSpringValue(value: SpringValue, position: number, velocity = 0): void {
+  const seed = seeders.get(value);
+  if (seed === undefined) throw new TypeError("seedSpringValue needs a value created by createSpringValue");
+  seed(position, velocity);
+}
+
 export function createSpringValue(initial: number, options: SpringValueOptions = {}): SpringValue {
   assertFinite("initial value", initial);
   const scheduler = options.scheduler ?? frame;
@@ -134,7 +148,7 @@ export function createSpringValue(initial: number, options: SpringValueOptions =
     return promise;
   };
 
-  return {
+  const value: SpringValue = {
     get: () => position,
     getVelocity: () => velocity,
     get animating() {
@@ -176,4 +190,13 @@ export function createSpringValue(initial: number, options: SpringValueOptions =
       };
     },
   };
+  seeders.set(value, (nextPosition, nextVelocity) => {
+    assertFinite("position", nextPosition);
+    assertFinite("velocity", nextVelocity);
+    cancel();
+    position = nextPosition;
+    velocity = nextVelocity;
+    notify();
+  });
+  return value;
 }

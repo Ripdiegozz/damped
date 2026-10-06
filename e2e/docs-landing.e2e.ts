@@ -13,7 +13,7 @@ const centreX = async (element: Locator): Promise<number> => {
 test("the landing page loads with no console errors or warnings and no failed request", async ({ page }) => {
   const problems = watchProblems(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Springs that keep their momentum");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Physics-based spring animations");
   // The package rows and the hero action links.
   await expect(page.locator(".package-row")).toHaveCount(3);
   await expect(page.getByRole("link", { name: "Get started" })).toHaveAttribute("href", "/getting-started/");
@@ -21,6 +21,26 @@ test("the landing page loads with no console errors or warnings and no failed re
   await expect(hero(page).getByRole("link", { name: /GitHub/ })).toHaveAttribute("href", "https://github.com/Ripdiegozz/damped");
   await demo(page, "spring-instrument");
   await page.waitForLoadState("networkidle");
+  expect(problems).toEqual([]);
+});
+
+test("the hero names the library and plays once on load, without being touched", async ({ page }) => {
+  const problems = watchProblems(page);
+  await page.goto("/");
+  await expect(hero(page).getByRole("heading", { level: 1 })).toHaveText("Physics-based spring animations");
+  await expect(hero(page).locator(".landing-hero__tagline")).toContainText("animation library");
+  const root = await demo(page, "spring-instrument");
+  // No click, no key: the load animation swings out, across, and home again, then settles where it started.
+  await expect(root).toHaveAttribute("data-state", "animating", { timeout: 5000 });
+  await expect(root).toHaveAttribute("data-state", "settled", { timeout: 10_000 });
+  expect(await runsOf(root)).toBeGreaterThanOrEqual(3);
+  await expect(root.getByRole("slider")).toHaveAttribute("aria-valuenow", "50");
+  await expect
+    .poll(async () => Math.abs((await centreX(root.locator(".instrument__mass-dot"))) - (await centreX(root.locator(".instrument__rest")))), { timeout: 5000 })
+    .toBeLessThan(1);
+  // At rest the strip drains away, while the phase portrait keeps the curve the dance drew.
+  await expect.poll(() => root.locator(".instrument__trail-path").getAttribute("d"), { timeout: 5000 }).toBe("");
+  await expect(root.locator(".instrument__phase-path")).toHaveAttribute("d", /^M.* L/);
   expect(problems).toEqual([]);
 });
 
@@ -48,6 +68,8 @@ test("pressing the track mid-flight retargets the mass, which comes to rest on t
 test("dragging the mass and letting go springs it back to its rest point, drawing the phase portrait on the way", async ({ page }) => {
   await page.goto("/");
   const root = await demo(page, "spring-instrument");
+  // The load animation owns the mass until it settles back at 50; the drag starts from there.
+  await expect(root).toHaveAttribute("data-state", "settled", { timeout: 10_000 });
   const mass = root.locator(".instrument__mass-dot");
   const rest = await centreX(root.locator(".instrument__rest"));
   const from = (await mass.boundingBox())!;

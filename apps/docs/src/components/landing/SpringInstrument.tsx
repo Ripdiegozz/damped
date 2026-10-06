@@ -1,4 +1,4 @@
-import { springParams } from "@damped/core";
+import { createSpring, springParams } from "@damped/core";
 import { useSpringValue } from "@damped/react";
 import { useEffect, useId, useRef, type KeyboardEvent, type PointerEvent } from "react";
 import { useDemoState, useMotionPreference } from "../demos/motion";
@@ -22,6 +22,12 @@ const ZETA = formatDamping(dampingRatio(PARAMS));
 
 const START = 50;
 const KEY_STEP = 10;
+// The load animation: after a short beat the mass swings out, across, and home again, each leg retargeted
+// mid-flight, so the page moves without being touched and the first thing a visitor sees is interruptions keeping
+// their momentum. Every leg uses the same spring as every touch of the track, and the dance ends where it started.
+const INTRO_DELAY_MS = 450;
+const INTRO_WAYPOINTS = [82, 18, START];
+const INTRO_LEG_FRACTION = 0.6;
 const TRAIL = { windowMs: 1600, gapMs: 120, height: 100 } as const;
 const PHASE = { size: 100, extent: 105 } as const;
 const PHASE_POINTS = 900;
@@ -33,13 +39,14 @@ const LABELS = new Set([0, 10, 20]);
 const clamp = (value: number): number => Math.min(100, Math.max(0, value));
 
 /**
- * The landing hero: a mass on a hairline track, driven by the same `useSpringValue` the docs describe. Drag the mass
- * and let go and it springs home with the velocity of your hand; press the track while it moves and the rest point
- * moves with it, velocity kept. A strip under the track records recent positions, and the phase portrait beside it
- * draws position against velocity as the mass settles: the spiral that ends on the rest dot.
+ * The landing hero: a live damped spring, driven by the same `useSpringValue` the docs describe. It plays once on
+ * load, swinging out, across, and home again without being touched; drag the mass and let go and it springs home with the
+ * velocity of your hand; press the track while it moves and the rest point moves with it, velocity kept. A strip
+ * under the track records recent positions, and the phase portrait beside it draws position against velocity as the
+ * mass settles: the spiral that ends on the rest dot.
  *
- * Every per-frame number goes to the DOM through refs, so React renders once. Reduced motion: the mass jumps to each
- * rest point, and "Play anyway" brings the spring back.
+ * Every per-frame number goes to the DOM through refs, so React renders once. Reduced motion: no load animation, the
+ * mass jumps to each rest point, and "Play anyway" brings the spring back.
  */
 export function SpringInstrument() {
   const root = useRef<HTMLDivElement>(null);
@@ -69,6 +76,8 @@ export function SpringInstrument() {
   const grab = useRef(0);
   const dragSpeed = useRef(0);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const introTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const trailClearTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const labelId = useId();
   const hintId = useId();
   const fadeId = useId();
@@ -120,6 +129,7 @@ export function SpringInstrument() {
       observer.disconnect();
       unsubscribe();
       clearTimeout(idleTimer.current);
+      clearTimeout(trailClearTimer.current);
     };
     // `paint` and `place` only read refs, and `value` is stable for the life of the component.
   }, [value]);
@@ -135,10 +145,17 @@ export function SpringInstrument() {
     track.current?.setAttribute("aria-valuetext", `Rest point at ${Math.round(percent)} percent of the track`);
   };
 
+  /** Any press, drag or key owns the mass from then on, so a pending load animation must not steal it back. */
+  const cancelIntro = (): void => {
+    for (const timer of introTimers.current) clearTimeout(timer);
+    introTimers.current = [];
+  };
+
   /** Sends the mass to `next`, keeping whatever velocity it has, or `velocity` when it is given (a release). */
   const retarget = (next: number, velocity?: number): void => {
     if (velocity === undefined && next === target.current && !value.animating && value.get() === next) return;
     aim(next);
+    clearTimeout(trailClearTimer.current);
     if (motion.still) {
       value.jump(next);
       clearPhase();
@@ -151,9 +168,30 @@ export function SpringInstrument() {
     const run = value.set(next, SPRING);
     if (velocity !== undefined && velocity !== 0) value.rebase(value.get(), velocity);
     void tracker.track(run).then((completed) => {
-      if (completed) announce(`Settled at ${Math.round(target.current)} percent of the track.`);
+      if (!completed) return;
+      announce(`Settled at ${Math.round(target.current)} percent of the track.`);
+      // At rest no frames run, so nothing would age the strip out: let it drain for its full window, then let go.
+      trailClearTimer.current = setTimeout(() => trailPath.current?.setAttribute("d", ""), TRAIL.windowMs);
     });
   };
+
+  useEffect(() => {
+    // The load animation plays once: out, across, and home, each leg retargeted mid-flight. Skipped when the
+    // visitor asks for reduced motion; the preference is read straight from the media query so the first paint
+    // already knows.
+    if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let at = INTRO_DELAY_MS;
+    let from = START;
+    for (const point of INTRO_WAYPOINTS) {
+      const legMs = createSpring(from, point, 0, SPRING).settleTime() * 1000;
+      const fireAt = at;
+      introTimers.current.push(setTimeout(() => retarget(point), fireAt));
+      at += legMs * INTRO_LEG_FRACTION;
+      from = point;
+    }
+    return () => cancelIntro();
+    // `retarget` and `cancelIntro` only read refs, and `value` is stable for the life of the component.
+  }, [value]);
 
   const pointerPercent = (event: PointerEvent<HTMLDivElement>): number => {
     const box = rail.current?.getBoundingClientRect();
@@ -175,6 +213,8 @@ export function SpringInstrument() {
   };
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
+    cancelIntro();
+    clearTimeout(trailClearTimer.current);
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
@@ -226,6 +266,7 @@ export function SpringInstrument() {
     const next = keys[event.key];
     if (next === undefined) return;
     event.preventDefault();
+    cancelIntro();
     retarget(clamp(next));
   };
 
@@ -233,7 +274,7 @@ export function SpringInstrument() {
     <div ref={root} className="not-content instrument" data-demo="spring-instrument" data-state="idle" data-runs="0" role="group" aria-labelledby={labelId}>
       <div className="instrument__bar">
         <p id={labelId} className="instrument__label">
-          Spring instrument
+          Live spring · running on damped
         </p>
         <p className="instrument__spec" aria-hidden="true">
           bounce {SPRING.bounce} · duration {SPRING.duration} s
@@ -313,7 +354,8 @@ export function SpringInstrument() {
           </div>
         </dl>
         <p id={hintId} className="instrument__hint">
-          Drag the mass and let go, or press the track while it moves. Arrow keys, Home and End also move the rest point.
+          It plays on load: the mass swings out, across, and home again, retargeted mid-flight every time. Drag the mass and let
+          go, or press the track while it moves. Arrow keys, Home and End also move the rest point.
         </p>
       </div>
 

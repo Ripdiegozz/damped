@@ -5,7 +5,7 @@
   </picture>
 </h1>
 
-Spring animations for the web and for React Native that keep their velocity when they are interrupted.
+Physics-based spring animations for the web, React and React Native that keep their velocity when they are interrupted.
 
 [![Northbook, the damped playground: counting numbers, a card that becomes a dialog and reverses mid-flight, a toast, and rows that reorder](assets/northbook.gif)](https://damped.dagadev.net)
 

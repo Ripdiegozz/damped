@@ -1,6 +1,6 @@
 # @damped/core
 
-Spring animations for the DOM that keep their velocity when they are interrupted.
+Physics-based spring animations for the DOM that keep their velocity when they are interrupted.
 
 ```sh
 bun add @damped/core   # npm install / pnpm add work the same way

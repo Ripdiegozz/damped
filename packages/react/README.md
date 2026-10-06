@@ -1,6 +1,6 @@
 # @damped/react
 
-React hooks and a component for [`@damped/core`](../core) springs. Animated values reach the DOM through refs, never through React state, so nothing re-renders per animation frame.
+React hooks and a component for the physics-based springs in [`@damped/core`](../core). Animated values reach the DOM through refs, never through React state, so nothing re-renders per animation frame.
 
 ```sh
 bun add @damped/react @damped/core react react-dom   # npm install / pnpm add work the same way

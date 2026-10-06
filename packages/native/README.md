@@ -1,6 +1,6 @@
 # @damped/native
 
-Spring animations for [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/) that keep their velocity when they are interrupted.
+Physics-based spring animations for [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/) that keep their velocity when they are interrupted.
 
 ```sh
 npx expo install react-native-reanimated   # the peer dependency

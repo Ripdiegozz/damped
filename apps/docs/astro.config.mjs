@@ -16,7 +16,7 @@ export default defineConfig({
     react(),
     starlight({
       title: "damped",
-      description: "Interruptible, physically based spring animations for the web, React and React Native.",
+      description: "damped is a physics-based spring animation library for the web, React and React Native.",
       logo: {
         // The lockup (mark and wordmark) is the whole header title. Two files because an <img> cannot follow the theme.
         dark: "./src/assets/lockup-dark.svg",

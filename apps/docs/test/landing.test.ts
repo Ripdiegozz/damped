@@ -179,7 +179,7 @@ describe.skipIf(mode !== "run")("landing page build output", () => {
   test("the title is one plain text node", () => {
     const heading = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1] ?? "";
     expect(heading).not.toMatch(/</);
-    expect(heading).toContain("Springs that keep their momentum");
+    expect(heading).toContain("Physics-based spring animations");
   });
 
   test("lists the three packages as rows", () => {
